@@ -50,6 +50,18 @@ class SquatAnalyzer {
     /// Текущее состояние пользователя.
     private var currentState: State = .unknown
 
+    /// Время последнего вывода углов в лог (для троттлинга).
+    private var lastAngleLogTime: TimeInterval = 0
+    private let angleLogInterval: TimeInterval = 0.25 // Интервал вывода лога (в секундах)
+
+    // --- Свойства для сглаживания углов ---
+    /// Размер окна для скользящего среднего.
+    private let smoothingWindowSize = 3
+    /// История последних углов колена для сглаживания.
+    private var kneeAngleHistory: [Float] = []
+    /// История последних углов бедра для сглаживания.
+    private var hipAngleHistory: [Float] = []
+
     // MARK: - Constants (для индексов точек)
     private enum Landmark { // Используем вложенный enum для ясности
         static let leftShoulder = 11
@@ -68,9 +80,13 @@ class SquatAnalyzer {
     // Пороговые значения углов (в градусах) - НУЖНО БУДЕТ ПОДБИРАТЬ ЭКСПЕРИМЕНТАЛЬНО!
     private enum Thresholds {
         static let kneeUp: Float = 160.0
-        static let kneeDown: Float = 95.0
+        static let kneeDown: Float = 125.0 // Порог для перехода UP -> DOWN
+        static let kneeUpTransition: Float = 140.0 // Порог для перехода DOWN -> UP
         static let hipUp: Float = 165.0
-        static let hipDown: Float = 95.0
+        static let hipDown: Float = 125.0 // Порог для перехода UP -> DOWN
+        static let hipUpTransition: Float = 145.0 // Порог для перехода DOWN -> UP
+        // Порог видимости точки (0.0 - 1.0)
+        static let visibility: Float = 0.5
     }
 
     // MARK: - Initialization
@@ -114,43 +130,71 @@ class SquatAnalyzer {
         // Если, например, колено не видно (visibility < порога), расчет угла будет неверным.
 
         // --- 2. Рассчитываем углы --- 
-        // Рассчитаем углы для левой и правой стороны тела
+        // Рассчитаем углы, только если все точки видны
         let leftKneeAngle = angle(
             firstPoint: leftHip,
-            midPoint: leftKnee, // Угол в колене
+            midPoint: leftKnee,
             lastPoint: leftAnkle
         )
         
         let rightKneeAngle = angle(
             firstPoint: rightHip,
-            midPoint: rightKnee, // Угол в колене
+            midPoint: rightKnee,
             lastPoint: rightAnkle
         )
         
         let leftHipAngle = angle(
             firstPoint: leftShoulder,
-            midPoint: leftHip,    // Угол в бедре (относительно плеча)
+            midPoint: leftHip,
             lastPoint: leftKnee
         )
         
         let rightHipAngle = angle(
             firstPoint: rightShoulder,
-            midPoint: rightHip,    // Угол в бедре (относительно плеча)
+            midPoint: rightHip,
             lastPoint: rightKnee
         )
         
-        // Можно использовать средние углы или минимальный/максимальный для робастности
-        let averageKneeAngle = (leftKneeAngle + rightKneeAngle) / 2.0
-        let averageHipAngle = (leftHipAngle + rightHipAngle) / 2.0
+        // Собираем валидные углы
+        var validKneeAngles: [Float] = []
+        if let angle = leftKneeAngle { validKneeAngles.append(angle) }
+        if let angle = rightKneeAngle { validKneeAngles.append(angle) }
+        
+        var validHipAngles: [Float] = []
+        if let angle = leftHipAngle { validHipAngles.append(angle) }
+        if let angle = rightHipAngle { validHipAngles.append(angle) }
 
-        // Выводим углы для отладки
-        // print(String(format: "Angles - Knee: %.1f, Hip: %.1f", averageKneeAngle, averageHipAngle))
+        // Если нет валидных углов для коленей или бедер, пропускаем анализ этого кадра
+        guard !validKneeAngles.isEmpty, !validHipAngles.isEmpty else {
+            // print("SquatAnalyzer: Skipping frame due to invisible key landmarks.")
+            // Возможно, стоит установить состояние .unknown или оставить как есть?
+            // updateState(newState: .unknown)
+            return
+        }
 
-        // --- 3. Определяем потенциальное новое состояние --- 
+        // Используем средние из ВАЛИДНЫХ углов
+        let averageKneeAngle = validKneeAngles.reduce(0, +) / Float(validKneeAngles.count)
+        let averageHipAngle = validHipAngles.reduce(0, +) / Float(validHipAngles.count)
+
+        // --- Сглаживание углов ---
+        addAngleToHistory(&kneeAngleHistory, angle: averageKneeAngle)
+        addAngleToHistory(&hipAngleHistory, angle: averageHipAngle)
+
+        let smoothedKneeAngle = calculateSmoothedAngle(from: kneeAngleHistory)
+        let smoothedHipAngle = calculateSmoothedAngle(from: hipAngleHistory)
+
+        // Вывод углов для отладки (с троттлингом) - теперь выводим сглаженные!
+        let currentTime = Date().timeIntervalSince1970
+        if currentTime - lastAngleLogTime >= angleLogInterval {
+            print(String(format: "Smoothed Angles - Knee: %.1f, Hip: %.1f", smoothedKneeAngle, smoothedHipAngle))
+            lastAngleLogTime = currentTime // Обновляем время последнего лога
+        }
+
+        // --- 3. Определяем потенциальное новое состояние (используем сглаженные углы) --- 
         let potentialState: State
-        if averageKneeAngle >= Thresholds.kneeUp && averageHipAngle >= Thresholds.hipUp {
+        if smoothedKneeAngle >= Thresholds.kneeUp && smoothedHipAngle >= Thresholds.hipUp {
             potentialState = .up
-        } else if averageKneeAngle <= Thresholds.kneeDown && averageHipAngle <= Thresholds.hipDown {
+        } else if smoothedKneeAngle <= Thresholds.kneeDown && smoothedHipAngle <= Thresholds.hipDown {
             potentialState = .down
         } else {
             // Находимся в промежуточном состоянии, сохраняем предыдущее известное
@@ -159,15 +203,33 @@ class SquatAnalyzer {
             // potentialState = .transitioning 
         }
 
-        // --- 4. Обнаружение перехода и подсчет --- 
-        // Проверяем переход из состояния "down" в "up" для подсчета
-        if currentState == .down && potentialState == .up {
-            countSquat() // Засчитываем приседание при подъеме
+        // --- 4. Обновляем состояние и счетчик --- 
+        switch currentState {
+        case .unknown:
+            // Начальное состояние, пытаемся определить как UP
+            if potentialState == .up { // Начинаем всегда с UP
+                currentState = .up
+                print("--- Состояние приседания: UP ---")
+            }
+            
+        case .up:
+            // Если были вверху, проверяем, не опустились ли достаточно низко
+            if potentialState == .down {
+                currentState = .down
+                print("--- Состояние приседания: DOWN ---")
+            }
+            
+        case .down:
+            // Если были внизу, проверяем, не поднялись ли достаточно высоко
+            if smoothedKneeAngle >= Thresholds.kneeUpTransition && smoothedHipAngle >= Thresholds.hipUpTransition {
+                currentState = .up
+                // --- СЧИТАЕМ ПРИСЕДАНИЕ! --- 
+                squatCount += 1
+                delegate?.squatAnalyzer(self, didCountSquat: squatCount)
+                print("--- Состояние приседания: UP ---")
+                print(" >>>>> ПРИСЕДАНИЕ #\(squatCount) ЗАСЧИТАНО! <<<<< ")
+            }
         }
-
-        // --- 5. Обновляем текущее состояние --- 
-        // Вызываем метод обновления, который также уведомит делегата при изменении
-        updateState(newState: potentialState)
     }
 
     // MARK: - Reset Method
@@ -195,13 +257,28 @@ class SquatAnalyzer {
        - firstPoint: Первая точка.
        - midPoint: Центральная точка (вершина угла).
        - lastPoint: Конечная точка.
-     - Returns: Угол в градусах (0-180) или 0, если точки совпадают или лежат на одной линии некорректно.
+     - Returns: Угол в градусах (0-180) или `nil`, если одна из точек не видна.
      */
-    private func angle(firstPoint: NormalizedLandmark, midPoint: NormalizedLandmark, lastPoint: NormalizedLandmark) -> Float {
-        // Используем координаты x и y (z можно добавить для 3D анализа, если нужно)
-        // Расчет угла через atan2 для большей стабильности, чем acos
+    private func angle(firstPoint: NormalizedLandmark, midPoint: NormalizedLandmark, lastPoint: NormalizedLandmark) -> Float? {
+        // Проверяем видимость всех трех точек
+        // ОСТАВЛЯЕМ ЭТО ПОКА
+        guard firstPoint.visibility as! Float > Thresholds.visibility,
+              midPoint.visibility as! Float > Thresholds.visibility,
+              lastPoint.visibility as! Float > Thresholds.visibility else {
+            return nil // Возвращаем nil, если хотя бы одна точка не видна
+        }
         
-        let radians = atan2(lastPoint.y - midPoint.y, lastPoint.x - midPoint.x) - atan2(firstPoint.y - midPoint.y, firstPoint.x - midPoint.x)
+        // Напрямую используем координаты, так как они должны быть Float
+        let fx = firstPoint.x
+        let fy = firstPoint.y
+        let mx = midPoint.x
+        let my = midPoint.y
+        let lx = lastPoint.x
+        let ly = lastPoint.y
+        
+        // Явно преобразуем к Float прямо перед использованием в atan2,
+        // чтобы обойти ошибку компилятора
+        let radians = atan2(Float(ly - my), Float(lx - mx)) - atan2(Float(fy - my), Float(fx - mx))
         var degrees = abs(radians * 180.0 / .pi)
         
         // Угол должен быть <= 180
@@ -236,6 +313,22 @@ class SquatAnalyzer {
         squatCount += 1
         delegate?.squatAnalyzer(self, didCountSquat: squatCount)
          print("SquatAnalyzer: Squat counted! Total: \(squatCount)")
+    }
+
+    // MARK: - Smoothing Helper Methods
+
+    /// Добавляет угол в историю и удаляет старые значения, если история превышает размер окна.
+    private func addAngleToHistory(_ history: inout [Float], angle: Float) {
+        history.append(angle)
+        if history.count > smoothingWindowSize {
+            history.removeFirst()
+        }
+    }
+
+    /// Рассчитывает сглаженный угол (среднее арифметическое) из истории.
+    private func calculateSmoothedAngle(from history: [Float]) -> Float {
+        guard !history.isEmpty else { return 0 } // Или другое значение по умолчанию?
+        return history.reduce(0, +) / Float(history.count)
     }
 
 } 
