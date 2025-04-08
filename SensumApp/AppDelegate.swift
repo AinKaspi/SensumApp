@@ -14,6 +14,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+        print("--- AppDelegate: didFinishLaunchingWithOptions CALLED ---")
         return true
     }
 
@@ -22,7 +23,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
         // Called when a new scene session is being created.
         // Use this method to select a configuration to create the new scene with.
-        return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+        print("--- AppDelegate: configurationForConnecting CALLED for session \(connectingSceneSession) ---")
+        // --- ВОТ КЛЮЧЕВОЙ МОМЕНТ ---
+        // Убедись, что имя "Default Configuration" совпадает с тем, что в Info
+        let config = UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+        print("--- AppDelegate: Returning UISceneConfiguration: \(config.name) ---")
+        return config
     }
 
     func application(_ application: UIApplication, didDiscardSceneSessions sceneSessions: Set<UISceneSession>) {
