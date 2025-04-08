@@ -10,7 +10,7 @@ import UIKit
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
-
+    var appCoordinator: AppCoordinator? // Добавляем свойство для главного координатора
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         
@@ -20,33 +20,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // Создаем самое ГЛАВНОЕ ОКНО для нашего приложения.
         let window = UIWindow(windowScene: windowScene)
         
-        // 1. Создаем TabBarController - это контейнер для наших вкладок
-        let tabBarController = UITabBarController()
-        
-        // 2. Создаем экземпляры ViewController'ов для КАЖДОЙ вкладки
-        let personVC = PersonViewController()
-        let eventsVC = EventsViewController() // Убедись, что имя класса совпадает с созданным файлом
-        let levelingVC = LevelingViewController() // Убедись, что имя класса совпадает
-        let rankVC = RankViewController()       // Убедись, что имя класса совпадает
-        let storeVC = StoreViewController()  // Убедись, что имя класса совпадает
-        
-        // 3. Настраиваем ИКОНКИ и ЗАГОЛОВКИ для каждой вкладки (пока используем системные иконки)
-        personVC.tabBarItem = UITabBarItem(title: "Person", image: UIImage(systemName: "person.fill"), tag: 0)
-        eventsVC.tabBarItem = UITabBarItem(title: "Events", image: UIImage(systemName: "calendar"), tag: 1)
-        levelingVC.tabBarItem = UITabBarItem(title: "Leveling", image: UIImage(systemName: "figure.walk"), tag: 2)
-        rankVC.tabBarItem = UITabBarItem(title: "Rank", image: UIImage(systemName: "list.star"), tag: 3)
-        storeVC.tabBarItem = UITabBarItem(title: "Store", image: UIImage(systemName: "cart.fill"), tag: 4)
-        
-        // 4. Добавляем ViewController'ы в TabBarController
-        tabBarController.viewControllers = [personVC, eventsVC, levelingVC, rankVC, storeVC]
-        
-        // 5. Опционально: Настраиваем внешний вид TabBar (например, цвет фона и выбранного элемента)
-        tabBarController.tabBar.backgroundColor = .darkGray // Пример цвета фона
-        tabBarController.tabBar.tintColor = .white          // Цвет выбранной иконки/текста
-        tabBarController.tabBar.unselectedItemTintColor = .lightGray // Цвет невыбранных
-        
-        // Говорим нашему главному окну: "Вот этот TabBarController будет твоим содержимым по умолчанию".
-        window.rootViewController = tabBarController
+        // Создаем главный координатор и запускаем его
+        appCoordinator = AppCoordinator(window: window)
+        appCoordinator?.start()
+
+        // Устанавливаем фон окна в черный
+        window.backgroundColor = .black
 
         // Сохраняем ссылку на это окно, чтобы оно не пропало.
         self.window = window
@@ -83,6 +62,155 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // to restore the scene back to its current state.
     }
 
-
 }
+
+// ----- Главный Координатор Приложения -----
+class AppCoordinator: Coordinator { // Делаем AppCoordinator соответствующим нашему протоколу
+    
+    // AppCoordinator владеет главным окном, а не UINavigationController напрямую
+    var window: UIWindow
+    
+    // Реализация требований протокола Coordinator
+    var navigationController: UINavigationController // Этот navController будет общим или не использоваться напрямую AppCoordinator'ом
+    var childCoordinators: [Coordinator] = []
+
+    init(window: UIWindow) {
+        self.window = window
+        self.navigationController = UINavigationController() // Создаем "пустой" navController для соответствия протоколу, но можем не использовать его
+    }
+
+    func start() {
+        // 1. Создаем TabBarController
+        let tabBarController = UITabBarController()
+        
+        // 2. Создаем КООРДИНАТОРЫ для каждой вкладки
+        // Важно: Убедись, что пути импорта для PersonCoordinator и других будут правильными,
+        // когда ты разнесешь координаторы по папкам. Возможно, понадобится @testable import SensumApp
+        let personCoordinator = PersonCoordinator(navigationController: UINavigationController()) // Даем каждому координатору СВОЙ UINavigationController
+        let eventsCoordinator = EventsCoordinator(navigationController: UINavigationController())
+        let levelingCoordinator = LevelingCoordinator(navigationController: UINavigationController())
+        let rankCoordinator = RankCoordinator(navigationController: UINavigationController())
+        let storeCoordinator = StoreCoordinator(navigationController: UINavigationController())
+        
+        // Сохраняем дочерние координаторы
+        addChild(personCoordinator)
+        addChild(eventsCoordinator)
+        addChild(levelingCoordinator)
+        addChild(rankCoordinator)
+        addChild(storeCoordinator)
+        
+        // 3. ЗАПУСКАЕМ каждый дочерний координатор
+        personCoordinator.start()
+        eventsCoordinator.start()
+        levelingCoordinator.start()
+        rankCoordinator.start()
+        storeCoordinator.start()
+
+        // 4. Настраиваем вкладки TabBarController, используя navigationController'ы координаторов
+        personCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Person", image: UIImage(systemName: "person.fill"), tag: 0)
+        eventsCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Events", image: UIImage(systemName: "calendar"), tag: 1)
+        levelingCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Leveling", image: UIImage(systemName: "figure.walk"), tag: 2)
+        rankCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Rank", image: UIImage(systemName: "list.star"), tag: 3)
+        storeCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Store", image: UIImage(systemName: "cart.fill"), tag: 4)
+
+        // 5. Добавляем НАВИГАЦИОННЫЕ КОНТРОЛЛЕРЫ координаторов в TabBarController
+        tabBarController.viewControllers = [
+            personCoordinator.navigationController,
+            eventsCoordinator.navigationController,
+            levelingCoordinator.navigationController,
+            rankCoordinator.navigationController,
+            storeCoordinator.navigationController
+        ]
+        
+        // 6. Настраиваем внешний вид TabBar с помощью Appearance API
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground() // Делаем фон непрозрачным
+        appearance.backgroundColor = UIColor(white: 0.1, alpha: 1.0) // Цвет фона (темно-серый, как у карточек)
+
+        // Настройка цвета иконок и текста
+        let itemAppearance = UITabBarItemAppearance()
+        itemAppearance.normal.iconColor = .lightGray
+        itemAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.lightGray]
+        itemAppearance.selected.iconColor = .white
+        itemAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor.white]
+
+        appearance.stackedLayoutAppearance = itemAppearance
+        appearance.inlineLayoutAppearance = itemAppearance
+        appearance.compactInlineLayoutAppearance = itemAppearance
+
+        tabBarController.tabBar.standardAppearance = appearance
+        // Добавляем 적용 для iOS 15+ скролл-эдж
+        if #available(iOS 15.0, *) {
+            tabBarController.tabBar.scrollEdgeAppearance = appearance
+        }
+
+        // Старые свойства можно закомментировать или удалить
+        // tabBarController.tabBar.backgroundColor = .darkGray
+        // tabBarController.tabBar.tintColor = .white
+        // tabBarController.tabBar.unselectedItemTintColor = .lightGray
+        
+        // 7. Устанавливаем TabBarController как корневой для окна
+        window.rootViewController = tabBarController
+    }
+}
+
+// ----- Координаторы-заглушки для других вкладок -----
+// TODO: Перенести эти классы в соответствующие папки Features/.../Coordinators/
+
+class EventsCoordinator: Coordinator {
+    var navigationController: UINavigationController
+    var childCoordinators: [Coordinator] = []
+    init(navigationController: UINavigationController) { self.navigationController = navigationController }
+    func start() {
+        let vc = EventsViewController() // Используем твой ViewController или заглушку
+        vc.view.backgroundColor = .darkGray // Пример фона
+        vc.title = "Events (stub)" // Пример заголовка
+        navigationController.setViewControllers([vc], animated: false)
+    }
+}
+
+class LevelingCoordinator: Coordinator {
+    var navigationController: UINavigationController
+    var childCoordinators: [Coordinator] = []
+    init(navigationController: UINavigationController) { self.navigationController = navigationController }
+    func start() {
+        let vc = LevelingViewController() // Используем твой ViewController или заглушку
+        vc.view.backgroundColor = .darkGray
+        vc.title = "Leveling (stub)"
+        navigationController.setViewControllers([vc], animated: false)
+    }
+}
+
+class RankCoordinator: Coordinator {
+    var navigationController: UINavigationController
+    var childCoordinators: [Coordinator] = []
+    init(navigationController: UINavigationController) { self.navigationController = navigationController }
+    func start() {
+        let vc = RankViewController() // Используем твой ViewController или заглушку
+        vc.view.backgroundColor = .darkGray
+        vc.title = "Rank (stub)"
+        navigationController.setViewControllers([vc], animated: false)
+    }
+}
+
+class StoreCoordinator: Coordinator {
+    var navigationController: UINavigationController
+    var childCoordinators: [Coordinator] = []
+    init(navigationController: UINavigationController) { self.navigationController = navigationController }
+    func start() {
+        let vc = StoreViewController() // Используем твой ViewController или заглушку
+        vc.view.backgroundColor = .darkGray
+        vc.title = "Store (stub)"
+        navigationController.setViewControllers([vc], animated: false)
+    }
+}
+
+// ----- ViewController'ы-заглушки для других вкладок -----
+// TODO: Перенести эти классы в соответствующие папки Features/.../Scenes/
+
+// Удаляем эти заглушки, так как реальные классы существуют или будут созданы
+// class EventsViewController: UIViewController {}
+// class LevelingViewController: UIViewController {}
+// class RankViewController: UIViewController {}
+// class StoreViewController: UIViewController {}
 

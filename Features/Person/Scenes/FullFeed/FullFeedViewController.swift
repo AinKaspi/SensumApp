@@ -3,7 +3,7 @@ import UIKit
 class FullFeedViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemTeal // Цвет для теста
-        title = "Вся лента" // Заголовок для UINavigationBar
+        view.backgroundColor = .systemGreen // Зеленый фон для заглушки
+        title = "Вся Лента" // Устанавливаем заголовок
     }
 }

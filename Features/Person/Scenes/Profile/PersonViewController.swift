@@ -66,7 +66,7 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
 
     // --- UI Элементы (Lazy Vars) ---
 
-    // ScrollView и StackView (НОВЫЕ)
+    // ScrollView и StackView
     private lazy var scrollView: UIScrollView = {
         let scrollView = UIScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -81,19 +81,25 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
         return stackView
     }()
 
-    // Контейнеры
-    private lazy var profileInfoContainerView: UIView = createContainerView()
+    // Контейнеры (График и Статы в отдельных контейнерах в один ряд)
+    private lazy var profileHeaderContainerView: UIView = createContainerView() 
+    private lazy var profileXPContainerView: UIView = createContainerView()     
+    private lazy var profileChartContainerView: UIView = createContainerView() // Контейнер ТОЛЬКО для графика
+    private lazy var profileStatsListContainerView: UIView = createContainerView() // Контейнер ТОЛЬКО для статов
+    // Удаляем общий контейнер
+    // private lazy var profileChartStatsContainerView: UIView = createContainerView()
     private lazy var achievementsContainerView: UIView = createContainerView()
     private lazy var feedContainerView: UIView = createContainerView()
 
-    // Элементы профиля (ПОЛНЫЙ КОД)
+    // --- Элементы Профиля --- 
+    // Блок 1: Header
     private lazy var avatarImageView: UIImageView = {
         let imageView = UIImageView()
         imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.backgroundColor = .lightGray // Временно серый фон
+        imageView.backgroundColor = .lightGray
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = 50 // Делаем круглым
+        imageView.layer.cornerRadius = 12 // Скругление для 100x100
         return imageView
     }()
     private lazy var nameLabel: UILabel = {
@@ -101,17 +107,7 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
         label.translatesAutoresizingMaskIntoConstraints = false
         label.text = "Имя Игрока"
         label.textColor = .white
-        label.font = UIFont.systemFont(ofSize: 22, weight: .semibold)
-        label.textAlignment = .center
-        return label
-    }()
-    private lazy var levelLabel: UILabel = {
-        let label = UILabel()
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.text = "Уровень: 1"
-        label.textColor = .gray
-        label.font = UIFont.systemFont(ofSize: 17, weight: .regular)
-        label.textAlignment = .center
+        label.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
         return label
     }()
     private lazy var rankLabel: UILabel = {
@@ -119,9 +115,110 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
         label.translatesAutoresizingMaskIntoConstraints = false
         label.text = "Ранг: E / Новобранец"
         label.textColor = .systemOrange
-        label.font = UIFont.systemFont(ofSize: 16, weight: .medium)
-        label.textAlignment = .center
+        label.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         return label
+    }()
+
+    // Блок 2: Chart & Stats (Снова вместе)
+    private lazy var radarChartView: RadarChartView = {
+        let chartView = RadarChartView()
+        chartView.translatesAutoresizingMaskIntoConstraints = false
+        return chartView
+    }()
+    private lazy var statsDescriptionLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = UIFont.systemFont(ofSize: 14)
+        label.numberOfLines = 0
+        label.attributedText = createStatsAttributedString()
+        return label
+    }()
+    // Удаляем разделитель
+    // private lazy var statsDividerView: UIView = { ... }()
+    
+    // Блок 3: XP 
+    private lazy var levelLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.text = "Уровень: 1"
+        label.textColor = .gray
+        label.font = UIFont.systemFont(ofSize: 12, weight: .regular) // Делаем шрифт как у XP
+        // label.textAlignment = .left // Стек будет управлять
+        return label
+    }()
+    private lazy var xpProgressView: UIProgressView = {
+        let progressView = UIProgressView(progressViewStyle: .default)
+        progressView.translatesAutoresizingMaskIntoConstraints = false
+        progressView.progressTintColor = .systemGreen
+        progressView.trackTintColor = UIColor.gray.withAlphaComponent(0.5)
+        progressView.progress = 0.6
+        progressView.layer.cornerRadius = 4
+        progressView.clipsToBounds = true
+        return progressView
+    }()
+    private lazy var xpLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.text = "600 / 1000 XP"
+        label.textColor = .lightGray
+        label.font = UIFont.systemFont(ofSize: 12, weight: .regular)
+        label.textAlignment = .right
+        return label
+    }()
+
+    // --- Стеки для новой структуры --- 
+    private lazy var nameLevelRankStackView: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [nameLabel, rankLabel]) 
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .vertical
+        stackView.alignment = .leading 
+        stackView.spacing = 4 
+        return stackView
+    }()
+
+    private lazy var headerStackView: UIStackView = {
+        // Аватар слева, стек с инфо справа
+        let stackView = UIStackView(arrangedSubviews: [avatarImageView, nameLevelRankStackView])
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .horizontal
+        stackView.alignment = .center // Выравниваем по центру вертикально
+        stackView.spacing = 15
+        // avatarImageView будет иметь фиксированный размер, nameLevelRankStackView займет остальное
+        return stackView
+    }()
+    
+    // Удаляем chartStatsHorizontalStackView
+    // private lazy var chartStatsHorizontalStackView: UIStackView = { ... }()
+
+    // НОВЫЙ СТЕК для РЯДА с графиком и статами
+    private lazy var chartStatsRowStackView: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [profileChartContainerView, profileStatsListContainerView])
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .horizontal
+        stackView.distribution = .fill // Будем управлять шириной через констрейнты контейнеров
+        stackView.spacing = 20 // Отступ МЕЖДУ контейнерами графика и статов
+        return stackView
+    }()
+
+    // НОВЫЙ СТЕК для лейблов Уровня и XP
+    private lazy var levelXPLabelStackView: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [levelLabel, xpLabel])
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .horizontal
+        // levelLabel займет свое место слева, xpLabel (с textAlignment = .right) уйдет вправо
+        stackView.distribution = .fill // Или .equalSpacing, .fillEqually - можно поиграть
+        return stackView
+    }()
+
+    private lazy var xpStackView: UIStackView = {
+        // Теперь содержит levelXPLabelStackView и xpProgressView
+        let stackView = UIStackView(arrangedSubviews: [levelXPLabelStackView, xpProgressView]) 
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .vertical
+        stackView.alignment = .fill
+        stackView.spacing = 6 // Немного увеличим отступ между лейблами и прогрессом
+        // stackView.setCustomSpacing(...) // Больше не нужно
+        return stackView
     }()
 
     // Элементы достижений
@@ -159,7 +256,6 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
         tableView.estimatedRowHeight = 44
         return tableView
     }()
-
 
     // --- Вспомогательные функции для создания UI (ПОЛНЫЙ КОД) ---
     private func createTitleLabel(text: String) -> UILabel {
@@ -210,27 +306,26 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
 
     // Настройка Views
     private func setupViews() {
-        // Добавляем scrollView на главный view
         view.addSubview(scrollView)
-        // Добавляем stackView внутрь scrollView
         scrollView.addSubview(contentStackView)
 
-        // УБИРАЕМ добавление контейнеров напрямую на view
-        // view.addSubview(profileInfoContainerView)
-        // view.addSubview(achievementsContainerView)
-        // view.addSubview(feedContainerView)
-
-        // ДОБАВЛЯЕМ контейнеры как arrangedSubviews в stackView
-        contentStackView.addArrangedSubview(profileInfoContainerView)
+        // Добавляем 5 "строк" в главный стек
+        contentStackView.addArrangedSubview(profileHeaderContainerView)
+        contentStackView.addArrangedSubview(profileXPContainerView)    
+        // Добавляем горизонтальный стек для графика и статов
+        contentStackView.addArrangedSubview(chartStatsRowStackView) 
         contentStackView.addArrangedSubview(achievementsContainerView)
         contentStackView.addArrangedSubview(feedContainerView)
 
-        // Элементы добавляются ВНУТРЬ своих контейнеров, как и раньше
-        profileInfoContainerView.addSubview(avatarImageView)
-        profileInfoContainerView.addSubview(nameLabel)
-        profileInfoContainerView.addSubview(levelLabel)
-        profileInfoContainerView.addSubview(rankLabel)
+        // Добавляем внутренние элементы в их ПРЯМЫЕ контейнеры
+        profileHeaderContainerView.addSubview(headerStackView)
+        profileXPContainerView.addSubview(xpStackView)
+        // График в свой контейнер (который уже в chartStatsRowStackView)
+        profileChartContainerView.addSubview(radarChartView)
+        // Статы в свой контейнер (который уже в chartStatsRowStackView)
+        profileStatsListContainerView.addSubview(statsDescriptionLabel)
 
+        // --- Остальные контейнеры без изменений ---
         achievementsContainerView.addSubview(achievementsTitleLabel)
         achievementsContainerView.addSubview(achievementsChevronImageView)
         achievementsContainerView.addSubview(achievementsCollectionView)
@@ -254,61 +349,59 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
     // Настройка констрейнтов
     private func setupConstraints() {
         let horizontalPadding: CGFloat = 16
-        // verticalSpacing теперь используется в contentStackView.spacing
-        // let verticalSpacing: CGFloat = 20
-        let profileContainerPadding: CGFloat = 15
+        let containerPadding: CGFloat = 15
         let cardInternalPadding: CGFloat = 12
-
-        // Констрейнты высоты для списков (УДАЛЯЕМ ПОЛНОСТЬЮ)
-        // achievementsCollectionViewHeightConstraint = achievementsCollectionView.heightAnchor.constraint(equalToConstant: 200) // УДАЛЯЕМ
-        // feedTableViewHeightConstraint = feedTableView.heightAnchor.constraint(equalToConstant: 200) // Уже удален
+        // spacing между контейнерами графика и статов задается в chartStatsRowStackView
 
         NSLayoutConstraint.activate([
-            // --- НОВЫЕ: Констрейнты для scrollView ---
+            // --- ScrollView и ContentStackView --- 
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
 
-            // --- НОВЫЕ: Констрейнты для contentStackView внутри scrollView ---
-            contentStackView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 20), // Добавим отступ сверху
+            contentStackView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 20),
             contentStackView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: horizontalPadding),
             contentStackView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -horizontalPadding),
-            contentStackView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -20), // Добавим отступ снизу
-            // Важно: ширина stackView равна ширине scrollView
+            contentStackView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -20),
             contentStackView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -2 * horizontalPadding),
 
-            // --- СТАРЫЕ: Констрейнты позиционирования контейнеров (удалены или закомментированы) ---
-            // profileInfoContainerView - позиционируется stackView
-            // profileInfoContainerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: verticalSpacing),
-            // profileInfoContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: horizontalPadding), // Управляется stackView
-            // profileInfoContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -horizontalPadding), // Управляется stackView
-            // Высота определяется rankLabel.bottom - ОСТАВЛЯЕМ
-            rankLabel.bottomAnchor.constraint(equalTo: profileInfoContainerView.bottomAnchor, constant: -profileContainerPadding),
-
-            // --- Элементы внутри profileInfoContainerView (ОСТАВЛЯЕМ без изменений) ---
-            avatarImageView.topAnchor.constraint(equalTo: profileInfoContainerView.topAnchor, constant: profileContainerPadding),
-            avatarImageView.centerXAnchor.constraint(equalTo: profileInfoContainerView.centerXAnchor),
+            // --- Констрейнты для profileHeaderContainerView ---
+            headerStackView.topAnchor.constraint(equalTo: profileHeaderContainerView.topAnchor, constant: containerPadding),
+            headerStackView.leadingAnchor.constraint(equalTo: profileHeaderContainerView.leadingAnchor, constant: containerPadding),
+            headerStackView.trailingAnchor.constraint(equalTo: profileHeaderContainerView.trailingAnchor, constant: -containerPadding),
+            headerStackView.bottomAnchor.constraint(equalTo: profileHeaderContainerView.bottomAnchor, constant: -containerPadding),
             avatarImageView.widthAnchor.constraint(equalToConstant: 100),
-            avatarImageView.heightAnchor.constraint(equalToConstant: 100),
-            nameLabel.topAnchor.constraint(equalTo: avatarImageView.bottomAnchor, constant: profileContainerPadding),
-            nameLabel.leadingAnchor.constraint(equalTo: profileInfoContainerView.leadingAnchor, constant: profileContainerPadding),
-            nameLabel.trailingAnchor.constraint(equalTo: profileInfoContainerView.trailingAnchor, constant: -profileContainerPadding),
-            levelLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 8),
-            levelLabel.leadingAnchor.constraint(equalTo: profileInfoContainerView.leadingAnchor, constant: profileContainerPadding),
-            levelLabel.trailingAnchor.constraint(equalTo: profileInfoContainerView.trailingAnchor, constant: -profileContainerPadding),
-            rankLabel.topAnchor.constraint(equalTo: levelLabel.bottomAnchor, constant: 8),
-            rankLabel.leadingAnchor.constraint(equalTo: profileInfoContainerView.leadingAnchor, constant: profileContainerPadding),
-            rankLabel.trailingAnchor.constraint(equalTo: profileInfoContainerView.trailingAnchor, constant: -profileContainerPadding),
-            // rankLabel.bottomAnchor уже привязан выше
+            avatarImageView.heightAnchor.constraint(equalTo: avatarImageView.widthAnchor),
+            
+            // --- Констрейнты для profileXPContainerView ---
+            xpStackView.topAnchor.constraint(equalTo: profileXPContainerView.topAnchor, constant: containerPadding),
+            xpStackView.leadingAnchor.constraint(equalTo: profileXPContainerView.leadingAnchor, constant: containerPadding),
+            xpStackView.trailingAnchor.constraint(equalTo: profileXPContainerView.trailingAnchor, constant: -containerPadding),
+            xpStackView.bottomAnchor.constraint(equalTo: profileXPContainerView.bottomAnchor, constant: -containerPadding),
+            xpProgressView.heightAnchor.constraint(equalToConstant: 8),
 
-            // achievementsContainerView - позиционируется stackView
-            // achievementsContainerView.topAnchor.constraint(equalTo: profileInfoContainerView.bottomAnchor, constant: verticalSpacing),
-            // achievementsContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: horizontalPadding), // Управляется stackView
-            // achievementsContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -horizontalPadding), // Управляется stackView
-            // НЕТ ФИКСИРОВАННОЙ ВЫСОТЫ - Управляется содержимым и stackView
+            // --- Констрейнты для chartStatsRowStackView (Строка с графиком и статами) ---
+            // Определяем пропорции ширины КОНТЕЙНЕРОВ внутри стека
+            profileChartContainerView.widthAnchor.constraint(equalTo: chartStatsRowStackView.widthAnchor, multiplier: 0.6, constant: -(chartStatsRowStackView.spacing * 0.6)),
+            profileStatsListContainerView.widthAnchor.constraint(equalTo: chartStatsRowStackView.widthAnchor, multiplier: 0.4, constant: -(chartStatsRowStackView.spacing * 0.4)),
+            
+            // --- Констрейнты ВНУТРИ profileChartContainerView ---
+            radarChartView.topAnchor.constraint(equalTo: profileChartContainerView.topAnchor, constant: containerPadding),
+            radarChartView.leadingAnchor.constraint(equalTo: profileChartContainerView.leadingAnchor, constant: containerPadding),
+            radarChartView.trailingAnchor.constraint(equalTo: profileChartContainerView.trailingAnchor, constant: -containerPadding),
+            radarChartView.bottomAnchor.constraint(equalTo: profileChartContainerView.bottomAnchor, constant: -containerPadding),
+            radarChartView.heightAnchor.constraint(equalTo: radarChartView.widthAnchor), // Квадратный
+            
+            // --- Констрейнты ВНУТРИ profileStatsListContainerView ---
+            // Центрируем лейбл внутри его контейнера
+            statsDescriptionLabel.topAnchor.constraint(equalTo: profileStatsListContainerView.topAnchor, constant: containerPadding),
+            statsDescriptionLabel.bottomAnchor.constraint(equalTo: profileStatsListContainerView.bottomAnchor, constant: -containerPadding),
+            statsDescriptionLabel.centerXAnchor.constraint(equalTo: profileStatsListContainerView.centerXAnchor), // Центрируем по горизонтали
+            // Ограничиваем ширину, если нужно, чтобы текст не прилипал к краям при длинных строках (хотя numberOfLines=0 должен переносить)
+            statsDescriptionLabel.widthAnchor.constraint(lessThanOrEqualTo: profileStatsListContainerView.widthAnchor, constant: -2 * containerPadding), // Оставляем боковые отступы
 
-            // --- Заголовок и шеврон внутри achievementsContainerView (ОСТАВЛЯЕМ) ---
+            // --- Констрейнты для Достижений и Ленты (без изменений) ---
             achievementsTitleLabel.topAnchor.constraint(equalTo: achievementsContainerView.topAnchor, constant: cardInternalPadding),
             achievementsTitleLabel.leadingAnchor.constraint(equalTo: achievementsContainerView.leadingAnchor, constant: cardInternalPadding),
             achievementsChevronImageView.centerYAnchor.constraint(equalTo: achievementsTitleLabel.centerYAnchor),
@@ -316,25 +409,11 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
             achievementsChevronImageView.widthAnchor.constraint(equalToConstant: 10),
             achievementsChevronImageView.heightAnchor.constraint(equalToConstant: 14),
             achievementsTitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: achievementsChevronImageView.leadingAnchor, constant: -8),
-
-            // --- achievementsCollectionView внутри achievementsContainerView (ОСТАВЛЯЕМ) ---
             achievementsCollectionView.topAnchor.constraint(equalTo: achievementsTitleLabel.bottomAnchor, constant: cardInternalPadding / 2),
             achievementsCollectionView.leadingAnchor.constraint(equalTo: achievementsContainerView.leadingAnchor, constant: cardInternalPadding),
             achievementsCollectionView.trailingAnchor.constraint(equalTo: achievementsContainerView.trailingAnchor, constant: -cardInternalPadding),
-            // Низ КОНТЕЙНЕРА привязан к низу КОЛЛЕКЦИИ (с отступом) - ОСТАВЛЯЕМ
             achievementsContainerView.bottomAnchor.constraint(equalTo: achievementsCollectionView.bottomAnchor, constant: cardInternalPadding),
-            // Активируем явный констрейнт высоты КОЛЛЕКЦИИ - УДАЛЯЕМ
-            // achievementsCollectionViewHeightConstraint!,
 
-            // feedContainerView - позиционируется stackView
-            // feedContainerView.topAnchor.constraint(equalTo: achievementsContainerView.bottomAnchor, constant: verticalSpacing),
-            // feedContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: horizontalPadding), // Управляется stackView
-            // feedContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -horizontalPadding), // Управляется stackView
-            // НЕТ ФИКСИРОВАННОЙ ВЫСОТЫ - Управляется содержимым и stackView
-            // Привязываем низ ПОСЛЕДНЕГО контейнера к низу Safe Area (опционально) - УДАЛЯЕМ, т.к. низ stackView привязан к низу scrollView
-            // feedContainerView.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -verticalSpacing),
-
-            // --- Заголовок и шеврон внутри feedContainerView (ОСТАВЛЯЕМ) ---
             feedTitleLabel.topAnchor.constraint(equalTo: feedContainerView.topAnchor, constant: cardInternalPadding),
             feedTitleLabel.leadingAnchor.constraint(equalTo: feedContainerView.leadingAnchor, constant: cardInternalPadding),
             feedChevronImageView.centerYAnchor.constraint(equalTo: feedTitleLabel.centerYAnchor),
@@ -342,27 +421,22 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
             feedChevronImageView.widthAnchor.constraint(equalToConstant: 10),
             feedChevronImageView.heightAnchor.constraint(equalToConstant: 14),
             feedTitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: feedChevronImageView.leadingAnchor, constant: -8),
-
-            // --- feedTableView внутри feedContainerView (ОСТАВЛЯЕМ) ---
             feedTableView.topAnchor.constraint(equalTo: feedTitleLabel.bottomAnchor, constant: cardInternalPadding / 2),
-            feedTableView.leadingAnchor.constraint(equalTo: feedContainerView.leadingAnchor), // Таблица занимает всю ширину контейнера
-            feedTableView.trailingAnchor.constraint(equalTo: feedContainerView.trailingAnchor), // Таблица занимает всю ширину контейнера
-            // Низ КОНТЕЙНЕРА привязан к низу ТАБЛИЦЫ (с отступом) - ОСТАВЛЯЕМ
+            feedTableView.leadingAnchor.constraint(equalTo: feedContainerView.leadingAnchor),
+            feedTableView.trailingAnchor.constraint(equalTo: feedContainerView.trailingAnchor),
             feedContainerView.bottomAnchor.constraint(equalTo: feedTableView.bottomAnchor, constant: cardInternalPadding),
-            // Активируем ЯВНЫЙ констрейнт высоты для ТАБЛИЦЫ - УДАЛЯЕМ
-            // feedTableViewHeightConstraint!
         ])
     }
 
     // --- Обработчики нажатий ---
     @objc private func achievementsHeaderTapped() {
         print("Нажата область заголовка/карточки достижений")
-        // delegate?.personViewControllerDidRequestShowAllAchievements(self)
+        delegate?.personViewControllerDidRequestShowAllAchievements(self)
     }
 
     @objc private func feedHeaderTapped() {
         print("Нажата область заголовка/карточки ленты")
-        // delegate?.personViewControllerDidRequestShowAllFeed(self)
+        delegate?.personViewControllerDidRequestShowAllFeed(self)
     }
 
     // --- UIGestureRecognizerDelegate ---
@@ -408,4 +482,60 @@ extension PersonViewController: UITableViewDataSource {
         cell.configure(with: event, dateFormatter: dateFormatter)
         return cell
     }
+}
+
+// НОВАЯ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ для статов
+private func createStatsAttributedString() -> NSAttributedString {
+    let stats: [(name: String, value: Int, change: Int)] = [
+        ("STR", 80, 2),
+        ("DEX", 60, -1),
+        ("CON", 70, 0),
+        ("INT", 50, 3),
+        ("LCK", 90, -2)
+    ]
+    
+    // Создаем стиль параграфа с увеличенным межстрочным интервалом
+    let paragraphStyle = NSMutableParagraphStyle()
+    paragraphStyle.lineSpacing = 4 // Подбери значение по вкусу
+    
+    let regularAttributes: [NSAttributedString.Key: Any] = [
+        .font: UIFont.systemFont(ofSize: 14),
+        .foregroundColor: UIColor.lightGray,
+        .paragraphStyle: paragraphStyle // Добавляем стиль параграфа
+    ]
+    let greenAttributes: [NSAttributedString.Key: Any] = [
+        .font: UIFont.systemFont(ofSize: 14),
+        .foregroundColor: UIColor.systemGreen,
+        .paragraphStyle: paragraphStyle
+    ]
+    let redAttributes: [NSAttributedString.Key: Any] = [
+        .font: UIFont.systemFont(ofSize: 14),
+        .foregroundColor: UIColor.systemRed,
+        .paragraphStyle: paragraphStyle
+    ]
+
+    let finalAttributedString = NSMutableAttributedString()
+
+    for (index, stat) in stats.enumerated() {
+        // Добавляем имя стата и значение
+        let baseString = "\(stat.name): \(stat.value)"
+        finalAttributedString.append(NSAttributedString(string: baseString, attributes: regularAttributes))
+        
+        // Добавляем изменение
+        if stat.change > 0 {
+            let changeString = " +\(stat.change)"
+            finalAttributedString.append(NSAttributedString(string: changeString, attributes: greenAttributes))
+        } else if stat.change < 0 {
+             let changeString = " \(stat.change)" // Минус уже есть
+             finalAttributedString.append(NSAttributedString(string: changeString, attributes: redAttributes))
+        }
+        // Для 0 ничего не добавляем
+
+        // Добавляем перенос строки, если это не последний стат
+        if index < stats.count - 1 {
+            finalAttributedString.append(NSAttributedString(string: "\n", attributes: regularAttributes))
+        }
+    }
+    
+    return finalAttributedString
 }
