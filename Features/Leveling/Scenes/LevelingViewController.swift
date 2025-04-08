@@ -49,6 +49,10 @@ class LevelingViewController: UIViewController {
     private let minTrackingConfidence: Float = DefaultConstants.minTrackingConfidence
     // -------------------------------------------------------
 
+    // --- Добавляем свойство для анализатора приседаний ---
+    private var squatAnalyzer: SquatAnalyzer?
+    // ---------------------------------------------------
+
     private lazy var poseOverlayView: PoseOverlayView = {
         let overlayView = PoseOverlayView()
         overlayView.translatesAutoresizingMaskIntoConstraints = false
@@ -66,6 +70,8 @@ class LevelingViewController: UIViewController {
         // Настраиваем MediaPipe ПОСЛЕ настройки AVFoundation
         sessionQueue.async {
             self.setupPoseLandmarker()
+            // Инициализируем анализатор здесь же, после MediaPipe
+            self.setupSquatAnalyzer()
         }
     }
 
@@ -220,6 +226,15 @@ class LevelingViewController: UIViewController {
         }
     }
 
+    // MARK: - Analyzer Setup (Новый метод)
+    private func setupSquatAnalyzer() {
+        // Убедимся, что вызывается из sessionQueue (или main, если безопасно)
+        // DispatchQueue.main.async { // Если инициализация быстрая, можно и в main
+            self.squatAnalyzer = SquatAnalyzer(delegate: self)
+            print("SquatAnalyzer инициализирован в LevelingViewController.")
+        // }
+    }
+
     // MARK: - Helper Methods
     private func getDefaultCamera() -> AVCaptureDevice? {
         // Предпочитаем фронтальную камеру для селфи-режима упражнений
@@ -346,10 +361,43 @@ extension LevelingViewController: PoseLandmarkerHelperLiveStreamDelegate {
                 return
             }
 
+            // --- Передаем landmarks в анализатор --- 
+            // Получаем landmarks как [[NormalizedLandmark]]
+            if let poseLandmarksArray = result.poseLandmarkerResults.first??.landmarks {
+                // Извлекаем ПЕРВЫЙ массив точек ([NormalizedLandmark])
+                if let firstPoseLandmarks = poseLandmarksArray.first,
+                   !firstPoseLandmarks.isEmpty {
+                     // Передаем именно [NormalizedLandmark]
+                     self.squatAnalyzer?.analyze(landmarks: firstPoseLandmarks)
+                }
+            } else {
+                // Если landmarks нет, возможно, стоит сбросить состояние анализатора?
+                // self.squatAnalyzer?.reset() 
+            }
+            // ----------------------------------------
+
             // Передаем данные в overlay view
-            // Передаем ResultBundle и РАЗМЕР КАДРА отдельно
             self.poseOverlayView.drawResult(result, frameSize: currentFrameSize)
         }
+    }
+}
+
+// MARK: - SquatAnalyzerDelegate (Новое расширение)
+extension LevelingViewController: SquatAnalyzerDelegate {
+    func squatAnalyzer(_ analyzer: SquatAnalyzer, didCountSquat totalCount: Int) {
+        // Вызывается, когда засчитано приседание
+        // TODO: Обновить UI, отобразить счетчик
+        print("\n >>>>> ПРИСЕДАНИЕ #\(totalCount) ЗАСЧИТАНО! <<<<< \n")
+        // Например, обновить лейбл:
+        // countLabel.text = "\(totalCount)"
+    }
+    
+    func squatAnalyzer(_ analyzer: SquatAnalyzer, didChangeState newState: String) {
+        // Вызывается при смене состояния (up/down/unknown)
+        // TODO: Обновить UI, отобразить текущее состояние
+        print("--- Состояние приседания: \(newState.uppercased()) ---")
+        // Например, изменить цвет индикатора:
+        // stateIndicatorView.backgroundColor = (newState == "down") ? .red : .green
     }
 }
 
@@ -571,7 +619,7 @@ extension AVCaptureVideoOrientation {
 // TODO: Этот код можно вынести в отдельный файл Configurations/DefaultConstants.swift
 struct DefaultConstants {
   // Используем встроенный Delegate
-  static let delegate: Delegate = .CPU
+  static let delegate: Delegate = .GPU
   static let modelPath: String = "pose_landmarker_full.task"
   static let numPoses: Int = 1
   static let minPoseDetectionConfidence: Float = 0.5
