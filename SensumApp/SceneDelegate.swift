@@ -13,10 +13,46 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
-        // Use this method to optionally configure and attach the UIWindow `window` to the provided UIWindowScene `scene`.
-        // If using a storyboard, the `window` property will automatically be initialized and attached to the scene.
-        // This delegate does not imply the connecting scene or session are new (see `application:configurationForConnectingSceneSession` instead).
-        guard let _ = (scene as? UIWindowScene) else { return }
+        
+        // Первое, получаем "сцену" - это как бы экран, на котором всё будет происходить.
+        guard let windowScene = (scene as? UIWindowScene) else { return }
+        
+        // Создаем самое ГЛАВНОЕ ОКНО для нашего приложения.
+        let window = UIWindow(windowScene: windowScene)
+        
+        // 1. Создаем TabBarController - это контейнер для наших вкладок
+        let tabBarController = UITabBarController()
+        
+        // 2. Создаем экземпляры ViewController'ов для КАЖДОЙ вкладки
+        let personVC = PersonViewController()
+        let eventsVC = EventsViewController() // Убедись, что имя класса совпадает с созданным файлом
+        let levelingVC = LevelingViewController() // Убедись, что имя класса совпадает
+        let rankVC = RankViewController()       // Убедись, что имя класса совпадает
+        let storeVC = StoreViewController()  // Убедись, что имя класса совпадает
+        
+        // 3. Настраиваем ИКОНКИ и ЗАГОЛОВКИ для каждой вкладки (пока используем системные иконки)
+        personVC.tabBarItem = UITabBarItem(title: "Person", image: UIImage(systemName: "person.fill"), tag: 0)
+        eventsVC.tabBarItem = UITabBarItem(title: "Events", image: UIImage(systemName: "calendar"), tag: 1)
+        levelingVC.tabBarItem = UITabBarItem(title: "Leveling", image: UIImage(systemName: "figure.walk"), tag: 2)
+        rankVC.tabBarItem = UITabBarItem(title: "Rank", image: UIImage(systemName: "list.star"), tag: 3)
+        storeVC.tabBarItem = UITabBarItem(title: "Store", image: UIImage(systemName: "cart.fill"), tag: 4)
+        
+        // 4. Добавляем ViewController'ы в TabBarController
+        tabBarController.viewControllers = [personVC, eventsVC, levelingVC, rankVC, storeVC]
+        
+        // 5. Опционально: Настраиваем внешний вид TabBar (например, цвет фона и выбранного элемента)
+        tabBarController.tabBar.backgroundColor = .darkGray // Пример цвета фона
+        tabBarController.tabBar.tintColor = .white          // Цвет выбранной иконки/текста
+        tabBarController.tabBar.unselectedItemTintColor = .lightGray // Цвет невыбранных
+        
+        // Говорим нашему главному окну: "Вот этот TabBarController будет твоим содержимым по умолчанию".
+        window.rootViewController = tabBarController
+
+        // Сохраняем ссылку на это окно, чтобы оно не пропало.
+        self.window = window
+
+        // Делаем окно видимым на экране телефона.
+        window.makeKeyAndVisible()
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {

@@ -36,6 +36,11 @@
 			path = SensumApp;
 			sourceTree = "<group>";
 		};
+		B148669E2DA43B8000C4A753 /* Features */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Features;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,13 +69,13 @@
 				C8CC09B1CFD35DA88F18E31E /* Pods-SensumApp.debug.xcconfig */,
 				4B4200EB984C0FC9B3FF8535 /* Pods-SensumApp.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
 		B14866602DA4351800C4A753 = {
 			isa = PBXGroup;
 			children = (
+				B148669E2DA43B8000C4A753 /* Features */,
 				B148666B2DA4351800C4A753 /* SensumApp */,
 				B148666A2DA4351800C4A753 /* Products */,
 				A86F01F3007F0FED35067835 /* Pods */,
@@ -104,6 +109,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				B148666B2DA4351800C4A753 /* SensumApp */,
+				B148669E2DA43B8000C4A753 /* Features */,
 			);
 			name = SensumApp;
 			productName = SensumApp;
