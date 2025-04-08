@@ -27,7 +27,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // --- ВОТ КЛЮЧЕВОЙ МОМЕНТ ---
         // Убедись, что имя "Default Configuration" совпадает с тем, что в Info
         let config = UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
-        print("--- AppDelegate: Returning UISceneConfiguration: \(config.name) ---")
+        print("--- AppDelegate: Returning UISceneConfiguration: \(config.name ?? "(nil name)") ---")
         return config
     }
 
