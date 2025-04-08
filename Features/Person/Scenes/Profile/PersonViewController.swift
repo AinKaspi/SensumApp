@@ -57,14 +57,29 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
         return formatter
     }()
 
-    // KVO Свойства
-    private var feedTableViewHeightConstraint: NSLayoutConstraint?
+    // KVO Свойства - УДАЛЯЕМ
+    // ВРЕМЕННО ВОЗВРАЩАЕМ ОБЪЯВЛЕНИЯ для теста с фикс. высотой
     private var achievementsCollectionViewHeightConstraint: NSLayoutConstraint?
-    private var tableViewContentSizeObserver: NSKeyValueObservation?
-    private var collectionViewContentSizeObserver: NSKeyValueObservation?
-
+    private var feedTableViewHeightConstraint: NSLayoutConstraint?
+    // private var tableViewContentSizeObserver: NSKeyValueObservation?
+    // private var collectionViewContentSizeObserver: NSKeyValueObservation?
 
     // --- UI Элементы (Lazy Vars) ---
+
+    // ScrollView и StackView (НОВЫЕ)
+    private lazy var scrollView: UIScrollView = {
+        let scrollView = UIScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        return scrollView
+    }()
+
+    private lazy var contentStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .vertical
+        stackView.spacing = 20 // Расстояние между карточками
+        return stackView
+    }()
 
     // Контейнеры
     private lazy var profileInfoContainerView: UIView = createContainerView()
@@ -117,7 +132,7 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
         layout.itemSize = CGSize(width: 45, height: 45)
         layout.minimumInteritemSpacing = 10
         layout.minimumLineSpacing = 10
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        let collectionView = SelfSizingCollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.backgroundColor = .clear
         collectionView.showsVerticalScrollIndicator = false
@@ -132,7 +147,7 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
     private lazy var feedTitleLabel: UILabel = createTitleLabel(text: "Лента")
     private lazy var feedChevronImageView: UIImageView = createChevronImageView()
     private lazy var feedTableView: UITableView = {
-        let tableView = UITableView()
+        let tableView = SelfSizingTableView()
         tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
@@ -180,7 +195,6 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
         setupViews()
         setupConstraints()
         addTapGestures()
-        setupKVO()
     }
     
     // Отладочный Print
@@ -189,19 +203,29 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
         print("--- viewDidLayoutSubviews ---")
         print("achievementsContainerView height: \(achievementsContainerView.frame.height)")
         print("achievementsCollectionView height: \(achievementsCollectionView.frame.height), contentSize: \(achievementsCollectionView.contentSize.height)")
-        print("achievementsCollectionViewHeightConstraint constant: \(achievementsCollectionViewHeightConstraint?.constant ?? -1)")
         print("feedContainerView height: \(feedContainerView.frame.height)")
         print("feedTableView height: \(feedTableView.frame.height), contentSize: \(feedTableView.contentSize.height)")
-        print("feedTableViewHeightConstraint constant: \(feedTableViewHeightConstraint?.constant ?? -1)")
         print("-----------------------------")
     }
 
     // Настройка Views
     private func setupViews() {
-        view.addSubview(profileInfoContainerView)
-        view.addSubview(achievementsContainerView)
-        view.addSubview(feedContainerView)
+        // Добавляем scrollView на главный view
+        view.addSubview(scrollView)
+        // Добавляем stackView внутрь scrollView
+        scrollView.addSubview(contentStackView)
 
+        // УБИРАЕМ добавление контейнеров напрямую на view
+        // view.addSubview(profileInfoContainerView)
+        // view.addSubview(achievementsContainerView)
+        // view.addSubview(feedContainerView)
+
+        // ДОБАВЛЯЕМ контейнеры как arrangedSubviews в stackView
+        contentStackView.addArrangedSubview(profileInfoContainerView)
+        contentStackView.addArrangedSubview(achievementsContainerView)
+        contentStackView.addArrangedSubview(feedContainerView)
+
+        // Элементы добавляются ВНУТРЬ своих контейнеров, как и раньше
         profileInfoContainerView.addSubview(avatarImageView)
         profileInfoContainerView.addSubview(nameLabel)
         profileInfoContainerView.addSubview(levelLabel)
@@ -230,23 +254,39 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
     // Настройка констрейнтов
     private func setupConstraints() {
         let horizontalPadding: CGFloat = 16
-        let verticalSpacing: CGFloat = 20
+        // verticalSpacing теперь используется в contentStackView.spacing
+        // let verticalSpacing: CGFloat = 20
         let profileContainerPadding: CGFloat = 15
         let cardInternalPadding: CGFloat = 12
 
-        // Создаем констрейнты высоты для ОБОИХ списков
-        achievementsCollectionViewHeightConstraint = achievementsCollectionView.heightAnchor.constraint(equalToConstant: 1) // Начинаем с 1
-        feedTableViewHeightConstraint = feedTableView.heightAnchor.constraint(equalToConstant: 1) // Начинаем с 1
+        // Констрейнты высоты для списков (УДАЛЯЕМ ПОЛНОСТЬЮ)
+        // achievementsCollectionViewHeightConstraint = achievementsCollectionView.heightAnchor.constraint(equalToConstant: 200) // УДАЛЯЕМ
+        // feedTableViewHeightConstraint = feedTableView.heightAnchor.constraint(equalToConstant: 200) // Уже удален
 
         NSLayoutConstraint.activate([
-            // profileInfoContainerView
-            profileInfoContainerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: verticalSpacing),
-            profileInfoContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: horizontalPadding),
-            profileInfoContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -horizontalPadding),
-            // Высота определяется rankLabel.bottom
+            // --- НОВЫЕ: Констрейнты для scrollView ---
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+
+            // --- НОВЫЕ: Констрейнты для contentStackView внутри scrollView ---
+            contentStackView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 20), // Добавим отступ сверху
+            contentStackView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: horizontalPadding),
+            contentStackView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -horizontalPadding),
+            contentStackView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -20), // Добавим отступ снизу
+            // Важно: ширина stackView равна ширине scrollView
+            contentStackView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -2 * horizontalPadding),
+
+            // --- СТАРЫЕ: Констрейнты позиционирования контейнеров (удалены или закомментированы) ---
+            // profileInfoContainerView - позиционируется stackView
+            // profileInfoContainerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: verticalSpacing),
+            // profileInfoContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: horizontalPadding), // Управляется stackView
+            // profileInfoContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -horizontalPadding), // Управляется stackView
+            // Высота определяется rankLabel.bottom - ОСТАВЛЯЕМ
             rankLabel.bottomAnchor.constraint(equalTo: profileInfoContainerView.bottomAnchor, constant: -profileContainerPadding),
 
-            // Элементы внутри profileInfoContainerView
+            // --- Элементы внутри profileInfoContainerView (ОСТАВЛЯЕМ без изменений) ---
             avatarImageView.topAnchor.constraint(equalTo: profileInfoContainerView.topAnchor, constant: profileContainerPadding),
             avatarImageView.centerXAnchor.constraint(equalTo: profileInfoContainerView.centerXAnchor),
             avatarImageView.widthAnchor.constraint(equalToConstant: 100),
@@ -262,13 +302,13 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
             rankLabel.trailingAnchor.constraint(equalTo: profileInfoContainerView.trailingAnchor, constant: -profileContainerPadding),
             // rankLabel.bottomAnchor уже привязан выше
 
-            // achievementsContainerView
-            achievementsContainerView.topAnchor.constraint(equalTo: profileInfoContainerView.bottomAnchor, constant: verticalSpacing),
-            achievementsContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: horizontalPadding),
-            achievementsContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -horizontalPadding),
-            // НЕТ ФИКСИРОВАННОЙ ВЫСОТЫ
+            // achievementsContainerView - позиционируется stackView
+            // achievementsContainerView.topAnchor.constraint(equalTo: profileInfoContainerView.bottomAnchor, constant: verticalSpacing),
+            // achievementsContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: horizontalPadding), // Управляется stackView
+            // achievementsContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -horizontalPadding), // Управляется stackView
+            // НЕТ ФИКСИРОВАННОЙ ВЫСОТЫ - Управляется содержимым и stackView
 
-            // Заголовок и шеврон внутри achievementsContainerView
+            // --- Заголовок и шеврон внутри achievementsContainerView (ОСТАВЛЯЕМ) ---
             achievementsTitleLabel.topAnchor.constraint(equalTo: achievementsContainerView.topAnchor, constant: cardInternalPadding),
             achievementsTitleLabel.leadingAnchor.constraint(equalTo: achievementsContainerView.leadingAnchor, constant: cardInternalPadding),
             achievementsChevronImageView.centerYAnchor.constraint(equalTo: achievementsTitleLabel.centerYAnchor),
@@ -277,24 +317,24 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
             achievementsChevronImageView.heightAnchor.constraint(equalToConstant: 14),
             achievementsTitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: achievementsChevronImageView.leadingAnchor, constant: -8),
 
-            // achievementsCollectionView внутри achievementsContainerView
+            // --- achievementsCollectionView внутри achievementsContainerView (ОСТАВЛЯЕМ) ---
             achievementsCollectionView.topAnchor.constraint(equalTo: achievementsTitleLabel.bottomAnchor, constant: cardInternalPadding / 2),
             achievementsCollectionView.leadingAnchor.constraint(equalTo: achievementsContainerView.leadingAnchor, constant: cardInternalPadding),
             achievementsCollectionView.trailingAnchor.constraint(equalTo: achievementsContainerView.trailingAnchor, constant: -cardInternalPadding),
-            // Низ КОНТЕЙНЕРА привязан к низу КОЛЛЕКЦИИ (с отступом)
+            // Низ КОНТЕЙНЕРА привязан к низу КОЛЛЕКЦИИ (с отступом) - ОСТАВЛЯЕМ
             achievementsContainerView.bottomAnchor.constraint(equalTo: achievementsCollectionView.bottomAnchor, constant: cardInternalPadding),
-            // Активируем явный констрейнт высоты КОЛЛЕКЦИИ
-            achievementsCollectionViewHeightConstraint!,
+            // Активируем явный констрейнт высоты КОЛЛЕКЦИИ - УДАЛЯЕМ
+            // achievementsCollectionViewHeightConstraint!,
 
-            // feedContainerView
-            feedContainerView.topAnchor.constraint(equalTo: achievementsContainerView.bottomAnchor, constant: verticalSpacing),
-            feedContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: horizontalPadding),
-            feedContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -horizontalPadding),
-            // НЕТ ФИКСИРОВАННОЙ ВЫСОТЫ
-            // Привязываем низ ПОСЛЕДНЕГО контейнера к низу Safe Area (опционально)
-            feedContainerView.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -verticalSpacing),
+            // feedContainerView - позиционируется stackView
+            // feedContainerView.topAnchor.constraint(equalTo: achievementsContainerView.bottomAnchor, constant: verticalSpacing),
+            // feedContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: horizontalPadding), // Управляется stackView
+            // feedContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -horizontalPadding), // Управляется stackView
+            // НЕТ ФИКСИРОВАННОЙ ВЫСОТЫ - Управляется содержимым и stackView
+            // Привязываем низ ПОСЛЕДНЕГО контейнера к низу Safe Area (опционально) - УДАЛЯЕМ, т.к. низ stackView привязан к низу scrollView
+            // feedContainerView.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -verticalSpacing),
 
-            // Заголовок и шеврон внутри feedContainerView
+            // --- Заголовок и шеврон внутри feedContainerView (ОСТАВЛЯЕМ) ---
             feedTitleLabel.topAnchor.constraint(equalTo: feedContainerView.topAnchor, constant: cardInternalPadding),
             feedTitleLabel.leadingAnchor.constraint(equalTo: feedContainerView.leadingAnchor, constant: cardInternalPadding),
             feedChevronImageView.centerYAnchor.constraint(equalTo: feedTitleLabel.centerYAnchor),
@@ -303,44 +343,16 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
             feedChevronImageView.heightAnchor.constraint(equalToConstant: 14),
             feedTitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: feedChevronImageView.leadingAnchor, constant: -8),
 
-            // feedTableView внутри feedContainerView
+            // --- feedTableView внутри feedContainerView (ОСТАВЛЯЕМ) ---
             feedTableView.topAnchor.constraint(equalTo: feedTitleLabel.bottomAnchor, constant: cardInternalPadding / 2),
-            feedTableView.leadingAnchor.constraint(equalTo: feedContainerView.leadingAnchor),
-            feedTableView.trailingAnchor.constraint(equalTo: feedContainerView.trailingAnchor),
-            // Низ КОНТЕЙНЕРА привязан к низу ТАБЛИЦЫ (с отступом)
+            feedTableView.leadingAnchor.constraint(equalTo: feedContainerView.leadingAnchor), // Таблица занимает всю ширину контейнера
+            feedTableView.trailingAnchor.constraint(equalTo: feedContainerView.trailingAnchor), // Таблица занимает всю ширину контейнера
+            // Низ КОНТЕЙНЕРА привязан к низу ТАБЛИЦЫ (с отступом) - ОСТАВЛЯЕМ
             feedContainerView.bottomAnchor.constraint(equalTo: feedTableView.bottomAnchor, constant: cardInternalPadding),
-            // Активируем ЯВНЫЙ констрейнт высоты для ТАБЛИЦЫ
-            feedTableViewHeightConstraint!
+            // Активируем ЯВНЫЙ констрейнт высоты для ТАБЛИЦЫ - УДАЛЯЕМ
+            // feedTableViewHeightConstraint!
         ])
     }
-
-    // --- KVO Настройка (теперь для обоих) ---
-    private func setupKVO() {
-        // Наблюдатель для Таблицы Ленты
-        tableViewContentSizeObserver = feedTableView.observe(\.contentSize, options: [.old, .new]) { [weak self] tableView, change in
-             guard let self = self, let newSize = change.newValue else { return }
-             let oldHeight = self.feedTableViewHeightConstraint?.constant ?? 0
-             guard abs(newSize.height - oldHeight) > 0.1, newSize.height >= 1 else { return }
-
-             self.feedTableViewHeightConstraint?.constant = newSize.height
-             print("KVO Feed: Обновлена высота feedTableView до \(newSize.height)")
-             DispatchQueue.main.async { self.view.layoutIfNeeded() }
-        }
-        print("KVO Feed: Обсервер для contentSize добавлен")
-
-        // Наблюдатель для Коллекции Достижений
-        collectionViewContentSizeObserver = achievementsCollectionView.observe(\.contentSize, options: [.old, .new]) { [weak self] collectionView, change in
-             guard let self = self, let newSize = change.newValue else { return }
-             let oldHeight = self.achievementsCollectionViewHeightConstraint?.constant ?? 0
-             guard abs(newSize.height - oldHeight) > 0.1, newSize.height >= 1 else { return }
-
-             self.achievementsCollectionViewHeightConstraint?.constant = newSize.height
-             print("KVO Achievements: Обновлена высота achievementsCollectionView до \(newSize.height)")
-             DispatchQueue.main.async { self.view.layoutIfNeeded() }
-        }
-         print("KVO Achievements: Обсервер для contentSize добавлен")
-    }
-
 
     // --- Обработчики нажатий ---
     @objc private func achievementsHeaderTapped() {
@@ -357,14 +369,6 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         return true
     }
-
-    // --- deinit ---
-     deinit {
-         // Обнуляем оба наблюдателя
-         tableViewContentSizeObserver = nil
-         collectionViewContentSizeObserver = nil
-         print("PersonViewController deinit")
-     }
 }
 
 // MARK: - UICollectionViewDataSource
