@@ -8,11 +8,15 @@
 
 /* Begin PBXBuildFile section */
 		0BEC571AAD9BAB36845AF4F7 /* Pods_SensumApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F08A7153A835D56D39470A7D /* Pods_SensumApp.framework */; };
+		B1BE36972DA6A6ED00BF1C55 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BE36962DA6A6ED00BF1C55 /* UserProfile.swift */; };
+		B1BE369A2DA6A75400BF1C55 /* DataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BE36992DA6A75400BF1C55 /* DataManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		4B4200EB984C0FC9B3FF8535 /* Pods-SensumApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SensumApp.release.xcconfig"; path = "Target Support Files/Pods-SensumApp/Pods-SensumApp.release.xcconfig"; sourceTree = "<group>"; };
 		B14866692DA4351800C4A753 /* SensumApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SensumApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B1BE36962DA6A6ED00BF1C55 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
+		B1BE36992DA6A75400BF1C55 /* DataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataManager.swift; sourceTree = "<group>"; };
 		C8CC09B1CFD35DA88F18E31E /* Pods-SensumApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SensumApp.debug.xcconfig"; path = "Target Support Files/Pods-SensumApp/Pods-SensumApp.debug.xcconfig"; sourceTree = "<group>"; };
 		F08A7153A835D56D39470A7D /* Pods_SensumApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SensumApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -75,6 +79,8 @@
 		B14866602DA4351800C4A753 = {
 			isa = PBXGroup;
 			children = (
+				B1BE36982DA6A74900BF1C55 /* Managers */,
+				B1BE36952DA6A6CF00BF1C55 /* Models */,
 				B148669E2DA43B8000C4A753 /* Features */,
 				B148666B2DA4351800C4A753 /* SensumApp */,
 				B148666A2DA4351800C4A753 /* Products */,
@@ -89,6 +95,22 @@
 				B14866692DA4351800C4A753 /* SensumApp.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		B1BE36952DA6A6CF00BF1C55 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				B1BE36962DA6A6ED00BF1C55 /* UserProfile.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		B1BE36982DA6A74900BF1C55 /* Managers */ = {
+			isa = PBXGroup;
+			children = (
+				B1BE36992DA6A75400BF1C55 /* DataManager.swift */,
+			);
+			path = Managers;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -190,6 +212,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B1BE369A2DA6A75400BF1C55 /* DataManager.swift in Sources */,
+				B1BE36972DA6A6ED00BF1C55 /* UserProfile.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

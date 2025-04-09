@@ -110,12 +110,18 @@ class LevelingViewController: UIViewController { // ВАЖНО: Имя клас�
     private let timerUpdateInterval: TimeInterval = 1.0
     
     // Для передачи размера кадра в делегат
-    private var lastFrameSize: CGSize? 
+    private var lastFrameSize: CGSize?
+
+    // Свойство для хранения текущего профиля пользователя
+    private var userProfile: UserProfile?
 
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        // Загружаем профиль пользователя
+        userProfile = DataManager.shared.getCurrentUserProfile()
+        
         setupViews()
         setupConstraints()
         squatAnalyzer.delegate = self
@@ -196,21 +202,29 @@ class LevelingViewController: UIViewController { // ВАЖНО: Имя клас�
     // MARK: - Session State Management
 
     private func resetSessionState() {
-        currentXP = 0
+        currentXP = 0 // Эта переменная теперь не нужна, XP берем из профиля
         progressiveSquatGoal = 5
         squatsTowardsProgressiveGoal = 0
-        totalSquatsInSession = 0
+        totalSquatsInSession = 0 // Счетчик приседаний *за сессию* оставляем
         sessionStartDate = nil
-        stopTimer() // Убедимся, что таймер остановлен
-        squatAnalyzer.reset() // Сбрасываем анализатор
+        stopTimer()
+        squatAnalyzer.reset()
+        
+        // Обновляем userProfile на случай, если он был nil
+        if userProfile == nil {
+            userProfile = DataManager.shared.getCurrentUserProfile()
+        }
+        
         updateUI()
     }
 
     private func updateUI() {
-        let progress = Float(currentXP) / Float(xpForNextLevel)
+        // Используем данные из userProfile
+        guard let profile = userProfile else { return } // Защита, если профиль еще не загружен
+        let progress = Float(profile.currentXP) / Float(profile.xpToNextLevel)
         xpProgressBar.setProgress(min(progress, 1.0), animated: true)
         progressiveGoalLabel.text = "Goal: \(squatsTowardsProgressiveGoal)/\(progressiveSquatGoal)"
-        totalSquatsLabel.text = "Total: \(totalSquatsInSession)"
+        totalSquatsLabel.text = "Total: \(profile.totalSquats)"
         if sessionStartDate == nil {
             timerLabel.text = "Time: 00:00"
         }
@@ -433,17 +447,44 @@ extension LevelingViewController: PoseLandmarkerHelperLiveStreamDelegate {
 extension LevelingViewController: SquatAnalyzerDelegate {
     func squatAnalyzer(_ analyzer: SquatAnalyzer, didCountSquat newTotalCount: Int) {
         // Этот код мы уже реализовали
-        totalSquatsInSession = newTotalCount
-        currentXP += xpPerSquat
+        // Убедимся, что профиль загружен
+        guard var profile = userProfile else {
+            print("Error: User profile is nil in squatAnalyzer delegate.")
+            return
+        }
+        
+        // 1. Обновляем ОБЩЕЕ количество приседаний в профиле
+        profile.totalSquats += 1 // Счетчик обновляем здесь
+        
+        // 2. Добавляем базовый опыт через метод addXP
+        let didLevelUpBasic = profile.addXP(xpPerSquat)
+        if didLevelUpBasic {
+            // TODO: Показать эффект повышения уровня?
+        }
+        
+        // 3. Продвигаем сессионную прогрессивную цель
         squatsTowardsProgressiveGoal += 1
 
         if squatsTowardsProgressiveGoal >= progressiveSquatGoal {
             print("--- Progressive Goal #\(progressiveSquatGoal) Reached! ---")
-            currentXP += bonusXPForGoal
+            
+            // Добавляем бонусный опыт через метод addXP
+            let didLevelUpBonus = profile.addXP(bonusXPForGoal)
+            if didLevelUpBonus {
+                // TODO: Показать эффект повышения уровня (может сработать и после базового)?
+            }
+            
             // Исправляем баг: увеличиваем ЦЕЛЬ, а не ИНКРЕМЕНТ
             progressiveSquatGoal += progressiveGoalIncrement 
             squatsTowardsProgressiveGoal = 0
         }
+        
+        // 4. Сохраняем обновленный профиль
+        DataManager.shared.updateUserProfile(profile)
+        // Обновляем локальную копию на всякий случай (хотя DataManager должен обновить свою)
+        self.userProfile = profile 
+        
+        // 5. Обновляем UI
         updateUI()
     }
     
