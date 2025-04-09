@@ -1,0 +1,22 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+Mediapipe 0.10.21
+Swift 5
+xcode 16.2
+UIKit
+
+Model:
+pose_landmarker_full.task
+
+Water shape:
+Pose detector: 224 x 224 x 3
+Pose landmarker: 256 x 256 x 3
+
+Data type:
+Float 16

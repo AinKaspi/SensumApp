@@ -296,12 +296,62 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
     // Отладочный Print
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        print("--- viewDidLayoutSubviews ---")
+        print("--- PersonVC viewDidLayoutSubviews ---") // Уточним имя контроллера
         print("achievementsContainerView height: \(achievementsContainerView.frame.height)")
         print("achievementsCollectionView height: \(achievementsCollectionView.frame.height), contentSize: \(achievementsCollectionView.contentSize.height)")
         print("feedContainerView height: \(feedContainerView.frame.height)")
         print("feedTableView height: \(feedTableView.frame.height), contentSize: \(feedTableView.contentSize.height)")
-        print("-----------------------------")
+        print("---------------------------------------")
+    }
+
+    // --- Обновление UI при появлении ---
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        print("--- PersonVC viewWillAppear ---")
+        updateProfileDisplay() // Обновляем данные профиля перед показом
+    }
+
+    // --- Обновление данных профиля ---
+    /// Загружает актуальные данные из DataManager и обновляет UI элементы профиля.
+    private func updateProfileDisplay() {
+        print("--- PersonVC updateProfileDisplay: Запрос данных из DataManager ---")
+        // 1. Получаем самый свежий профиль пользователя
+        let profile = DataManager.shared.getCurrentUserProfile()
+        print("--- PersonVC updateProfileDisplay: Получен профиль: Уровень \(profile.level), XP \(profile.currentXP)/\(profile.xpToNextLevel), Ранг \(profile.rank.rawValue) ---")
+
+        // 2. Обновляем UI элементы, связанные с уровнем и XP
+        // Устанавливаем текст для лейбла уровня
+        levelLabel.text = "Уровень: \(profile.level)"
+        // Устанавливаем текст для лейбла XP, показывая текущее / необходимое
+        xpLabel.text = "\(profile.currentXP) / \(profile.xpToNextLevel) XP"
+
+        // 3. Рассчитываем прогресс для XP ProgressBar
+        // Проверяем, что xpToNextLevel не равен нулю, чтобы избежать деления на ноль
+        let progress: Float
+        if profile.xpToNextLevel > 0 {
+            // Рассчитываем прогресс как отношение текущего XP к необходимому
+            progress = Float(profile.currentXP) / Float(profile.xpToNextLevel)
+        } else {
+            // Если xpToNextLevel равен 0 (теоретически возможно при очень высоких уровнях или ошибках), устанавливаем прогресс в 0
+            progress = 0.0
+            print("--- PersonVC updateProfileDisplay: ВНИМАНИЕ! xpToNextLevel равен 0. Прогресс установлен в 0. ---")
+        }
+
+        // 4. Ограничиваем значение прогресса диапазоном от 0.0 до 1.0
+        // Это нужно на случай, если currentXP вдруг станет больше xpToNextLevel (хотя логика в addXP должна это предотвращать)
+        let clampedProgress = max(0.0, min(1.0, progress))
+        
+        // 5. Устанавливаем рассчитанный прогресс в UIProgressView
+        // animated: false, так как обновление происходит перед тем, как view появится
+        xpProgressView.setProgress(clampedProgress, animated: false)
+        
+        // 6. Обновляем другие элементы профиля (имя, ранг, аватар и т.д.) - TODO: Загрузить реальные данные
+        nameLabel.text = profile.username ?? "Игрок" // Используем имя из профиля или дефолтное
+        rankLabel.text = "Ранг: \(profile.rank.rawValue)" // Используем ранг из профиля
+        // TODO: Загрузить и установить изображение аватара (если есть)
+        // avatarImageView.image = ... 
+
+        print("--- PersonVC updateProfileDisplay: UI обновлен (Уровень: \(levelLabel.text ?? "nil"), XP: \(xpLabel.text ?? "nil"), Прогресс: \(xpProgressView.progress)) ---")
     }
 
     // Настройка Views
