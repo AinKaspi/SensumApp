@@ -2,25 +2,6 @@ import UIKit
 import AVFoundation
 import MediaPipeTasksVision
 
-// MARK: - Protocols (Нужны для PoseLandmarkerHelperDelegate)
-// Убедись, что эти структуры/протоколы доступны
-// (Либо определены здесь, либо импортированы из PoseLandmarkerHelper)
-
-// Примерная структура, используемая в делегате MediaPipe
-struct ResultBundle {
-    let inferenceTime: Double
-    let poseLandmarkerResults: [PoseLandmarkerResult?
-    // Добавляем размер кадра, так как он нужен для отрисовки
-    let frameSize: CGSize
-}
-
-// Протокол делегата от PoseLandmarkerHelper
-protocol PoseLandmarkerHelperLiveStreamDelegate: AnyObject {
-    func poseLandmarkerHelper(_ poseLandmarkerHelper: PoseLandmarkerHelper,
-                              didFinishDetection result: ResultBundle?,
-                              error: Error?)
-}
-
 // MARK: - LevelingViewController Class
 
 // ИСПОЛЬЗУЕМ СТАРОЕ ИМЯ КЛАССА, ПОКА НЕ ПЕРЕИМЕНОВАЛИ ФАЙЛ
@@ -52,8 +33,14 @@ class LevelingViewController: UIViewController { // ВАЖНО: Имя клас�
     // -------------------------------------------------------
 
     // MARK: - UI Elements
-    // TODO: Добавить PoseOverlayView, если нужен для отрисовки скелета
-    // private lazy var poseOverlayView: PoseOverlayView = { ... }()
+    // Отображение скелета
+    private lazy var poseOverlayView: PoseOverlayView = {
+        let overlayView = PoseOverlayView()
+        overlayView.translatesAutoresizingMaskIntoConstraints = false
+        overlayView.backgroundColor = .clear
+        overlayView.clearsContextBeforeDrawing = true
+        return overlayView
+    }()
 
     private lazy var xpProgressBar: UIProgressView = {
         let progressView = UIProgressView(progressViewStyle: .bar)
@@ -160,7 +147,7 @@ class LevelingViewController: UIViewController { // ВАЖНО: Имя клас�
         super.viewDidLayoutSubviews()
         // Обновляем frame previewLayer при изменении layout'а
         previewLayer.frame = view.bounds
-        // poseOverlayView.frame = view.bounds // Если используется
+        poseOverlayView.frame = view.bounds // Обновляем frame overlay тоже
     }
 
     // MARK: - UI Setup
@@ -168,7 +155,7 @@ class LevelingViewController: UIViewController { // ВАЖНО: Имя клас�
     private func setupViews() {
         view.backgroundColor = .black // Фон для камеры
         view.layer.addSublayer(previewLayer)
-        // view.addSubview(poseOverlayView) // Если используется
+        view.addSubview(poseOverlayView) // Добавляем overlay
 
         view.addSubview(xpProgressBar)
         view.addSubview(bottomStatsStackView)
@@ -182,15 +169,13 @@ class LevelingViewController: UIViewController { // ВАЖНО: Имя клас�
         // Констрейнты для previewLayer (на весь экран)
         // previewLayer констрейнтов не имеет, устанавливается через frame
         
-        // Констрейнты для poseOverlayView (если используется)
-        /*
+        // Констрейнты для poseOverlayView (раскомментировано)
         NSLayoutConstraint.activate([
             poseOverlayView.topAnchor.constraint(equalTo: view.topAnchor),
             poseOverlayView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             poseOverlayView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             poseOverlayView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
-        */
 
         // Constraints for XP Progress Bar
         NSLayoutConstraint.activate([
@@ -425,18 +410,22 @@ extension LevelingViewController: PoseLandmarkerHelperLiveStreamDelegate {
             }
 
             // Извлекаем landmarks из результата (предполагаем одну позу)
-            if let poseLandmarksArray = result.poseLandmarkerResults.first??.landmarks,
-               let firstPoseLandmarks = poseLandmarksArray.first, !firstPoseLandmarks.isEmpty {
-                 self.squatAnalyzer.analyze(landmarks: firstPoseLandmarks)
+            if let poseLandmarks = result.poseLandmarkerResult?.landmarks, // landmarks здесь [[NormalizedLandmark]]
+                let firstPoseLandmarks = poseLandmarks.first, // Извлекаем первый (и единственный) массив точек -> [NormalizedLandmark]?
+                !firstPoseLandmarks.isEmpty { // Проверяем, что он не пустой
+                self.squatAnalyzer.analyze(landmarks: firstPoseLandmarks) // Передаем [NormalizedLandmark]
             } else {
                  // Поз не найдено или нет точек
                  // Можно сбросить состояние анализатора, если нужно
                  // self.squatAnalyzer.reset()
             }
             
-            // Отрисовка (если используется PoseOverlayView)
-            // guard let frameSize = self.lastFrameSize else { return }
-            // self.poseOverlayView?.drawResult(result, frameSize: frameSize)
+            // Отрисовка скелета
+            guard let frameSize = self.lastFrameSize else {
+                print("Warning: frameSize not available for drawing overlay.")
+                return
+            }
+            self.poseOverlayView.drawResult(result, frameSize: frameSize)
         }
     }
 }
@@ -462,5 +451,159 @@ extension LevelingViewController: SquatAnalyzerDelegate {
     func squatAnalyzer(_ analyzer: SquatAnalyzer, didChangeState newState: String) {
         // Пока можно просто вывести в лог
         print("(Delegate) Squat State Changed: \(newState)")
+    }
+}
+
+// MARK: - PoseOverlayView (Добавляем определение сюда)
+
+// TODO: Этот код можно вынести в отдельный файл Views/PoseOverlayView.swift
+class PoseOverlayView: UIView {
+
+    private var currentResult: ResultBundle?
+    // Добавляем свойство для хранения размера кадра
+    private var currentFrameSize: CGSize = .zero
+
+    override func draw(_ rect: CGRect) {
+        super.draw(rect)
+        // Используем Optional Chaining и guard для безопасности
+        guard let poseResult = currentResult?.poseLandmarkerResult else { return }
+
+        // Отрисовка позы
+        // Используем currentFrameSize для нормализации
+        drawLandmarks(poseResult.landmarks, in: rect, imageSize: currentFrameSize)
+        drawConnections(poseResult.landmarks, in: rect, imageSize: currentFrameSize)
+    }
+
+    /**
+     Рисует точки (landmarks) на вью.
+     - Parameters:
+       - landmarks: Массив точек [[NormalizedLandmark]].
+       - rect: Границы текущего UIView.
+       - imageSize: Размер исходного изображения/кадра, к которому нормализованы landmarks.
+     */
+    private func drawLandmarks(_ landmarks: [[NormalizedLandmark]], in rect: CGRect, imageSize: CGSize) {
+        guard let context = UIGraphicsGetCurrentContext(), !landmarks.isEmpty else { return }
+
+        context.saveGState()
+        context.setFillColor(Constants.pointFillColor.cgColor)
+
+        // Landmarks - это [[NormalizedLandmark]], итерируем по внешнему массиву (хотя у нас он один)
+        for poseLandmarks in landmarks {
+            for landmark in poseLandmarks {
+                // Пропускаем отрисовку, если точка не видна достаточно хорошо (опционально)
+                guard landmark.visibility?.floatValue ?? 0 > 0.1 else { continue }
+                
+                let viewPoint = normalizedPoint(from: landmark, imageSize: imageSize, viewRect: rect)
+                let pointRect = CGRect(x: viewPoint.x - Constants.pointRadius, y: viewPoint.y - Constants.pointRadius, width: Constants.pointRadius * 2, height: Constants.pointRadius * 2)
+                context.fillEllipse(in: pointRect)
+            }
+        }
+        context.restoreGState()
+    }
+
+    /**
+     Рисует линии соединений между точками.
+     - Parameters:
+       - landmarks: Массив точек [[NormalizedLandmark]].
+       - rect: Границы текущего UIView.
+       - imageSize: Размер исходного изображения/кадра, к которому нормализованы landmarks.
+     */
+    private func drawConnections(_ landmarks: [[NormalizedLandmark]], in rect: CGRect, imageSize: CGSize) {
+        guard let context = UIGraphicsGetCurrentContext(), !landmarks.isEmpty else { return }
+
+        context.saveGState()
+        context.setLineWidth(Constants.lineWidth)
+        context.setStrokeColor(Constants.lineColor.cgColor)
+
+        // Итерируем по внешнему массиву поз
+        for poseLandmarks in landmarks { // poseLandmarks здесь типа [NormalizedLandmark]
+            for connection in Constants.poseConnections {
+                guard let startLandmark = poseLandmarks[safe: connection.start],
+                      let endLandmark = poseLandmarks[safe: connection.end] else {
+                    continue // Пропускаем, если индексы некорректны
+                }
+                
+                // Проверяем видимость обеих точек для соединения (опционально)
+                guard startLandmark.visibility?.floatValue ?? 0 > 0.1,
+                      endLandmark.visibility?.floatValue ?? 0 > 0.1 else {
+                    continue
+                }
+
+                let startPoint = normalizedPoint(from: startLandmark, imageSize: imageSize, viewRect: rect)
+                let endPoint = normalizedPoint(from: endLandmark, imageSize: imageSize, viewRect: rect)
+
+                context.move(to: startPoint)
+                context.addLine(to: endPoint)
+                context.strokePath()
+            }
+        }
+        context.restoreGState()
+    }
+
+    // MARK: - Public Methods
+    /**
+     Устанавливает результат для отрисовки и вызывает перерисовку.
+     - Parameter result: Результат от PoseLandmarkerHelper.
+     */
+    func drawResult(_ result: ResultBundle?, frameSize: CGSize) {
+        self.currentResult = result
+        // Сохраняем размер кадра
+        self.currentFrameSize = frameSize
+        self.setNeedsDisplay()
+    }
+
+    /**
+     Очищает текущий результат и перерисовывает (становится пустым).
+     */
+    func clearOverlay() {
+        self.currentResult = nil
+        self.setNeedsDisplay()
+    }
+
+    // MARK: - Helper Methods
+    /**
+     Преобразует нормализованную точку из координат изображения в координаты UIView.
+     */
+    private func normalizedPoint(from normalizedLandmark: NormalizedLandmark, imageSize: CGSize, viewRect: CGRect) -> CGPoint {
+        guard imageSize.width > 0, imageSize.height > 0 else { return .zero }
+
+        let absoluteX = CGFloat(normalizedLandmark.x) * imageSize.width
+        let absoluteY = CGFloat(normalizedLandmark.y) * imageSize.height
+
+        let viewWidth = viewRect.width
+        let viewHeight = viewRect.height
+        let scaleX = viewWidth / imageSize.width
+        let scaleY = viewHeight / imageSize.height
+        let scale = max(scaleX, scaleY) // .resizeAspectFill
+
+        let offsetX = (viewWidth - imageSize.width * scale) / 2.0
+        let offsetY = (viewHeight - imageSize.height * scale) / 2.0
+
+        let viewPointX = absoluteX * scale + offsetX
+        let viewPointY = absoluteY * scale + offsetY
+
+        return CGPoint(x: viewPointX, y: viewPointY)
+    }
+
+    // MARK: - Constants
+    private enum Constants {
+        static let pointRadius: CGFloat = 5.0
+        static let pointFillColor: UIColor = .yellow
+        static let lineWidth: CGFloat = 2.0
+        static let lineColor: UIColor = .green
+
+        static let poseConnections: [(start: Int, end: Int)] = [
+            (start: 11, end: 12), (start: 11, end: 23), (start: 12, end: 24), (start: 23, end: 24),
+            (start: 11, end: 13), (start: 13, end: 15), (start: 12, end: 14), (start: 14, end: 16),
+            (start: 23, end: 25), (start: 25, end: 27), (start: 24, end: 26), (start: 26, end: 28)
+            // Добавь другие соединения при необходимости
+        ]
+    }
+}
+
+// Добавляем утилиту безопасного доступа к массиву, если ее нет в другом месте
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        return indices.contains(index) ? self[index] : nil
     }
 }

@@ -52,9 +52,7 @@ protocol PoseLandmarkerHelperVideoDelegate: AnyObject {
  */
 struct ResultBundle {
   let inferenceTime: Double
-  let poseLandmarkerResults: [PoseLandmarkerResult?] // Can contain multiple poses
-  // УДАЛЯЕМ поле size, его будет передавать ViewController
-  // var size: CGSize
+  let poseLandmarkerResult: PoseLandmarkerResult? // Один результат
 }
 
 // MARK: - PoseLandmarkerHelper Class -
@@ -236,7 +234,7 @@ class PoseLandmarkerHelper: NSObject {
       let result = try landmarker.detect(image: mpImage)
       let inferenceTime = Date().timeIntervalSince(startDate) * 1000
       // В ResultBundle больше нет size
-      return ResultBundle(inferenceTime: inferenceTime, poseLandmarkerResults: [result])
+      return ResultBundle(inferenceTime: inferenceTime, poseLandmarkerResult: result)
     } catch {
       print("Failed to detect pose in image: \(error)")
       // Можно передать ошибку наружу, если нужно
@@ -334,7 +332,7 @@ class PoseLandmarkerHelper: NSObject {
 
     return ResultBundle(
       inferenceTime: averageInferenceTime,
-      poseLandmarkerResults: resultsTuple.poseLandmarkerResults
+      poseLandmarkerResult: resultsTuple.poseLandmarkerResults.first.flatMap { $0 }
     )
   }
 
@@ -451,8 +449,7 @@ extension PoseLandmarkerHelper: PoseLandmarkerLiveStreamDelegate {
     // 4. Создаем ResultBundle БЕЗ размера
     let resultBundle = ResultBundle(
       inferenceTime: Date().timeIntervalSince1970 * 1000 - Double(timestampInMilliseconds),
-      poseLandmarkerResults: [poseResult]
-      // size больше нет
+      poseLandmarkerResult: poseResult
     )
 
     // 5. Уведомляем наш внешний делегат (LevelingViewController)
