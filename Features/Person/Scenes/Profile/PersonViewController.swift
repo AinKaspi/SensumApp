@@ -1,5 +1,8 @@
 import UIKit
 
+// Добавляем Charts для RadarChartView, если он используется
+// import Charts 
+
 // --- Модели Данных ---
 struct Achievement {
     let id: String
@@ -20,7 +23,7 @@ protocol PersonViewControllerDelegate: AnyObject {
 }
 
 // --- Класс ViewController ---
-class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
+class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
 
     // --- Свойства ---
     weak var delegate: PersonViewControllerDelegate?
@@ -291,6 +294,7 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
         setupViews()
         setupConstraints()
         addTapGestures()
+        setupAvatarTapGesture() // Добавляем настройку нажатия на аватар
     }
     
     // Отладочный Print
@@ -349,7 +353,14 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
         nameLabel.text = profile.username ?? "Игрок" // Используем имя из профиля или дефолтное
         rankLabel.text = "Ранг: \(profile.rank.rawValue)" // Используем ранг из профиля
         // TODO: Загрузить и установить изображение аватара (если есть)
-        // avatarImageView.image = ... 
+        if let avatar = loadAvatarImage(forUserID: profile.userID) {
+            print("--- PersonVC updateProfileDisplay: Загружен сохраненный аватар ---")
+            avatarImageView.image = avatar
+        } else {
+            print("--- PersonVC updateProfileDisplay: Сохраненный аватар не найден, используется стандартный вид ---")
+            avatarImageView.image = nil // Убедимся, что старое изображение убрано, если аватар удалили/не нашли
+            avatarImageView.backgroundColor = .lightGray // Возвращаем серый фон, если нет картинки
+        }
 
         print("--- PersonVC updateProfileDisplay: UI обновлен (Уровень: \(levelLabel.text ?? "nil"), XP: \(xpLabel.text ?? "nil"), Прогресс: \(xpProgressView.progress)) ---")
     }
@@ -394,6 +405,17 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
         let feedTap = UITapGestureRecognizer(target: self, action: #selector(feedHeaderTapped))
         feedTap.delegate = self
         feedContainerView.addGestureRecognizer(feedTap)
+    }
+    
+    // Добавляем настройку жеста для аватара
+    private func setupAvatarTapGesture() {
+        // Делаем avatarImageView интерактивным
+        avatarImageView.isUserInteractionEnabled = true
+        // Создаем распознаватель нажатия
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(avatarTapped))
+        // Добавляем его к avatarImageView
+        avatarImageView.addGestureRecognizer(tapGesture)
+        print("--- PersonVC setupAvatarTapGesture: Распознаватель нажатия добавлен к avatarImageView ---")
     }
 
     // Настройка констрейнтов
@@ -489,6 +511,21 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate {
         delegate?.personViewControllerDidRequestShowAllFeed(self)
     }
 
+    // --- Обработчик нажатия на аватар ---
+    @objc private func avatarTapped() {
+        print("--- PersonVC avatarTapped: Аватар нажат, открываем UIImagePickerController ---")
+        // Создаем стандартный контроллер для выбора изображений
+        let imagePickerController = UIImagePickerController()
+        // Устанавливаем делегата для получения результата выбора
+        imagePickerController.delegate = self
+        // Указываем, что хотим выбирать из фотогалереи
+        imagePickerController.sourceType = .photoLibrary
+        // Опционально: разрешить редактирование (кадрирование) перед выбором
+        // imagePickerController.allowsEditing = true 
+        // Показываем контроллер выбора изображения
+        present(imagePickerController, animated: true, completion: nil)
+    }
+
     // --- UIGestureRecognizerDelegate ---
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         return true
@@ -531,6 +568,140 @@ extension PersonViewController: UITableViewDataSource {
         let event = feedEvents[indexPath.row]
         cell.configure(with: event, dateFormatter: dateFormatter)
         return cell
+    }
+}
+
+// MARK: - UIImagePickerControllerDelegate Methods
+
+extension PersonViewController {
+    
+    // Метод вызывается, когда пользователь выбрал изображение (или видео)
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        print("--- PersonVC imagePickerController:didFinishPickingMediaWithInfo: Изображение выбрано ---")
+        
+        // Пытаемся получить выбранное изображение
+        // Сначала проверяем отредактированное изображение (если allowsEditing = true)
+        // Иначе берем оригинальное
+        guard let selectedImage = info[.editedImage] as? UIImage ?? info[.originalImage] as? UIImage else {
+            print("--- PersonVC imagePickerController: Ошибка: Не удалось получить выбранное изображение ---")
+            // Закрываем пикер в любом случае
+            picker.dismiss(animated: true, completion: nil)
+            return
+        }
+        
+        // 1. Обновляем UI немедленно
+        avatarImageView.image = selectedImage
+        print("--- PersonVC imagePickerController: avatarImageView обновлен выбранным изображением ---")
+        
+        // 2. Сохраняем изображение в файл
+        // Получаем ID текущего пользователя для имени файла
+        let userID = DataManager.shared.getCurrentUserProfile().userID
+        if saveAvatarImage(selectedImage, forUserID: userID) {
+            print("--- PersonVC imagePickerController: Выбранный аватар успешно сохранен для userID: \(userID) ---")
+        } else {
+            print("--- PersonVC imagePickerController: Ошибка при сохранении аватара для userID: \(userID) ---")
+            // Можно показать пользователю сообщение об ошибке, если сохранение критично
+        }
+
+        // 3. Закрываем контроллер выбора изображения
+        picker.dismiss(animated: true, completion: nil)
+    }
+
+    // Метод вызывается, если пользователь нажал "Отмена"
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        print("--- PersonVC imagePickerControllerDidCancel: Пользователь отменил выбор изображения ---")
+        // Просто закрываем контроллер выбора
+        picker.dismiss(animated: true, completion: nil)
+    }
+}
+
+// MARK: - Avatar File Management Helpers
+
+extension PersonViewController {
+
+    /// Получает URL для сохранения/загрузки аватара пользователя.
+    /// - Parameter userID: Уникальный идентификатор пользователя.
+    /// - Returns: Полный URL файла аватара в папке Documents или nil, если не удалось получить папку Documents.
+    private func getAvatarFileURL(forUserID userID: UUID) -> URL? {
+        // Получаем URL папки Documents для текущего пользователя
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            print("--- PersonVC getAvatarFileURL: Ошибка: Не удалось получить доступ к папке Documents ---")
+            return nil
+        }
+        // Формируем имя файла, используя UUID пользователя, чтобы оно было уникальным
+        // Используем .png как формат по умолчанию
+        let fileName = "avatar_\(userID.uuidString).png"
+        // Создаем полный URL, добавляя имя файла к пути папки Documents
+        return documentsDirectory.appendingPathComponent(fileName)
+    }
+
+    /// Сохраняет изображение аватара в папку Documents.
+    /// - Parameters:
+    ///   - image: Изображение для сохранения.
+    ///   - userID: ID пользователя, для которого сохраняется аватар.
+    /// - Returns: `true` при успешном сохранении, `false` при ошибке.
+    private func saveAvatarImage(_ image: UIImage, forUserID userID: UUID) -> Bool {
+        print("--- PersonVC saveAvatarImage: Попытка сохранения аватара для userID: \(userID) ---")
+        // Получаем URL файла, куда будем сохранять
+        guard let fileURL = getAvatarFileURL(forUserID: userID) else {
+            print("--- PersonVC saveAvatarImage: Ошибка: Не удалось получить URL файла для сохранения ---")
+            return false
+        }
+
+        // Конвертируем UIImage в данные в формате PNG
+        // PNG сохраняет прозрачность и обычно без потерь качества
+        guard let imageData = image.pngData() else {
+            print("--- PersonVC saveAvatarImage: Ошибка: Не удалось конвертировать UIImage в PNG data ---")
+            return false
+        }
+
+        // Пытаемся записать данные в файл
+        do {
+            // Атомарная запись означает, что файл сначала полностью записывается во временное место,
+            // а затем перемещается в конечное, что безопаснее при сбоях.
+            try imageData.write(to: fileURL, options: .atomic)
+            print("--- PersonVC saveAvatarImage: Изображение успешно сохранено по пути: \(fileURL.path) ---")
+            return true
+        } catch {
+            // Если произошла ошибка при записи, выводим ее в лог
+            print("--- PersonVC saveAvatarImage: Ошибка записи данных изображения в файл: \(error.localizedDescription) ---")
+            return false
+        }
+    }
+
+    /// Загружает изображение аватара из папки Documents.
+    /// - Parameter userID: ID пользователя, чей аватар нужно загрузить.
+    /// - Returns: Загруженное изображение `UIImage` или `nil`, если файл не найден или произошла ошибка.
+    private func loadAvatarImage(forUserID userID: UUID) -> UIImage? {
+        print("--- PersonVC loadAvatarImage: Попытка загрузки аватара для userID: \(userID) ---")
+        // Получаем URL файла, откуда будем загружать
+        guard let fileURL = getAvatarFileURL(forUserID: userID) else {
+            print("--- PersonVC loadAvatarImage: Ошибка: Не удалось получить URL файла для загрузки ---")
+            return nil
+        }
+
+        // Проверяем, существует ли файл по указанному пути
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            print("--- PersonVC loadAvatarImage: Файл аватара не найден по пути: \(fileURL.path) ---")
+            return nil
+        }
+
+        // Пытаемся загрузить данные из файла
+        do {
+            let imageData = try Data(contentsOf: fileURL)
+            // Пытаемся создать UIImage из загруженных данных
+            if let image = UIImage(data: imageData) {
+                 print("--- PersonVC loadAvatarImage: Изображение успешно загружено из файла ---")
+                return image
+            } else {
+                print("--- PersonVC loadAvatarImage: Ошибка: Не удалось создать UIImage из данных файла ---")
+                return nil
+            }
+        } catch {
+            // Если произошла ошибка при чтении данных из файла
+            print("--- PersonVC loadAvatarImage: Ошибка чтения данных изображения из файла: \(error.localizedDescription) ---")
+            return nil
+        }
     }
 }
 
