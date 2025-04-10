@@ -4,8 +4,13 @@ import AVFoundation // Для AVFoundation типов, если понадобя
 import MediaPipeTasksVision
 import UIKit // Для UIImage
 
-// TODO: Определить протокол для связи ViewModel -> View
-// protocol ExerciseExecutionViewModelViewDelegate: AnyObject { ... }
+// Определяем протокол для связи ViewModel -> View
+protocol ExerciseExecutionViewModelViewDelegate: AnyObject {
+    func viewModelDidUpdateTimer(timeString: String)
+    func viewModelDidUpdateProgress(currentXP: Int, xpToNextLevel: Int)
+    func viewModelDidUpdateGoal(current: Int, target: Int)
+    // TODO: Добавить методы для сообщения о повышении уровня, ошибках и т.д.
+}
 
 class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSObject для соответствия протоколам делегатов
 
@@ -37,16 +42,22 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     private(set) var isPreparing: Bool = false // Флаг, что идет подготовка
     private var countdownTimer: Timer?
     private var countdownValue: Int = 3
+    // Свойства для прогрессивной цели
+    private var progressiveSquatGoal: Int = 5
+    private let progressiveGoalIncrement: Int = 5
+    private var squatsTowardsProgressiveGoal: Int = 0
+    private let bonusXPForGoal: Int = 50 // Базовый бонус за цель
     
     // TODO: Добавить свойства для счетчиков прогрессивной цели
     // private var progressiveSquatGoal: Int = 5 ...
 
     // MARK: - Delegate
-    // weak var viewDelegate: ExerciseExecutionViewModelViewDelegate?
+    weak var viewDelegate: ExerciseExecutionViewModelViewDelegate?
 
-    init(exercise: Exercise) {
+    init(exercise: Exercise, viewDelegate: ExerciseExecutionViewModelViewDelegate?) {
         self.exercise = exercise
         self.userProfile = DataManager.shared.getCurrentUserProfile()
+        self.viewDelegate = viewDelegate // Сохраняем делегата
         super.init() // Нужно вызвать super.init(), так как наследуемся от NSObject
         print("ExerciseExecutionViewModel initialized for exercise: \(exercise.name)")
         // Назначаем себя делегатом анализатора
@@ -55,6 +66,9 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
         sessionQueue.async {
             self.setupPoseLandmarker()
         }
+        // Сообщаем View начальное время (00:00)
+        viewDelegate?.viewModelDidUpdateTimer(timeString: "00:00")
+        print("--- ExerciseExecutionVM: Таймер запущен --- ")
     }
     
     // MARK: - Public Methods (для View Controller)
@@ -202,7 +216,7 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
         let seconds = elapsedTime % 60
         let timeString = String(format: "%02d:%02d", minutes, seconds)
         // Сообщаем View обновленное время
-        // TODO: viewDelegate?.viewModelDidUpdateTime(timeString: timeString)
+        viewDelegate?.viewModelDidUpdateTimer(timeString: timeString)
         print("--- ExerciseExecutionVM: Тик таймера: \(timeString) ---")
     }
 }
@@ -316,12 +330,32 @@ extension ExerciseExecutionViewModel: SquatAnalyzerDelegate {
         let balGain = 1
         profile.gainAttributes(strGain: strGain, conGain: conGain, balGain: balGain)
         
-        // 5. Продвигаем сессионную прогрессивную цель (эту логику тоже нужно перенести)
-        // TODO: Перенести сюда свойства progressiveSquatGoal, squatsTowardsProgressiveGoal и логику бонуса
-        // squatsTowardsProgressiveGoal += 1
-        // if squatsTowardsProgressiveGoal >= progressiveSquatGoal { ... profile.addXP(bonusXPForGoal) ... }
+        // 5. Продвигаем сессионную прогрессивную цель
+        squatsTowardsProgressiveGoal += 1
+        print("--- ExerciseExecutionVM: Прогресс к цели: \(squatsTowardsProgressiveGoal)/\(progressiveSquatGoal) ---")
         
-        // 6. Сохраняем обновленный профиль
+        if squatsTowardsProgressiveGoal >= progressiveSquatGoal {
+            print("--- ExerciseExecutionVM: Progressive Goal #\(progressiveSquatGoal) Reached! --- ")
+            // Добавляем бонусный опыт
+            let didLevelUpBonus = profile.addXP(bonusXPForGoal)
+            if didLevelUpBonus {
+                print("--- ExerciseExecutionVM: Обнаружено повышение уровня после БОНУСНОГО XP! ---")
+                // TODO: Сообщить View о повышении уровня (возможно, особым образом)
+            }
+            
+            // Увеличиваем следующую цель и сбрасываем счетчик
+            progressiveSquatGoal += progressiveGoalIncrement
+            squatsTowardsProgressiveGoal = 0
+            print("--- ExerciseExecutionVM: Новая цель: \(progressiveSquatGoal) приседаний --- ")
+            // TODO: Сообщить View об обновлении цели
+            viewDelegate?.viewModelDidUpdateGoal(current: squatsTowardsProgressiveGoal, target: progressiveSquatGoal)
+        } else {
+            // Если цель не достигнута, просто сообщаем View текущий прогресс к цели
+             // TODO: Сообщить View об обновлении цели
+             viewDelegate?.viewModelDidUpdateGoal(current: squatsTowardsProgressiveGoal, target: progressiveSquatGoal)
+        }
+        
+        // 6. Сохраняем обновленный профиль (после всех изменений XP и атрибутов)
         DataManager.shared.updateUserProfile(profile)
         // Обновляем локальную копию во ViewModel
         self.userProfile = profile 
@@ -329,6 +363,10 @@ extension ExerciseExecutionViewModel: SquatAnalyzerDelegate {
         // 7. Сообщаем View об обновлении данных (количество приседаний, XP)
         // TODO: Определить и вызвать метод делегата View
         // viewDelegate?.viewModelDidUpdateProgress(totalSquats: profile.totalSquats, currentXP: profile.currentXP, xpToNextLevel: profile.xpToNextLevel)
+        // Сообщаем View об обновлении прогресса XP
+        viewDelegate?.viewModelDidUpdateProgress(currentXP: profile.currentXP, xpToNextLevel: profile.xpToNextLevel)
+        // Сообщаем View об обновлении цели (после if/else)
+        viewDelegate?.viewModelDidUpdateGoal(current: squatsTowardsProgressiveGoal, target: progressiveSquatGoal)
     }
     
     func squatAnalyzer(_ analyzer: SquatAnalyzer, didChangeState newState: String) {

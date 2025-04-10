@@ -203,7 +203,10 @@ class LevelingCoordinator: Coordinator, ExerciseSelectionViewModelCoordinatorDel
         print("--- LevelingCoordinator: Получено событие выбора упражнения: \(exercise.name) ---")
         // Создаем и показываем экран выполнения
         let executionVC = ExerciseExecutionViewController()
-        executionVC.selectedExercise = exercise // Передаем выбранное упражнение
+        // Создаем ViewModel, передавая упражнение и делегата (сам VC)
+        let executionViewModel = ExerciseExecutionViewModel(exercise: exercise, viewDelegate: executionVC)
+        executionVC.viewModel = executionViewModel // Устанавливаем ViewModel для VC
+        executionVC.selectedExercise = exercise // Передаем выбранное упражнение (может быть уже не нужно, если VM всем рулит)
         executionVC.title = exercise.name // Устанавливаем заголовок
         navigationController.pushViewController(executionVC, animated: true)
     }

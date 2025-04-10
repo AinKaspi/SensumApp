@@ -9,15 +9,8 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
 
     // MARK: - Dependencies & Core Logic
     var selectedExercise: Exercise? // Добавляем свойство для хранения выбранного упражнения
-    // Создаем ViewModel (будет передаваться извне или создаваться здесь)
-    // TODO: Решить, как передавать ViewModel (Dependency Injection)
-    lazy var viewModel: ExerciseExecutionViewModel = {
-        guard let exercise = selectedExercise else {
-            // В реальном приложении нужна более надежная обработка ошибки
-            fatalError("ExerciseExecutionViewController требует selectedExercise")
-        }
-        return ExerciseExecutionViewModel(exercise: exercise)
-    }()
+    // Оставляем только объявление viewModel. Он будет установлен координатором.
+    var viewModel: ExerciseExecutionViewModel!
     
     // Удаляем свойства, связанные с MediaPipe и анализом
     // private var poseLandmarkerHelper: PoseLandmarkerHelper?
@@ -320,6 +313,36 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
     }
 
 } // Конец class ExerciseExecutionViewController
+
+// MARK: - ExerciseExecutionViewModelViewDelegate
+extension ExerciseExecutionViewController: ExerciseExecutionViewModelViewDelegate {
+    
+    func viewModelDidUpdateTimer(timeString: String) {
+        // Обновляем UI в главном потоке
+        DispatchQueue.main.async {
+            self.timerLabel.text = "Time: \(timeString)"
+        }
+    }
+    
+    func viewModelDidUpdateProgress(currentXP: Int, xpToNextLevel: Int) {
+        // Обновляем UI в главном потоке
+        DispatchQueue.main.async {
+            let progress = xpToNextLevel > 0 ? Float(currentXP) / Float(xpToNextLevel) : 0
+            let clampedProgress = max(0.0, min(1.0, progress))
+            self.xpProgressBar.setProgress(clampedProgress, animated: true) // Можно анимировать
+            // TODO: Возможно, обновить и текстовые метки XP, если они появятся
+        }
+    }
+    
+    func viewModelDidUpdateGoal(current: Int, target: Int) {
+        // Обновляем UI в главном потоке
+        DispatchQueue.main.async {
+            self.progressiveGoalLabel.text = "Goal: \(current)/\(target)"
+        }
+    }
+    
+    // TODO: Реализовать другие методы делегата (level up, error, etc.)
+}
 
 // MARK: - Delegates
 
