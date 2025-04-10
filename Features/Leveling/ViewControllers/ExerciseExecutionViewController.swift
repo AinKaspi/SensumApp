@@ -4,9 +4,8 @@ import MediaPipeTasksVision
 
 // MARK: - LevelingViewController Class
 
-// ИСПОЛЬЗУЕМ СТАРОЕ ИМЯ КЛАССА, ПОКА НЕ ПЕРЕИМЕНОВАЛИ ФАЙЛ
-// ПОТОМ НУЖНО БУДЕТ ВЕРНУТЬ LevelingViewController
-class LevelingViewController: UIViewController { // ВАЖНО: Имя класса должно совпадать с именем файла после переименования!
+// Переименовываем класс в ExerciseExecutionViewController
+class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя класса должно совпадать с именем файла после переименования!
 
     // MARK: - Dependencies & Core Logic
     private var poseLandmarkerHelper: PoseLandmarkerHelper?
@@ -376,11 +375,11 @@ class LevelingViewController: UIViewController { // ВАЖНО: Имя клас�
         }
     }
 
-} // Конец class LevelingViewController
+} // Конец class ExerciseExecutionViewController
 
 // MARK: - Delegates
 
-extension LevelingViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
+extension ExerciseExecutionViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         // Выполняется в sessionQueue
         guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
@@ -402,9 +401,10 @@ extension LevelingViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
     }
 }
 
-extension LevelingViewController: PoseLandmarkerHelperLiveStreamDelegate {
+extension ExerciseExecutionViewController: PoseLandmarkerHelperLiveStreamDelegate {
+    // Обновляем имя параметра на resultBundle, как в протоколе
     func poseLandmarkerHelper(_ poseLandmarkerHelper: PoseLandmarkerHelper,
-                              didFinishDetection result: ResultBundle?,
+                              didFinishDetection resultBundle: ResultBundle?,
                               error: Error?) {
         // Вызывается из PoseLandmarkerHelper
         DispatchQueue.main.async { [weak self] in
@@ -412,39 +412,54 @@ extension LevelingViewController: PoseLandmarkerHelperLiveStreamDelegate {
             
             // Обработка ошибки
             if let error = error {
-                print("Ошибка детекции поз: \(error.localizedDescription)")
-                // self.poseOverlayView?.clearOverlay() // Если используется
+                print("Ошибка детекции поз: \\(error.localizedDescription)")
+                self.poseOverlayView.clearOverlay() // Очищаем старый оверлей при ошибке
                 return
             }
             
             // Обработка результата
-            guard let result = result else {
-                // self.poseOverlayView?.clearOverlay() // Если используется
+            guard let resultBundle = resultBundle else {
+                self.poseOverlayView.clearOverlay() // Очищаем, если результата нет
                 return
             }
 
-            // Извлекаем landmarks из результата (предполагаем одну позу)
-            if let poseLandmarks = result.poseLandmarkerResult?.landmarks, // landmarks здесь [[NormalizedLandmark]]
-                let firstPoseLandmarks = poseLandmarks.first, // Извлекаем первый (и единственный) массив точек -> [NormalizedLandmark]?
-                !firstPoseLandmarks.isEmpty { // Проверяем, что он не пустой
-                self.squatAnalyzer.analyze(landmarks: firstPoseLandmarks) // Передаем [NormalizedLandmark]
+            // --- ИЗВЛЕКАЕМ 3D КООРДИНАТЫ --- 
+            // resultBundle.poseWorldLandmarks содержит [[Landmark]]?
+            // Landmark содержит x, y, z в метрах
+            if let worldLandmarks = resultBundle.poseWorldLandmarks,
+               let firstPoseWorldLandmarks = worldLandmarks.first, // Берем первую обнаруженную позу
+               !firstPoseWorldLandmarks.isEmpty {
+                // Передаем 3D-координаты в анализатор
+                // Раскомментируем вызов, так как SquatAnalyzer теперь принимает [Landmark]
+                self.squatAnalyzer.analyze(worldLandmarks: firstPoseWorldLandmarks)
+                print("--- LevelingVC: Получены 3D worldLandmarks (\\(firstPoseWorldLandmarks.count) точек). Переданы в анализатор. ---")
             } else {
-                 // Поз не найдено или нет точек
-                 // Можно сбросить состояние анализатора, если нужно
-                 // self.squatAnalyzer.reset()
+                 // Поз не найдено или нет 3D точек
+                 self.squatAnalyzer.reset() // Сбрасываем состояние анализатора
+                 print("--- LevelingVC: Не найдены 3D worldLandmarks. Анализатор сброшен. ---")
             }
             
-            // Отрисовка скелета
+            // --- Отрисовка скелета (ПОКА ОТКЛЮЧАЕМ/УПРОЩАЕМ) ---
+            // TODO: Обновить PoseOverlayView для отрисовки 3D-точек или временно отключить
+            /* 
             guard let frameSize = self.lastFrameSize else {
                 print("Warning: frameSize not available for drawing overlay.")
                 return
             }
-            self.poseOverlayView.drawResult(result, frameSize: frameSize)
+            // Сейчас PoseOverlayView ожидает старый ResultBundle и 2D точки.
+            // Нужно либо передавать 2D точки (resultBundle.poseLandmarks), 
+            // либо переделать PoseOverlayView для 3D.
+            // Пока очистим, чтобы не было ошибок.
+            */
+            self.poseOverlayView.clearOverlay() 
+            // Или временно передаем 2D, если хотим видеть хоть что-то:
+            // self.poseOverlayView.drawResult(resultBundle.poseLandmarks, frameSize: frameSize)
+            
         }
     }
 }
 
-extension LevelingViewController: SquatAnalyzerDelegate {
+extension ExerciseExecutionViewController: SquatAnalyzerDelegate {
     func squatAnalyzer(_ analyzer: SquatAnalyzer, didCountSquat newTotalCount: Int) {
         // Убедимся, что профиль загружен
         guard var profile = userProfile else {
