@@ -17,9 +17,8 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     // MARK: - Dependencies
     private let exercise: Exercise
     private var userProfile: UserProfile?
-    // Переносим анализатор и хелпер сюда
-    // TODO: Инициализировать анализатор в зависимости от exercise.id
-    private var analyzer: SquatAnalyzer? = SquatAnalyzer() // Пока оставляем SquatAnalyzer
+    // Используем протокол ExerciseAnalyzer
+    private var analyzer: ExerciseAnalyzer?
     private var poseLandmarkerHelper: PoseLandmarkerHelper?
     private let sessionQueue = DispatchQueue(label: "com.sensum.sessionQueue.execVM") // Отдельная очередь для VM
     
@@ -60,6 +59,10 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
         self.viewDelegate = viewDelegate // Сохраняем делегата
         super.init() // Нужно вызвать super.init(), так как наследуемся от NSObject
         print("ExerciseExecutionViewModel initialized for exercise: \(exercise.name)")
+        
+        // Создаем нужный анализатор в зависимости от упражнения
+        setupAnalyzer(for: exercise)
+        
         // Назначаем себя делегатом анализатора
         self.analyzer?.delegate = self 
         // Запускаем настройку MediaPipe в фоновой очереди
@@ -123,6 +126,22 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
             // TODO: Обработать ошибку
         } else {
             print("ExerciseExecutionViewModel: PoseLandmarkerHelper успешно инициализирован.")
+        }
+    }
+    
+    // MARK: - Analyzer Setup
+    /// Создает и настраивает анализатор для выбранного упражнения
+    private func setupAnalyzer(for exercise: Exercise) {
+        switch exercise.id {
+        case "squats":
+            print("--- ExerciseExecutionVM: Создание SquatAnalyzer3D ---")
+            self.analyzer = SquatAnalyzer3D(delegate: self)
+        // TODO: Добавить кейсы для других упражнений
+        // case "pushups":
+        //    self.analyzer = PushupAnalyzer(delegate: self)
+        default:
+            print("--- ExerciseExecutionVM ВНИМАНИЕ: Неизвестный ID упражнения ('\(exercise.id)') - анализатор не создан. ---")
+            self.analyzer = nil
         }
     }
     
@@ -291,14 +310,15 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
     }
 }
 
-// Добавляем extension для делегата SquatAnalyzer
-extension ExerciseExecutionViewModel: SquatAnalyzerDelegate {
-    func squatAnalyzer(_ analyzer: SquatAnalyzer, didCountSquat newTotalCount: Int) {
-        print("--- ExerciseExecutionVM: SquatAnalyzer засчитал приседание #\(newTotalCount) ---")
+// Обновляем extension для НОВОГО делегата ExerciseAnalyzerDelegate
+extension ExerciseExecutionViewModel: ExerciseAnalyzerDelegate {
+    // Метод вызывается новым протоколом
+    func exerciseAnalyzer(_ analyzer: ExerciseAnalyzer, didCountRepetition newTotalCount: Int) {
+        print("--- ExerciseExecutionVM: Анализатор засчитал повторение #\(newTotalCount) ---")
         
         // Получаем текущий профиль (он должен быть загружен в init)
         guard var profile = userProfile else {
-            print("ExerciseExecutionVM Ошибка: User profile is nil в squatAnalyzer delegate.")
+            print("ExerciseExecutionVM Ошибка: User profile is nil в exerciseAnalyzer delegate.")
             return
         }
         
@@ -369,8 +389,9 @@ extension ExerciseExecutionViewModel: SquatAnalyzerDelegate {
         viewDelegate?.viewModelDidUpdateGoal(current: squatsTowardsProgressiveGoal, target: progressiveSquatGoal)
     }
     
-    func squatAnalyzer(_ analyzer: SquatAnalyzer, didChangeState newState: String) {
-        print("--- ExerciseExecutionVM: SquatAnalyzer сменил состояние на \(newState) ---")
+    // Метод вызывается новым протоколом
+    func exerciseAnalyzer(_ analyzer: ExerciseAnalyzer, didChangeState newState: String) {
+        print("--- ExerciseExecutionVM: Анализатор сменил состояние на \(newState) ---")
         // TODO: Передать информацию об изменении состояния во View?
         // viewDelegate?.viewModelDidChangeState(newState)
     }
