@@ -9,9 +9,19 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
 
     // MARK: - Dependencies & Core Logic
     var selectedExercise: Exercise? // Добавляем свойство для хранения выбранного упражнения
+    // Создаем ViewModel (будет передаваться извне или создаваться здесь)
+    // TODO: Решить, как передавать ViewModel (Dependency Injection)
+    lazy var viewModel: ExerciseExecutionViewModel = {
+        guard let exercise = selectedExercise else {
+            // В реальном приложении нужна более надежная обработка ошибки
+            fatalError("ExerciseExecutionViewController требует selectedExercise")
+        }
+        return ExerciseExecutionViewModel(exercise: exercise)
+    }()
     
-    private var poseLandmarkerHelper: PoseLandmarkerHelper?
-    private let squatAnalyzer: SquatAnalyzer = SquatAnalyzer() // Явный тип
+    // Удаляем свойства, связанные с MediaPipe и анализом
+    // private var poseLandmarkerHelper: PoseLandmarkerHelper?
+    // private let squatAnalyzer: SquatAnalyzer = SquatAnalyzer() 
 
     // MARK: - AVFoundation Properties
     private var captureSession = AVCaptureSession()
@@ -23,15 +33,11 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
     private var videoDataOutput = AVCaptureVideoDataOutput()
     private let sessionQueue = DispatchQueue(label: "com.sensum.sessionQueue")
 
-    // MARK: - MediaPipe Properties
-    private let modelPath = "pose_landmarker_full.task" // Убедись, что имя верное
-    // --- Параметры для инициализации хелпера (могут быть в DefaultConstants) ---
-    private let numPoses = 1
-    private let minPoseDetectionConfidence: Float = 0.5
-    private let minPosePresenceConfidence: Float = 0.5
-    private let minTrackingConfidence: Float = 0.5
-    private let computeDelegate: Delegate = .GPU // Или .CPU
-    // -------------------------------------------------------
+    // Удаляем свойства MediaPipe
+    /*
+    private let modelPath = "pose_landmarker_full.task"
+    // ... остальные параметры ... 
+    */
 
     // MARK: - UI Elements
     // Отображение скелета
@@ -120,34 +126,49 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Загружаем профиль пользователя
-        userProfile = DataManager.shared.getCurrentUserProfile()
+        // Удаляем загрузку профиля, этим займется ViewModel
+        // userProfile = DataManager.shared.getCurrentUserProfile()
         
         setupViews()
         setupConstraints()
-        squatAnalyzer.delegate = self
-        resetSessionState()
+        // Удаляем назначение делегата анализатору, ViewModel сама это сделает
+        // squatAnalyzer.delegate = self
+        // Удаляем resetSessionState, логика состояния переедет в ViewModel
+        // resetSessionState()
 
-        // Настраиваем AVFoundation и MediaPipe
+        // Настраиваем AVFoundation (остается здесь, т.к. управляет View)
         setupAVSession()
+        // Удаляем запуск настройки MediaPipe, ViewModel сама запустит
+        /*
         sessionQueue.async { [weak self] in
             self?.setupPoseLandmarker()
         }
+        */
+        // Сообщаем ViewModel, что View загрузилась
+        viewModel.viewDidLoad()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        startSession() // Запускаем камеру
-        if sessionStartDate == nil { // Запускаем таймер, если сессия новая
+        startSession() // Запускаем камеру (остается здесь)
+        // Удаляем запуск таймера и сброс анализатора
+        /*
+        if sessionStartDate == nil { 
             startTimer()
-            squatAnalyzer.reset() // Сбрасываем счетчик при начале новой сессии
+            squatAnalyzer.reset() 
         }
+        */
+        // Сообщаем ViewModel
+        viewModel.viewDidAppear()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        stopSession() // Останавливаем камеру
-        stopTimer()   // Останавливаем таймер
+        stopSession() // Останавливаем камеру (остается здесь)
+        // Удаляем остановку таймера
+        // stopTimer()
+        // Сообщаем ViewModel
+        viewModel.viewWillDisappear()
     }
     
     override func viewDidLayoutSubviews() {
@@ -200,36 +221,9 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
         ])
     }
 
-    // MARK: - Session State Management
-
-    private func resetSessionState() {
-        currentXP = 0 // Эта переменная теперь не нужна, XP берем из профиля
-        progressiveSquatGoal = 5
-        squatsTowardsProgressiveGoal = 0
-        totalSquatsInSession = 0 // Счетчик приседаний *за сессию* оставляем
-        sessionStartDate = nil
-        stopTimer()
-        squatAnalyzer.reset()
-        
-        // Обновляем userProfile на случай, если он был nil
-        if userProfile == nil {
-            userProfile = DataManager.shared.getCurrentUserProfile()
-        }
-        
-        updateUI()
-    }
-
-    private func updateUI() {
-        // Используем данные из userProfile
-        guard let profile = userProfile else { return } // Защита, если профиль еще не загружен
-        let progress = Float(profile.currentXP) / Float(profile.xpToNextLevel)
-        xpProgressBar.setProgress(min(progress, 1.0), animated: true)
-        progressiveGoalLabel.text = "Goal: \(squatsTowardsProgressiveGoal)/\(progressiveSquatGoal)"
-        totalSquatsLabel.text = "Total: \(profile.totalSquats)"
-        if sessionStartDate == nil {
-            timerLabel.text = "Time: 00:00"
-        }
-    }
+    // MARK: - Session State Management (удаляем или переносим во ViewModel)
+    // private func resetSessionState() { ... }
+    // private func updateUI() { ... } // ViewModel будет давать команды на обновление
 
     // MARK: - Camera Setup & Control
     
@@ -295,58 +289,6 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
         }
     }
 
-    // MARK: - MediaPipe Setup
-
-    private func setupPoseLandmarker() {
-        // Убедимся, что вызывается из sessionQueue
-        guard let modelPath = Bundle.main.path(forResource: self.modelPath, ofType: nil) else {
-            print("Ошибка: Файл модели MediaPipe не найден (\(self.modelPath)).")
-            return
-        }
-
-        self.poseLandmarkerHelper = PoseLandmarkerHelper.liveStreamPoseLandmarkerHelper(
-            modelPath: modelPath,
-            numPoses: self.numPoses,
-            minPoseDetectionConfidence: self.minPoseDetectionConfidence,
-            minPosePresenceConfidence: self.minPosePresenceConfidence,
-            minTrackingConfidence: self.minTrackingConfidence,
-            liveStreamDelegate: self,
-            computeDelegate: self.computeDelegate
-        )
-        
-        if poseLandmarkerHelper == nil {
-            print("Ошибка инициализации PoseLandmarkerHelper.")
-        } else {
-            print("PoseLandmarkerHelper успешно инициализирован.")
-        }
-    }
-
-    // MARK: - Timer Logic
-
-    private func startTimer() {
-        stopTimer()
-        sessionStartDate = Date()
-        timerLabel.text = "Time: 00:00"
-        sessionTimer = Timer.scheduledTimer(timeInterval: timerUpdateInterval,
-                                            target: self,
-                                            selector: #selector(updateTimerLabel),
-                                            userInfo: nil,
-                                            repeats: true)
-    }
-
-    private func stopTimer() {
-        sessionTimer?.invalidate()
-        sessionTimer = nil
-    }
-
-    @objc private func updateTimerLabel() {
-        guard let startDate = sessionStartDate else { return }
-        let elapsedTime = Int(Date().timeIntervalSince(startDate))
-        let minutes = elapsedTime / 60
-        let seconds = elapsedTime % 60
-        timerLabel.text = String(format: "Time: %02d:%02d", minutes, seconds)
-    }
-    
     // MARK: - Helper Methods
     
     private func getDefaultCamera() -> AVCaptureDevice? {
@@ -381,6 +323,7 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
 
 // MARK: - Delegates
 
+// AVCaptureVideoDataOutputSampleBufferDelegate остается здесь, но передает кадр во ViewModel
 extension ExerciseExecutionViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         // Выполняется в sessionQueue
@@ -395,149 +338,30 @@ extension ExerciseExecutionViewController: AVCaptureVideoDataOutputSampleBufferD
         let frameTimestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         let milliseconds = Int(CMTimeGetSeconds(frameTimestamp) * 1000)
 
-        poseLandmarkerHelper?.detectAsync(
-            sampleBuffer: sampleBuffer,
-            orientation: orientation,
+        // Передаем кадр во ViewModel для обработки
+        viewModel.processVideoFrame(
+            sampleBuffer: sampleBuffer, 
+            orientation: orientation, 
             timeStamps: milliseconds
         )
     }
 }
 
+// Удаляем реализацию PoseLandmarkerHelperLiveStreamDelegate отсюда
+/*
 extension ExerciseExecutionViewController: PoseLandmarkerHelperLiveStreamDelegate {
-    // Обновляем имя параметра на resultBundle, как в протоколе
-    func poseLandmarkerHelper(_ poseLandmarkerHelper: PoseLandmarkerHelper,
-                              didFinishDetection resultBundle: ResultBundle?,
-                              error: Error?) {
-        // Вызывается из PoseLandmarkerHelper
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
-            // Обработка ошибки
-            if let error = error {
-                print("Ошибка детекции поз: \\(error.localizedDescription)")
-                self.poseOverlayView.clearOverlay() // Очищаем старый оверлей при ошибке
-                return
-            }
-            
-            // Обработка результата
-            guard let resultBundle = resultBundle else {
-                self.poseOverlayView.clearOverlay() // Очищаем, если результата нет
-                return
-            }
-
-            // --- ИЗВЛЕКАЕМ 3D КООРДИНАТЫ --- 
-            // resultBundle.poseWorldLandmarks содержит [[Landmark]]?
-            // Landmark содержит x, y, z в метрах
-            if let worldLandmarks = resultBundle.poseWorldLandmarks,
-               let firstPoseWorldLandmarks = worldLandmarks.first, // Берем первую обнаруженную позу
-               !firstPoseWorldLandmarks.isEmpty {
-                // Передаем 3D-координаты в анализатор
-                // Раскомментируем вызов, так как SquatAnalyzer теперь принимает [Landmark]
-                self.squatAnalyzer.analyze(worldLandmarks: firstPoseWorldLandmarks)
-                print("--- LevelingVC: Получены 3D worldLandmarks (\\(firstPoseWorldLandmarks.count) точек). Переданы в анализатор. ---")
-            } else {
-                 // Поз не найдено или нет 3D точек
-                 self.squatAnalyzer.reset() // Сбрасываем состояние анализатора
-                 print("--- LevelingVC: Не найдены 3D worldLandmarks. Анализатор сброшен. ---")
-            }
-            
-            // --- Отрисовка скелета (ПОКА ОТКЛЮЧАЕМ/УПРОЩАЕМ) ---
-            // TODO: Обновить PoseOverlayView для отрисовки 3D-точек или временно отключить
-            /* 
-            guard let frameSize = self.lastFrameSize else {
-                print("Warning: frameSize not available for drawing overlay.")
-                return
-            }
-            // Сейчас PoseOverlayView ожидает старый ResultBundle и 2D точки.
-            // Нужно либо передавать 2D точки (resultBundle.poseLandmarks), 
-            // либо переделать PoseOverlayView для 3D.
-            // Пока очистим, чтобы не было ошибок.
-            */
-            self.poseOverlayView.clearOverlay() 
-            // Или временно передаем 2D, если хотим видеть хоть что-то:
-            // self.poseOverlayView.drawResult(resultBundle.poseLandmarks, frameSize: frameSize)
-            
-        }
-    }
+    func poseLandmarkerHelper(...) { ... }
 }
+*/
 
+// Удаляем реализацию SquatAnalyzerDelegate отсюда
+/*
 extension ExerciseExecutionViewController: SquatAnalyzerDelegate {
-    func squatAnalyzer(_ analyzer: SquatAnalyzer, didCountSquat newTotalCount: Int) {
-        // Убедимся, что профиль загружен
-        guard var profile = userProfile else {
-            print("Error: User profile is nil in squatAnalyzer delegate.")
-            return
-        }
-        
-        // 1. Обновляем ОБЩЕЕ количество приседаний в профиле
-        profile.totalSquats += 1 // Счетчик обновляем здесь
-        
-        // 2. Рассчитываем модификатор опыта на основе статов
-        // Для приседаний используем Мощь (PWR)
-        // Базовое значение стата берем из UserProfile.baseStatValue (20)
-        // Отклонение = Текущий_стат - Базовый_стат
-        // Модификатор = 1.0 + (Отклонение / 100.0) (т.е. +/- 1% за каждое очко отклонения от базы 20)
-        let powerStat = profile.power // Получаем Мощь
-        let baseStatValue = UserProfile.baseStatValue // Используем базу из UserProfile
-        let statDifference = powerStat - baseStatValue
-        let xpMultiplier = 1.0 + (Double(statDifference) / 100.0)
-        
-        // Рассчитываем итоговый опыт, но не меньше 1
-        let baseXP = Double(xpPerSquat)
-        let calculatedXP = Int(round(baseXP * xpMultiplier))
-        let finalXP = max(1, calculatedXP) // Опыт не может быть меньше 1
-        
-        // Добавляем baseStatValue обратно в лог
-        print("--- LevelingVC squatAnalyzer: Расчет XP: База=\(xpPerSquat), Мощь=\(powerStat), БазСтат=\(baseStatValue), Множ=x\(String(format: "%.2f", xpMultiplier)), Итог=\(finalXP) ---")
-        
-        // 3. Добавляем РАССЧИТАННЫЙ опыт через метод addXP
-        let didLevelUpBasic = profile.addXP(finalXP)
-        if didLevelUpBasic {
-            print("--- LevelingVC squatAnalyzer: Обнаружено повышение уровня после базового XP! ---")
-            // TODO: Показать эффект повышения уровня?
-        }
-        
-        // 4. Определяем прирост атрибутов для приседания (примерные значения)
-        // Приседания качают силу ног и кора (STR), выносливость (CON), баланс (BAL)
-        let strGain = 2
-        let conGain = 1
-        let balGain = 1
-        // Вызываем метод прокачки атрибутов
-        profile.gainAttributes(strGain: strGain, conGain: conGain, balGain: balGain)
-        
-        // 5. Продвигаем сессионную прогрессивную цель
-        squatsTowardsProgressiveGoal += 1
-
-        if squatsTowardsProgressiveGoal >= progressiveSquatGoal {
-            
-            // Добавляем бонусный опыт через метод addXP (бонус не модифицируем статами, он фиксированный)
-            let didLevelUpBonus = profile.addXP(bonusXPForGoal)
-            if didLevelUpBonus {
-                // TODO: Показать эффект повышения уровня (может сработать и после базового)?
-            }
-            
-            // Исправляем баг: увеличиваем ЦЕЛЬ, а не ИНКРЕМЕНТ
-            progressiveSquatGoal += progressiveGoalIncrement 
-            squatsTowardsProgressiveGoal = 0
-        }
-        
-        // 6. Сохраняем обновленный профиль (после всех изменений XP и атрибутов)
-        DataManager.shared.updateUserProfile(profile)
-        // Обновляем локальную копию на всякий случай (хотя DataManager должен обновить свою)
-        self.userProfile = profile 
-        
-        // 7. Обновляем UI
-        updateUI()
-    }
-    
-    // Добавим этот метод, чтобы можно было реализовать delegate
-    func squatAnalyzer(_ analyzer: SquatAnalyzer, didChangeState newState: String) {
-        // Пока можно просто вывести в лог
-        print("(Delegate) Squat State Changed: \(newState)")
-    }
+    func squatAnalyzer(...) { ... }
 }
+*/
 
-// MARK: - PoseOverlayView (Добавляем определение сюда)
+// MARK: - PoseOverlayView (остается здесь, т.к. это View)
 
 // TODO: Этот код можно вынести в отдельный файл Views/PoseOverlayView.swift
 class PoseOverlayView: UIView {
