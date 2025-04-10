@@ -8,6 +8,8 @@ import MediaPipeTasksVision
 class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя класса должно совпадать с именем файла после переименования!
 
     // MARK: - Dependencies & Core Logic
+    var selectedExercise: Exercise? // Добавляем свойство для хранения выбранного упражнения
+    
     private var poseLandmarkerHelper: PoseLandmarkerHelper?
     private let squatAnalyzer: SquatAnalyzer = SquatAnalyzer() // Явный тип
 

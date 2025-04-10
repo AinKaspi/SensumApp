@@ -1,11 +1,13 @@
 import Foundation
 
-// TODO: Определить протокол для связи с координатором
-// protocol ExerciseSelectionViewModelCoordinatorDelegate: AnyObject { ... }
+// Определяем протокол для связи с координатором
+protocol ExerciseSelectionViewModelCoordinatorDelegate: AnyObject {
+    func exerciseSelectionViewModelDidSelect(exercise: Exercise)
+}
 
 class ExerciseSelectionViewModel {
 
-    // weak var coordinatorDelegate: ExerciseSelectionViewModelCoordinatorDelegate?
+    weak var coordinatorDelegate: ExerciseSelectionViewModelCoordinatorDelegate?
     
     // --- Данные --- 
     // Массив доступных упражнений (пока моковые данные)
@@ -33,11 +35,23 @@ class ExerciseSelectionViewModel {
         return exercises[index]
     }
     
+    // --- Обработка действий пользователя --- 
+    
+    /// Вызывается, когда пользователь выбрал упражнение по индексу
+    func didSelectExercise(at index: Int) {
+        guard let exercise = exercise(at: index) else {
+            print("--- ExerciseSelectionVM: Ошибка: Неверный индекс \(index) при выборе упражнения ---")
+            return
+        }
+        print("--- ExerciseSelectionVM: Выбрано упражнение \(exercise.name), сообщаем координатору ---")
+        coordinatorDelegate?.exerciseSelectionViewModelDidSelect(exercise: exercise)
+    }
+    
     // TODO: Добавить логику загрузки упражнений (из сети/базы)
-    // TODO: Добавить метод для обработки выбора упражнения и вызова делегата координатора
 
-    init(/* coordinatorDelegate: ExerciseSelectionViewModelCoordinatorDelegate? */) {
-        // self.coordinatorDelegate = coordinatorDelegate
+    // Принимаем делегата координатора в инициализаторе
+    init(coordinatorDelegate: ExerciseSelectionViewModelCoordinatorDelegate?) {
+        self.coordinatorDelegate = coordinatorDelegate
         print("ExerciseSelectionViewModel initialized")
     }
 }

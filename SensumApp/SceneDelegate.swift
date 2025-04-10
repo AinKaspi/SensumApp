@@ -183,22 +183,30 @@ class EventsCoordinator: Coordinator {
     }
 }
 
-class LevelingCoordinator: Coordinator {
+class LevelingCoordinator: Coordinator, ExerciseSelectionViewModelCoordinatorDelegate { // Добавляем соответствие протоколу
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
     init(navigationController: UINavigationController) { self.navigationController = navigationController }
+    
     func start() {
         // Стартуем с экрана выбора упражнений
         let selectionVC = ExerciseSelectionViewController()
-        // TODO: Позже передадим ViewModel и настроим делегата
-        // let viewModel = ExerciseSelectionViewModel(coordinatorDelegate: self) 
-        // selectionVC.viewModel = viewModel
+        // Создаем ViewModel и передаем себя как делегата
+        let viewModel = ExerciseSelectionViewModel(coordinatorDelegate: self) 
+        selectionVC.viewModel = viewModel // Передаем ViewModel во ViewController
         selectionVC.title = "Упражнения"
         navigationController.setViewControllers([selectionVC], animated: false)
     }
     
-    // TODO: Добавить методы для навигации к ExerciseExecutionViewController
-    // Например, func showExerciseExecution(exercise: Exercise) { ... }
+    // Реализуем метод делегата
+    func exerciseSelectionViewModelDidSelect(exercise: Exercise) {
+        print("--- LevelingCoordinator: Получено событие выбора упражнения: \(exercise.name) ---")
+        // Создаем и показываем экран выполнения
+        let executionVC = ExerciseExecutionViewController()
+        executionVC.selectedExercise = exercise // Передаем выбранное упражнение
+        executionVC.title = exercise.name // Устанавливаем заголовок
+        navigationController.pushViewController(executionVC, animated: true)
+    }
 }
 
 class RankCoordinator: Coordinator {

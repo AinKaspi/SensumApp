@@ -3,7 +3,7 @@ import UIKit
 class ExerciseSelectionViewController: UIViewController {
 
     // MARK: - Properties
-    private let viewModel = ExerciseSelectionViewModel() // Создаем экземпляр ViewModel
+    var viewModel: ExerciseSelectionViewModel! // Используем ! т.к. он будет установлен до viewDidLoad
 
     // MARK: - UI Elements
     private lazy var tableView: UITableView = {
@@ -73,8 +73,8 @@ extension ExerciseSelectionViewController: UITableViewDelegate {
         
         if let selectedExercise = viewModel.exercise(at: indexPath.row) {
             print("--- ExerciseSelectionVC: Выбрано упражнение: \(selectedExercise.name) (ID: \(selectedExercise.id)) ---")
-            // TODO: Сообщить координатору о выборе упражнения
-            // viewModel.didSelectExercise(selectedExercise)
+            // Вызываем метод ViewModel для обработки выбора
+            viewModel.didSelectExercise(at: indexPath.row)
         } else {
             print("--- ExerciseSelectionVC: Ошибка: Не удалось получить данные для выбранной строки \(indexPath.row) ---")
         }

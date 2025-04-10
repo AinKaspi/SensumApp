@@ -88,8 +88,8 @@ class SquatAnalyzer {
         static let hipUp: Float = 165.0
         static let hipDown: Float = 125.0 // Порог для перехода UP -> DOWN
         static let hipUpTransition: Float = 145.0 // Порог для перехода DOWN -> UP
-        // Порог видимости точки (0.0 - 1.0)
-        static let visibility: Float = 0.5
+        // Значительно понижаем порог видимости для теста
+        static let visibility: Float = 0.1
     }
 
     // MARK: - Initialization
