@@ -182,11 +182,15 @@ class SquatAnalyzer {
         let smoothedKneeAngle = calculateSmoothedAngle(from: kneeAngleHistory)
         let smoothedHipAngle = calculateSmoothedAngle(from: hipAngleHistory)
 
-        // Вывод углов для отладки (с троттлингом) - теперь выводим сглаженные!
+        // --- Троттлинг Отладочных Логгов --- 
         let currentTime = Date().timeIntervalSince1970
-        if currentTime - lastAngleLogTime >= angleLogInterval {
+        let shouldLog = (currentTime - lastAngleLogTime >= angleLogInterval)
+        // --------------------------------------
+
+        // Вывод углов для отладки - теперь только если shouldLog
+        if shouldLog {
             print(String(format: "Smoothed Angles - Knee: %.1f, Hip: %.1f", smoothedKneeAngle, smoothedHipAngle))
-            lastAngleLogTime = currentTime // Обновляем время последнего лога
+            lastAngleLogTime = currentTime // Обновляем время последнего лога ТОЛЬКО когда вывели что-то
         }
 
         // --- 3. Определяем потенциальное новое состояние (используем сглаженные углы) --- 
@@ -205,51 +209,81 @@ class SquatAnalyzer {
         // Убираем лог potentialState, так как будем проверять углы напрямую в switch
 
         // --- 4. Обновляем состояние и счетчик --- 
-        switch currentState {
-        case .unknown:
-            print("[DEBUG] State: UNKNOWN. Checking initial state...")
-            // Начальное состояние, пытаемся определить как UP
-            if smoothedKneeAngle >= Thresholds.kneeUp && smoothedHipAngle >= Thresholds.hipUp { 
-                print("[DEBUG] State: UNKNOWN -> UP (Angles match UP)")
-                currentState = .up
-                delegate?.squatAnalyzer(self, didChangeState: currentState.rawValue) // Уведомляем делегата
-                print("--- Состояние приседания: UP ---")
-            } else if smoothedKneeAngle <= Thresholds.kneeDown && smoothedHipAngle <= Thresholds.hipDown { 
-                // На случай, если пользователь начал сидя (маловероятно, но возможно)
-                print("[DEBUG] State: UNKNOWN -> DOWN (Angles match DOWN)")
-                currentState = .down
-                delegate?.squatAnalyzer(self, didChangeState: currentState.rawValue) // Уведомляем делегата
-                print("--- Состояние приседания: DOWN ---")
-            } else {
-                print("[DEBUG] State: UNKNOWN. Angles in transition zone (\(String(format: "%.1f", smoothedKneeAngle)), \(String(format: "%.1f", smoothedHipAngle))). Waiting...")
-                // Остаемся в .unknown
+        // Весь блок switch currentState для отладки тоже обернем в shouldLog
+        if shouldLog {
+            switch currentState {
+            case .unknown:
+                print("[DEBUG] State: UNKNOWN. Checking initial state...")
+                // Начальное состояние, пытаемся определить как UP
+                if smoothedKneeAngle >= Thresholds.kneeUp && smoothedHipAngle >= Thresholds.hipUp { 
+                    print("[DEBUG] State: UNKNOWN -> UP (Angles match UP)")
+                    currentState = .up
+                    delegate?.squatAnalyzer(self, didChangeState: currentState.rawValue) // Уведомляем делегата
+                    print("--- Состояние приседания: UP ---")
+                } else if smoothedKneeAngle <= Thresholds.kneeDown && smoothedHipAngle <= Thresholds.hipDown { 
+                    // На случай, если пользователь начал сидя (маловероятно, но возможно)
+                    print("[DEBUG] State: UNKNOWN -> DOWN (Angles match DOWN)")
+                    currentState = .down
+                    delegate?.squatAnalyzer(self, didChangeState: currentState.rawValue) // Уведомляем делегата
+                    print("--- Состояние приседания: DOWN ---")
+                } else {
+                    print("[DEBUG] State: UNKNOWN. Angles in transition zone (\(String(format: "%.1f", smoothedKneeAngle)), \(String(format: "%.1f", smoothedHipAngle))). Waiting...")
+                    // Остаемся в .unknown
+                }
+                
+            case .up:
+                print("[DEBUG] Checking UP -> DOWN: Knee=\(String(format: "%.1f", smoothedKneeAngle)) <= \(Thresholds.kneeDown), Hip=\(String(format: "%.1f", smoothedHipAngle)) <= \(Thresholds.hipDown)")
+                // Если были вверху, проверяем, не опустились ли достаточно низко
+                if smoothedKneeAngle <= Thresholds.kneeDown && smoothedHipAngle <= Thresholds.hipDown {
+                    print("[DEBUG] State: UP -> DOWN")
+                    currentState = .down
+                    delegate?.squatAnalyzer(self, didChangeState: currentState.rawValue) // Уведомляем делегата
+                    print("--- Состояние приседания: DOWN ---")
+                }
+                
+            case .down:
+                // Лог проверки остался прежним
+                print("[DEBUG] Checking DOWN -> UP: Knee=\(String(format: "%.1f", smoothedKneeAngle)) >= \(Thresholds.kneeUpTransition), Hip=\(String(format: "%.1f", smoothedHipAngle)) >= \(Thresholds.hipUpTransition)")
+                // Если были внизу, проверяем, не поднялись ли достаточно высоко
+                if smoothedKneeAngle >= Thresholds.kneeUpTransition && smoothedHipAngle >= Thresholds.hipUpTransition {
+                    print("[DEBUG] State: DOWN -> UP. Counting squat...")
+                    currentState = .up
+                    delegate?.squatAnalyzer(self, didChangeState: currentState.rawValue) // Уведомляем делегата
+                    // --- СЧИТАЕМ ПРИСЕДАНИЕ! --- 
+                    squatCount += 1
+                    print("[DEBUG] Calling delegate didCountSquat: \(squatCount)")
+                    delegate?.squatAnalyzer(self, didCountSquat: squatCount)
+                    print("--- Состояние приседания: UP ---")
+                    print(" >>>>> ПРИСЕДАНИЕ #\(squatCount) ЗАСЧИТАНО! <<<<< ")
+                }
             }
-            
-        case .up:
-            print("[DEBUG] Checking UP -> DOWN: Knee=\(String(format: "%.1f", smoothedKneeAngle)) <= \(Thresholds.kneeDown), Hip=\(String(format: "%.1f", smoothedHipAngle)) <= \(Thresholds.hipDown)")
-            // Если были вверху, проверяем, не опустились ли достаточно низко
-            if smoothedKneeAngle <= Thresholds.kneeDown && smoothedHipAngle <= Thresholds.hipDown {
-                print("[DEBUG] State: UP -> DOWN")
-                currentState = .down
-                delegate?.squatAnalyzer(self, didChangeState: currentState.rawValue) // Уведомляем делегата
-                print("--- Состояние приседания: DOWN ---")
-            }
-            
-        case .down:
-            // Лог проверки остался прежним
-            print("[DEBUG] Checking DOWN -> UP: Knee=\(String(format: "%.1f", smoothedKneeAngle)) >= \(Thresholds.kneeUpTransition), Hip=\(String(format: "%.1f", smoothedHipAngle)) >= \(Thresholds.hipUpTransition)")
-            // Если были внизу, проверяем, не поднялись ли достаточно высоко
-            if smoothedKneeAngle >= Thresholds.kneeUpTransition && smoothedHipAngle >= Thresholds.hipUpTransition {
-                print("[DEBUG] State: DOWN -> UP. Counting squat...")
-                currentState = .up
-                delegate?.squatAnalyzer(self, didChangeState: currentState.rawValue) // Уведомляем делегата
-                // --- СЧИТАЕМ ПРИСЕДАНИЕ! --- 
-                squatCount += 1
-                print("[DEBUG] Calling delegate didCountSquat: \(squatCount)")
-                delegate?.squatAnalyzer(self, didCountSquat: squatCount)
-                print("--- Состояние приседания: UP ---")
-                print(" >>>>> ПРИСЕДАНИЕ #\(squatCount) ЗАСЧИТАНО! <<<<< ")
-            }
+        } else {
+             // Если не логируем отладку, все равно нужно обновить состояние!
+             // Копируем логику обновления состояния без print'ов
+             switch currentState {
+             case .unknown:
+                 if smoothedKneeAngle >= Thresholds.kneeUp && smoothedHipAngle >= Thresholds.hipUp { 
+                     currentState = .up
+                     delegate?.squatAnalyzer(self, didChangeState: currentState.rawValue)
+                 } else if smoothedKneeAngle <= Thresholds.kneeDown && smoothedHipAngle <= Thresholds.hipDown { 
+                     currentState = .down
+                     delegate?.squatAnalyzer(self, didChangeState: currentState.rawValue)
+                 }
+             case .up:
+                 if smoothedKneeAngle <= Thresholds.kneeDown && smoothedHipAngle <= Thresholds.hipDown {
+                     currentState = .down
+                     delegate?.squatAnalyzer(self, didChangeState: currentState.rawValue)
+                 }
+             case .down:
+                 if smoothedKneeAngle >= Thresholds.kneeUpTransition && smoothedHipAngle >= Thresholds.hipUpTransition {
+                     currentState = .up
+                     delegate?.squatAnalyzer(self, didChangeState: currentState.rawValue)
+                     squatCount += 1
+                     delegate?.squatAnalyzer(self, didCountSquat: squatCount)
+                     // Можно добавить один не-отладочный лог о засчитанном приседании, если нужно
+                     // print("Приседание #\(squatCount) засчитано!")
+                 }
+             }
         }
     }
 

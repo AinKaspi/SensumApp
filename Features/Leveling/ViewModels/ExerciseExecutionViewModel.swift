@@ -30,9 +30,14 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     private var sessionStartDate: Date?
     private var sessionTimer: Timer?
     private let timerUpdateInterval: TimeInterval = 1.0
-    // Свойства для троттлинга логов MediaPipe
+    // Троттлинг логов
     private var lastPoseLogTime: TimeInterval = 0
-    private let poseLogInterval: TimeInterval = 0.5 // Интервал вывода лога (в секундах)
+    private let poseLogInterval: TimeInterval = 0.5
+    // Состояние подготовки и обратного отсчета
+    private(set) var isPreparing: Bool = false // Флаг, что идет подготовка
+    private var countdownTimer: Timer?
+    private var countdownValue: Int = 3
+    
     // TODO: Добавить свойства для счетчиков прогрессивной цели
     // private var progressiveSquatGoal: Int = 5 ...
 
@@ -60,17 +65,21 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     
     func viewDidAppear() {
         print("ExerciseExecutionViewModel: viewDidAppear")
-        // Запускаем таймер, если сессия новая
+        // Запускаем таймер ПОДГОТОВКИ, а не основной
+        startPreparationTimer()
+        /*
         if sessionStartDate == nil {
             startTimer()
-            analyzer?.reset() // Сбрасываем счетчик при начале новой сессии
+            analyzer?.reset()
         }
+        */
         // TODO: Запустить сессию камеры (если она управляется отсюда)
     }
     
     func viewWillDisappear() {
         print("ExerciseExecutionViewModel: viewWillDisappear")
-        stopTimer() // Останавливаем таймер
+        stopTimer() // Останавливаем основной таймер
+        stopPreparationTimer() // Останавливаем таймер подготовки
         // TODO: Остановить сессию камеры (если она управляется отсюда)
     }
     
@@ -117,8 +126,57 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     // TODO: Перенести логику обработки результатов анализатора, расчета XP/атрибутов
 
     // MARK: - Timer Handling
+    
+    // --- Таймер подготовки (Обратный отсчет) ---
+    private func startPreparationTimer() {
+        guard !isPreparing else { return } // Не запускаем, если уже идет
+        
+        print("--- ExerciseExecutionVM: Запуск таймера подготовки --- ")
+        isPreparing = true
+        countdownValue = 3 // Начальное значение
+        stopPreparationTimer() // На всякий случай остановим старый
+        
+        // Сообщаем View, чтобы показала обратный отсчет
+        // TODO: viewDelegate?.viewModelDidStartPreparation(initialValue: countdownValue)
+        print("--- ExerciseExecutionVM: Сообщено View о начале подготовки (Значение: \(countdownValue)) ---")
+        
+        countdownTimer = Timer.scheduledTimer(timeInterval: 1.0,
+                                              target: self,
+                                              selector: #selector(updatePreparationTimer),
+                                              userInfo: nil,
+                                              repeats: true)
+    }
+    
+    private func stopPreparationTimer() {
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+    }
+    
+    @objc private func updatePreparationTimer() {
+        countdownValue -= 1
+        print("--- ExerciseExecutionVM: Тик таймера подготовки: \(countdownValue) ---")
+        
+        if countdownValue > 0 {
+            // Сообщаем View новое значение
+            // TODO: viewDelegate?.viewModelDidUpdateCountdown(value: countdownValue)
+        } else {
+            // Обратный отсчет завершен
+            stopPreparationTimer()
+            isPreparing = false
+            // Сообщаем View, что можно начинать (например, показать "Старт!")
+            // TODO: viewDelegate?.viewModelDidFinishPreparation()
+             print("--- ExerciseExecutionVM: Подготовка завершена, запускаем основной таймер --- ")
+            // Запускаем основной таймер сессии
+            startTimer()
+             // Сбрасываем анализатор перед началом
+             analyzer?.reset() 
+        }
+    }
+    
+    // --- Основной таймер сессии ---
     private func startTimer() {
-        stopTimer() // Убедимся, что предыдущий таймер остановлен
+        guard sessionTimer == nil else { return } // Не запускаем, если уже идет
+        stopTimer() // Убедимся, что предыдущий остановлен
         sessionStartDate = Date()
         // Сообщаем View начальное время (00:00)
         // TODO: viewDelegate?.viewModelDidUpdateTime(timeString: "00:00")
@@ -158,7 +216,14 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
                               error: Error?) {
         // Этот метод теперь будет вызываться здесь, в ViewModel
         // Выполняется в основном потоке (или в потоке, заданном хелпером)
-        // TODO: Нужно решить, в каком потоке выполнять анализ и обновление UI
+        
+        // --- Игнорируем обработку, если идет подготовка --- 
+        guard !isPreparing else {
+            // Опционально: можно очищать оверлей во время подготовки
+            // viewDelegate?.viewModelShouldClearOverlay()
+            return // Ничего не делаем, пока идет обратный отсчет
+        }
+        // ----------------------------------------------------
         
         // --- Троттлинг логов --- 
         let currentTime = Date().timeIntervalSince1970
@@ -187,17 +252,23 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
         if let worldLandmarks = resultBundle.poseWorldLandmarks,
            let firstPoseWorldLandmarks = worldLandmarks.first,
            !firstPoseWorldLandmarks.isEmpty {
-            // TODO: Убедиться, что analyzer инициализирован
-            analyzer?.analyze(worldLandmarks: firstPoseWorldLandmarks)
-            // Логируем передачу в анализатор только если логируем сам результат
-            if shouldLog {
-                 print("--- ExerciseExecutionVM: 3D worldLandmarks переданы в анализатор. ---")
+            // Добавляем явную проверку isPreparing перед вызовом анализа
+            if !isPreparing {
+                // TODO: Убедиться, что analyzer инициализирован
+                analyzer?.analyze(worldLandmarks: firstPoseWorldLandmarks)
+                // Логируем передачу в анализатор только если логируем сам результат
+                if shouldLog {
+                    print("--- ExerciseExecutionVM: 3D worldLandmarks переданы в анализатор. ---")
+                }
             }
         } else {
-            analyzer?.reset() // Сбрасываем анализатор, если точек нет
-            // Логируем сброс анализатора только если логируем сам результат
-            if shouldLog {
-                 print("--- ExerciseExecutionVM: Не найдены 3D worldLandmarks. Анализатор сброшен. ---")
+             // Добавляем явную проверку isPreparing перед сбросом
+             if !isPreparing {
+                analyzer?.reset() // Сбрасываем анализатор, если точек нет
+                // Логируем сброс анализатора только если логируем сам результат
+                if shouldLog {
+                    print("--- ExerciseExecutionVM: Не найдены 3D worldLandmarks. Анализатор сброшен. ---")
+                }
             }
         }
         
