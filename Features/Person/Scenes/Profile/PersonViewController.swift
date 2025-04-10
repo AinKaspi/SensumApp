@@ -1,4 +1,6 @@
 import UIKit
+// Импортируем DGCharts, так как это имя продукта в Package.swift для SPM
+import DGCharts
 
 // Добавляем Charts для RadarChartView, если он используется
 // import Charts 
@@ -123,9 +125,18 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIIma
     }()
 
     // Блок 2: Chart & Stats (Снова вместе)
-    private lazy var radarChartView: RadarChartView = {
-        let chartView = RadarChartView()
+    private lazy var radarChartView: DGCharts.RadarChartView = {
+        // Явно указываем тип переменной chartView с модулем
+        let chartView: DGCharts.RadarChartView = DGCharts.RadarChartView()
         chartView.translatesAutoresizingMaskIntoConstraints = false
+        // Убираем всю настройку отсюда, оставляем только создание
+        /*
+        // --- Настройка внешнего вида для Charts 4.x/5.x ---
+        // Убираем свойства web... и настраиваем сетку через оси
+        // chartView.webLineWidth = 1.5
+        // ... (остальная убранная настройка)
+        chartView.legend.enabled = false // Отключаем легенду
+        */
         return chartView
     }()
     private lazy var statsDescriptionLabel: UILabel = {
@@ -133,7 +144,9 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIIma
         label.translatesAutoresizingMaskIntoConstraints = false
         label.font = UIFont.systemFont(ofSize: 14)
         label.numberOfLines = 0
-        label.attributedText = createStatsAttributedString()
+        // Убираем установку текста здесь, т.к. функция createStatsAttributedString удалена/переименована
+        // и self еще недоступен. Текст будет установлен в updateProfileDisplay.
+        // label.attributedText = createStatsAttributedString()
         return label
     }()
     // Удаляем разделитель
@@ -295,17 +308,13 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIIma
         setupConstraints()
         addTapGestures()
         setupAvatarTapGesture() // Добавляем настройку нажатия на аватар
+        setupRadarChartAppearance() // Вызываем новую функцию настройки
     }
     
     // Отладочный Print
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        print("--- PersonVC viewDidLayoutSubviews ---") // Уточним имя контроллера
-        print("achievementsContainerView height: \(achievementsContainerView.frame.height)")
-        print("achievementsCollectionView height: \(achievementsCollectionView.frame.height), contentSize: \(achievementsCollectionView.contentSize.height)")
-        print("feedContainerView height: \(feedContainerView.frame.height)")
-        print("feedTableView height: \(feedTableView.frame.height), contentSize: \(feedTableView.contentSize.height)")
-        print("---------------------------------------")
+        
     }
 
     // --- Обновление UI при появлении ---
@@ -354,15 +363,17 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIIma
         rankLabel.text = "Ранг: \(profile.rank.rawValue)" // Используем ранг из профиля
         // TODO: Загрузить и установить изображение аватара (если есть)
         if let avatar = loadAvatarImage(forUserID: profile.userID) {
-            print("--- PersonVC updateProfileDisplay: Загружен сохраненный аватар ---")
             avatarImageView.image = avatar
         } else {
-            print("--- PersonVC updateProfileDisplay: Сохраненный аватар не найден, используется стандартный вид ---")
             avatarImageView.image = nil // Убедимся, что старое изображение убрано, если аватар удалили/не нашли
             avatarImageView.backgroundColor = .lightGray // Возвращаем серый фон, если нет картинки
         }
 
-        print("--- PersonVC updateProfileDisplay: UI обновлен (Уровень: \(levelLabel.text ?? "nil"), XP: \(xpLabel.text ?? "nil"), Прогресс: \(xpProgressView.progress)) ---")
+        // 7. Обновляем список базовых атрибутов
+        statsDescriptionLabel.attributedText = createBaseAttributesString(from: profile)
+        
+        // 8. Обновляем Radar Chart
+        updateRadarChart(with: profile)
     }
 
     // Настройка Views
@@ -415,7 +426,6 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIIma
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(avatarTapped))
         // Добавляем его к avatarImageView
         avatarImageView.addGestureRecognizer(tapGesture)
-        print("--- PersonVC setupAvatarTapGesture: Распознаватель нажатия добавлен к avatarImageView ---")
     }
 
     // Настройка констрейнтов
@@ -513,7 +523,6 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIIma
 
     // --- Обработчик нажатия на аватар ---
     @objc private func avatarTapped() {
-        print("--- PersonVC avatarTapped: Аватар нажат, открываем UIImagePickerController ---")
         // Создаем стандартный контроллер для выбора изображений
         let imagePickerController = UIImagePickerController()
         // Устанавливаем делегата для получения результата выбора
@@ -529,6 +538,47 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIIma
     // --- UIGestureRecognizerDelegate ---
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         return true
+    }
+
+    // --- Новая функция для настройки внешнего вида графика ---
+    private func setupRadarChartAppearance() {
+        // Настройка внешнего вида для Charts 4.x/5.x
+        // Настройка сетки через оси
+        radarChartView.xAxis.labelFont = .systemFont(ofSize: 9, weight: .light)
+        radarChartView.xAxis.xOffset = 0
+        radarChartView.xAxis.yOffset = 0
+        radarChartView.xAxis.valueFormatter = RadarChartXAxisValueFormatter() // Форматтер меток оси X (будет перезаписан в updateRadarChart)
+        radarChartView.xAxis.labelTextColor = .white
+        radarChartView.xAxis.drawGridLinesEnabled = true // Линии от центра
+        radarChartView.xAxis.gridLineWidth = 1.5 
+        radarChartView.xAxis.gridColor = UIColor.lightGray.withAlphaComponent(0.8)
+        
+        radarChartView.yAxis.labelFont = .systemFont(ofSize: 9, weight: .light)
+        radarChartView.yAxis.labelCount = 6 // Количество меток (0, 20, 40, 60, 80, 100)
+        radarChartView.yAxis.axisMinimum = 0
+        // Максимальное значение = База(20) + 2 * (Макс.Атрибут(100)/10) = 20 + 2*10 = 40
+        // Установим чуть больше для запаса, например 50
+        radarChartView.yAxis.axisMaximum = 50
+        // Убираем числовые метки с оси Y
+        radarChartView.yAxis.drawLabelsEnabled = false // Показываем метки (0, 20, ...)
+        radarChartView.yAxis.valueFormatter = YAxisValueFormatter() // Форматтер меток оси Y
+        radarChartView.yAxis.labelTextColor = UIColor.lightGray
+        // Устанавливаем полный диапазон оси явно
+        radarChartView.yAxis.axisRange = 100
+        // Попробуем принудительно использовать указанное количество меток
+        radarChartView.yAxis.forceLabelsEnabled = true
+        // Добавляем гранулярность для четких шагов по 20
+        radarChartView.yAxis.granularityEnabled = true
+        radarChartView.yAxis.granularity = 20
+        // Настройка сетки оси Y (концентрические линии)
+        radarChartView.yAxis.drawGridLinesEnabled = true
+        radarChartView.yAxis.gridLineWidth = 1.0
+        radarChartView.yAxis.gridColor = UIColor.darkGray.withAlphaComponent(0.8)
+
+        radarChartView.rotationEnabled = false
+        radarChartView.legend.enabled = false // Отключаем легенду
+        
+        print("--- PersonVC setupRadarChartAppearance: Внешний вид RadarChartView настроен ---")
     }
 }
 
@@ -577,13 +627,11 @@ extension PersonViewController {
     
     // Метод вызывается, когда пользователь выбрал изображение (или видео)
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-        print("--- PersonVC imagePickerController:didFinishPickingMediaWithInfo: Изображение выбрано ---")
         
         // Пытаемся получить выбранное изображение
         // Сначала проверяем отредактированное изображение (если allowsEditing = true)
         // Иначе берем оригинальное
         guard let selectedImage = info[.editedImage] as? UIImage ?? info[.originalImage] as? UIImage else {
-            print("--- PersonVC imagePickerController: Ошибка: Не удалось получить выбранное изображение ---")
             // Закрываем пикер в любом случае
             picker.dismiss(animated: true, completion: nil)
             return
@@ -591,15 +639,12 @@ extension PersonViewController {
         
         // 1. Обновляем UI немедленно
         avatarImageView.image = selectedImage
-        print("--- PersonVC imagePickerController: avatarImageView обновлен выбранным изображением ---")
         
         // 2. Сохраняем изображение в файл
         // Получаем ID текущего пользователя для имени файла
         let userID = DataManager.shared.getCurrentUserProfile().userID
         if saveAvatarImage(selectedImage, forUserID: userID) {
-            print("--- PersonVC imagePickerController: Выбранный аватар успешно сохранен для userID: \(userID) ---")
         } else {
-            print("--- PersonVC imagePickerController: Ошибка при сохранении аватара для userID: \(userID) ---")
             // Можно показать пользователю сообщение об ошибке, если сохранение критично
         }
 
@@ -609,7 +654,6 @@ extension PersonViewController {
 
     // Метод вызывается, если пользователь нажал "Отмена"
     func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-        print("--- PersonVC imagePickerControllerDidCancel: Пользователь отменил выбор изображения ---")
         // Просто закрываем контроллер выбора
         picker.dismiss(animated: true, completion: nil)
     }
@@ -641,17 +685,14 @@ extension PersonViewController {
     ///   - userID: ID пользователя, для которого сохраняется аватар.
     /// - Returns: `true` при успешном сохранении, `false` при ошибке.
     private func saveAvatarImage(_ image: UIImage, forUserID userID: UUID) -> Bool {
-        print("--- PersonVC saveAvatarImage: Попытка сохранения аватара для userID: \(userID) ---")
         // Получаем URL файла, куда будем сохранять
         guard let fileURL = getAvatarFileURL(forUserID: userID) else {
-            print("--- PersonVC saveAvatarImage: Ошибка: Не удалось получить URL файла для сохранения ---")
             return false
         }
 
         // Конвертируем UIImage в данные в формате PNG
         // PNG сохраняет прозрачность и обычно без потерь качества
         guard let imageData = image.pngData() else {
-            print("--- PersonVC saveAvatarImage: Ошибка: Не удалось конвертировать UIImage в PNG data ---")
             return false
         }
 
@@ -660,11 +701,9 @@ extension PersonViewController {
             // Атомарная запись означает, что файл сначала полностью записывается во временное место,
             // а затем перемещается в конечное, что безопаснее при сбоях.
             try imageData.write(to: fileURL, options: .atomic)
-            print("--- PersonVC saveAvatarImage: Изображение успешно сохранено по пути: \(fileURL.path) ---")
             return true
         } catch {
             // Если произошла ошибка при записи, выводим ее в лог
-            print("--- PersonVC saveAvatarImage: Ошибка записи данных изображения в файл: \(error.localizedDescription) ---")
             return false
         }
     }
@@ -673,16 +712,13 @@ extension PersonViewController {
     /// - Parameter userID: ID пользователя, чей аватар нужно загрузить.
     /// - Returns: Загруженное изображение `UIImage` или `nil`, если файл не найден или произошла ошибка.
     private func loadAvatarImage(forUserID userID: UUID) -> UIImage? {
-        print("--- PersonVC loadAvatarImage: Попытка загрузки аватара для userID: \(userID) ---")
         // Получаем URL файла, откуда будем загружать
         guard let fileURL = getAvatarFileURL(forUserID: userID) else {
-            print("--- PersonVC loadAvatarImage: Ошибка: Не удалось получить URL файла для загрузки ---")
             return nil
         }
 
         // Проверяем, существует ли файл по указанному пути
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            print("--- PersonVC loadAvatarImage: Файл аватара не найден по пути: \(fileURL.path) ---")
             return nil
         }
 
@@ -691,72 +727,131 @@ extension PersonViewController {
             let imageData = try Data(contentsOf: fileURL)
             // Пытаемся создать UIImage из загруженных данных
             if let image = UIImage(data: imageData) {
-                 print("--- PersonVC loadAvatarImage: Изображение успешно загружено из файла ---")
                 return image
             } else {
-                print("--- PersonVC loadAvatarImage: Ошибка: Не удалось создать UIImage из данных файла ---")
                 return nil
             }
         } catch {
             // Если произошла ошибка при чтении данных из файла
-            print("--- PersonVC loadAvatarImage: Ошибка чтения данных изображения из файла: \(error.localizedDescription) ---")
             return nil
         }
     }
 }
 
-// НОВАЯ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ для статов
-private func createStatsAttributedString() -> NSAttributedString {
-    let stats: [(name: String, value: Int, change: Int)] = [
-        ("STR", 80, 2),
-        ("DEX", 60, -1),
-        ("CON", 70, 0),
-        ("INT", 50, 3),
-        ("LCK", 90, -2)
-    ]
+// MARK: - Chart Helper Classes & Functions
+extension PersonViewController {
     
-    // Создаем стиль параграфа с увеличенным межстрочным интервалом
-    let paragraphStyle = NSMutableParagraphStyle()
-    paragraphStyle.lineSpacing = 4 // Подбери значение по вкусу
-    
-    let regularAttributes: [NSAttributedString.Key: Any] = [
-        .font: UIFont.systemFont(ofSize: 14),
-        .foregroundColor: UIColor.lightGray,
-        .paragraphStyle: paragraphStyle // Добавляем стиль параграфа
-    ]
-    let greenAttributes: [NSAttributedString.Key: Any] = [
-        .font: UIFont.systemFont(ofSize: 14),
-        .foregroundColor: UIColor.systemGreen,
-        .paragraphStyle: paragraphStyle
-    ]
-    let redAttributes: [NSAttributedString.Key: Any] = [
-        .font: UIFont.systemFont(ofSize: 14),
-        .foregroundColor: UIColor.systemRed,
-        .paragraphStyle: paragraphStyle
-    ]
+    // MARK: - Форматтеры для Radar Chart
+    // Форматтер для оси X (названия статов) - используем IndexAxisValueFormatter стандартный
+    // Указываем модуль для родительского класса
+    class RadarChartXAxisValueFormatter: DGCharts.IndexAxisValueFormatter {
+        // Оставляем пустым, будем использовать стандартный IndexAxisValueFormatter
+    }
 
-    let finalAttributedString = NSMutableAttributedString()
-
-    for (index, stat) in stats.enumerated() {
-        // Добавляем имя стата и значение
-        let baseString = "\(stat.name): \(stat.value)"
-        finalAttributedString.append(NSAttributedString(string: baseString, attributes: regularAttributes))
-        
-        // Добавляем изменение
-        if stat.change > 0 {
-            let changeString = " +\(stat.change)"
-            finalAttributedString.append(NSAttributedString(string: changeString, attributes: greenAttributes))
-        } else if stat.change < 0 {
-             let changeString = " \(stat.change)" // Минус уже есть
-             finalAttributedString.append(NSAttributedString(string: changeString, attributes: redAttributes))
-        }
-        // Для 0 ничего не добавляем
-
-        // Добавляем перенос строки, если это не последний стат
-        if index < stats.count - 1 {
-            finalAttributedString.append(NSAttributedString(string: "\n", attributes: regularAttributes))
+    // Форматтер для оси Y (значения 0-100)
+    // Указываем модуль для протокола и родительского класса
+    class YAxisValueFormatter: NSObject, DGCharts.AxisValueFormatter {
+        // Указываем модуль для AxisBase
+        func stringForValue(_ value: Double, axis: DGCharts.AxisBase?) -> String {
+            // Показываем значения кратные 20 (0, 20, 40, 60, 80, 100)
+            if value.truncatingRemainder(dividingBy: 20) == 0 {
+                return String(format: "%.0f", value)
+            } else {
+                return "" // Не показываем другие метки
+            }
         }
     }
-    
-    return finalAttributedString
+
+    // MARK: - Stat String Generation
+    /// Создает NSAttributedString для отображения БАЗОВЫХ атрибутов.
+    private func createBaseAttributesString(from profile: UserProfile) -> NSAttributedString {
+        // Собираем базовые атрибуты из профиля, используя сокращения
+        let attributes: [(name: String, value: Int)] = [
+            ("STR", profile.strength),
+            ("CON", profile.constitution),
+            ("ACC", profile.accuracy),
+            ("SPD", profile.speed),
+            ("BAL", profile.balance),
+            ("FLX", profile.flexibility)
+        ]
+        
+        // Стиль параграфа
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineSpacing = 4
+        
+        // Атрибуты текста
+        let regularAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 14),
+            .foregroundColor: UIColor.lightGray,
+            .paragraphStyle: paragraphStyle
+        ]
+
+        let finalAttributedString = NSMutableAttributedString()
+
+        for (index, attribute) in attributes.enumerated() {
+            // Добавляем имя и значение атрибута
+            let attributeString = "\(attribute.name): \(attribute.value)"
+            finalAttributedString.append(NSAttributedString(string: attributeString, attributes: regularAttributes))
+            
+            // Добавляем перенос строки
+            if index < attributes.count - 1 {
+                finalAttributedString.append(NSAttributedString(string: "\n", attributes: regularAttributes))
+            }
+        }
+        
+        return finalAttributedString
+    }
+
+    // MARK: - Radar Chart Update
+    /// Обновляет данные и внешний вид Radar Chart на основе профиля пользователя.
+    private func updateRadarChart(with profile: UserProfile) {
+        // 1. Определяем главные статы для отображения
+        let stats = [
+            ("PWR", profile.power), // Мощь
+            ("CTL", profile.control), // Контроль
+            ("END", profile.endurance), // Стойкость
+            ("AGI", profile.agility), // Проворство
+            ("MOB", profile.mobility), // Мобильность
+            ("WLN", profile.wellness)  // Здоровье
+        ]
+
+        // 2. Готовим данные для графика
+        // Каждый стат - это RadarChartDataEntry. Значение должно быть Double.
+        // Главные статы теперь в диапазоне ~0-40. НЕ НУЖНО делить на 2.
+        // Просто конвертируем в Double
+        let entries = stats.map { DGCharts.RadarChartDataEntry(value: Double($0.1)) } 
+        print("--- PersonVC updateRadarChart: Подготовлены записи для графика: \\(entries.map { $0.value }) ---")
+
+        // 3. Создаем набор данных (DataSet)
+        // Указываем модуль для типа RadarChartDataSet
+        let dataSet = DGCharts.RadarChartDataSet(entries: entries, label: "Главные Статы")
+        dataSet.lineWidth = 2
+        // Устанавливаем цвет линии и заливки
+        let dataSetColor = UIColor.systemGreen
+        dataSet.colors = [dataSetColor]
+        dataSet.fillColor = dataSetColor
+        dataSet.drawFilledEnabled = true // Включаем заливку области
+        dataSet.fillAlpha = 0.5 // Прозрачность заливки
+        dataSet.drawValuesEnabled = false // Не показываем значения над точками
+        dataSet.valueFont = .systemFont(ofSize: 10)
+        dataSet.valueTextColor = .white
+
+        // 4. Создаем объект данных для графика
+        // Указываем модуль для типа RadarChartData
+        let data = DGCharts.RadarChartData(dataSets: [dataSet])
+        data.setValueTextColor(.white)
+        data.setValueFont(.systemFont(ofSize: 8, weight: .light))
+        
+        // 5. Настраиваем оси X (названия статов)
+        // Убедимся, что порядок совпадает с порядком в `stats`
+        let statNames = stats.map { $0.0 }
+        // Указываем модуль для типа IndexAxisValueFormatter
+        radarChartView.xAxis.valueFormatter = DGCharts.IndexAxisValueFormatter(values: statNames)
+
+        // 6. Устанавливаем данные в график и обновляем его
+        radarChartView.data = data
+        radarChartView.notifyDataSetChanged() // Уведомляем об изменениях
+
+        print("--- PersonVC updateRadarChart: Данные установлены, график обновлен --- ")
+    }
 }

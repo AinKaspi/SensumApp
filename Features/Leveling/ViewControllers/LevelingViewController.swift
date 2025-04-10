@@ -446,7 +446,6 @@ extension LevelingViewController: PoseLandmarkerHelperLiveStreamDelegate {
 
 extension LevelingViewController: SquatAnalyzerDelegate {
     func squatAnalyzer(_ analyzer: SquatAnalyzer, didCountSquat newTotalCount: Int) {
-        // Этот код мы уже реализовали
         // Убедимся, что профиль загружен
         guard var profile = userProfile else {
             print("Error: User profile is nil in squatAnalyzer delegate.")
@@ -456,19 +455,45 @@ extension LevelingViewController: SquatAnalyzerDelegate {
         // 1. Обновляем ОБЩЕЕ количество приседаний в профиле
         profile.totalSquats += 1 // Счетчик обновляем здесь
         
-        // 2. Добавляем базовый опыт через метод addXP
-        let didLevelUpBasic = profile.addXP(xpPerSquat)
+        // 2. Рассчитываем модификатор опыта на основе статов
+        // Для приседаний используем Мощь (PWR)
+        // Базовое значение стата берем из UserProfile.baseStatValue (20)
+        // Отклонение = Текущий_стат - Базовый_стат
+        // Модификатор = 1.0 + (Отклонение / 100.0) (т.е. +/- 1% за каждое очко отклонения от базы 20)
+        let powerStat = profile.power // Получаем Мощь
+        let baseStatValue = UserProfile.baseStatValue // Используем базу из UserProfile
+        let statDifference = powerStat - baseStatValue
+        let xpMultiplier = 1.0 + (Double(statDifference) / 100.0)
+        
+        // Рассчитываем итоговый опыт, но не меньше 1
+        let baseXP = Double(xpPerSquat)
+        let calculatedXP = Int(round(baseXP * xpMultiplier))
+        let finalXP = max(1, calculatedXP) // Опыт не может быть меньше 1
+        
+        // Добавляем baseStatValue обратно в лог
+        print("--- LevelingVC squatAnalyzer: Расчет XP: База=\(xpPerSquat), Мощь=\(powerStat), БазСтат=\(baseStatValue), Множ=x\(String(format: "%.2f", xpMultiplier)), Итог=\(finalXP) ---")
+        
+        // 3. Добавляем РАССЧИТАННЫЙ опыт через метод addXP
+        let didLevelUpBasic = profile.addXP(finalXP)
         if didLevelUpBasic {
+            print("--- LevelingVC squatAnalyzer: Обнаружено повышение уровня после базового XP! ---")
             // TODO: Показать эффект повышения уровня?
         }
         
-        // 3. Продвигаем сессионную прогрессивную цель
+        // 4. Определяем прирост атрибутов для приседания (примерные значения)
+        // Приседания качают силу ног и кора (STR), выносливость (CON), баланс (BAL)
+        let strGain = 2
+        let conGain = 1
+        let balGain = 1
+        // Вызываем метод прокачки атрибутов
+        profile.gainAttributes(strGain: strGain, conGain: conGain, balGain: balGain)
+        
+        // 5. Продвигаем сессионную прогрессивную цель
         squatsTowardsProgressiveGoal += 1
 
         if squatsTowardsProgressiveGoal >= progressiveSquatGoal {
-            print("--- Progressive Goal #\(progressiveSquatGoal) Reached! ---")
             
-            // Добавляем бонусный опыт через метод addXP
+            // Добавляем бонусный опыт через метод addXP (бонус не модифицируем статами, он фиксированный)
             let didLevelUpBonus = profile.addXP(bonusXPForGoal)
             if didLevelUpBonus {
                 // TODO: Показать эффект повышения уровня (может сработать и после базового)?
@@ -479,12 +504,12 @@ extension LevelingViewController: SquatAnalyzerDelegate {
             squatsTowardsProgressiveGoal = 0
         }
         
-        // 4. Сохраняем обновленный профиль
+        // 6. Сохраняем обновленный профиль (после всех изменений XP и атрибутов)
         DataManager.shared.updateUserProfile(profile)
         // Обновляем локальную копию на всякий случай (хотя DataManager должен обновить свою)
         self.userProfile = profile 
         
-        // 5. Обновляем UI
+        // 7. Обновляем UI
         updateUI()
     }
     

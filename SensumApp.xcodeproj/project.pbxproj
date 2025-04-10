@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		0BEC571AAD9BAB36845AF4F7 /* Pods_SensumApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F08A7153A835D56D39470A7D /* Pods_SensumApp.framework */; };
+		B11327172DA7476A009315D3 /* DGCharts in Frameworks */ = {isa = PBXBuildFile; productRef = B11327162DA7476A009315D3 /* DGCharts */; };
+		B1A6E6E62DA74B4500E9E9EB /* DGCharts in Frameworks */ = {isa = PBXBuildFile; productRef = B1A6E6E52DA74B4500E9E9EB /* DGCharts */; };
 		B1BE36972DA6A6ED00BF1C55 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BE36962DA6A6ED00BF1C55 /* UserProfile.swift */; };
 		B1BE369A2DA6A75400BF1C55 /* DataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BE36992DA6A75400BF1C55 /* DataManager.swift */; };
 /* End PBXBuildFile section */
@@ -52,6 +54,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B1A6E6E62DA74B4500E9E9EB /* DGCharts in Frameworks */,
+				B11327172DA7476A009315D3 /* DGCharts in Frameworks */,
 				0BEC571AAD9BAB36845AF4F7 /* Pods_SensumApp.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -162,6 +166,9 @@
 			);
 			mainGroup = B14866602DA4351800C4A753;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B11327152DA7476A009315D3 /* XCRemoteSwiftPackageReference "Charts" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B148666A2DA4351800C4A753 /* Products */;
 			projectDirPath = "";
@@ -419,6 +426,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B11327152DA7476A009315D3 /* XCRemoteSwiftPackageReference "Charts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ChartsOrg/Charts";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B11327162DA7476A009315D3 /* DGCharts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B11327152DA7476A009315D3 /* XCRemoteSwiftPackageReference "Charts" */;
+			productName = DGCharts;
+		};
+		B1A6E6E52DA74B4500E9E9EB /* DGCharts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B11327152DA7476A009315D3 /* XCRemoteSwiftPackageReference "Charts" */;
+			productName = DGCharts;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B14866612DA4351800C4A753 /* Project object */;
 }
