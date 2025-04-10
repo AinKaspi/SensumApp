@@ -556,9 +556,9 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIIma
         radarChartView.yAxis.labelFont = .systemFont(ofSize: 9, weight: .light)
         radarChartView.yAxis.labelCount = 6 // Количество меток (0, 20, 40, 60, 80, 100)
         radarChartView.yAxis.axisMinimum = 0
-        // Максимальное значение = База(20) + 2 * (Макс.Атрибут(100)/10) = 20 + 2*10 = 40
-        // Установим чуть больше для запаса, например 50
-        radarChartView.yAxis.axisMaximum = 50
+        // Максимальное значение = База(20) + 2 * (Макс.Атрибут(100)/10) = 40
+        // Устанавливаем максимум оси Y в 60 для большего пространства
+        radarChartView.yAxis.axisMaximum = 60
         // Убираем числовые метки с оси Y
         radarChartView.yAxis.drawLabelsEnabled = false // Показываем метки (0, 20, ...)
         radarChartView.yAxis.valueFormatter = YAxisValueFormatter() // Форматтер меток оси Y
