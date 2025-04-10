@@ -1,8 +1,9 @@
-//
-//  Exercise.swift
-//  SensumApp
-//
-//  Created by Ain on 10/04/2025.
-//
-
 import Foundation
+
+struct Exercise: Identifiable { // Identifiable может быть полезен для таблиц/коллекций
+    let id: String // Уникальный идентификатор (можно UUID)
+    let name: String
+    let description: String
+    let iconName: String // Имя системной иконки или ассета
+    // TODO: Добавить информацию о прокачиваемых атрибутах
+}

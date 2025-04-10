@@ -547,12 +547,14 @@ class PoseOverlayView: UIView {
     override func draw(_ rect: CGRect) {
         super.draw(rect)
         // Используем Optional Chaining и guard для безопасности
-        guard let poseResult = currentResult?.poseLandmarkerResult else { return }
+        // Изменяем доступ к данным: берем 2D poseLandmarks из ResultBundle
+        guard let landmarks2D = currentResult?.poseLandmarks else { return }
 
         // Отрисовка позы
         // Используем currentFrameSize для нормализации
-        drawLandmarks(poseResult.landmarks, in: rect, imageSize: currentFrameSize)
-        drawConnections(poseResult.landmarks, in: rect, imageSize: currentFrameSize)
+        // Передаем landmarks2D вместо poseResult.landmarks
+        drawLandmarks(landmarks2D, in: rect, imageSize: currentFrameSize)
+        drawConnections(landmarks2D, in: rect, imageSize: currentFrameSize)
     }
 
     /**

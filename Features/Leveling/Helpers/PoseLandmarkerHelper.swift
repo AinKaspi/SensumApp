@@ -23,7 +23,7 @@ import AVFoundation
  */
 protocol PoseLandmarkerHelperLiveStreamDelegate: AnyObject {
   func poseLandmarkerHelper(_ poseLandmarkerHelper: PoseLandmarkerHelper,
-                             didFinishDetection result: ResultBundle?,
+                             didFinishDetection resultBundle: ResultBundle?,
                              error: Error?)
 }
 
@@ -52,7 +52,8 @@ protocol PoseLandmarkerHelperVideoDelegate: AnyObject {
  */
 struct ResultBundle {
   let inferenceTime: Double
-  let poseLandmarkerResult: PoseLandmarkerResult? // Один результат
+  let poseLandmarks: [[NormalizedLandmark]]?
+  let poseWorldLandmarks: [[Landmark]]?
 }
 
 // MARK: - PoseLandmarkerHelper Class -
@@ -234,7 +235,11 @@ class PoseLandmarkerHelper: NSObject {
       let result = try landmarker.detect(image: mpImage)
       let inferenceTime = Date().timeIntervalSince(startDate) * 1000
       // В ResultBundle больше нет size
-      return ResultBundle(inferenceTime: inferenceTime, poseLandmarkerResult: result)
+      return ResultBundle(
+        inferenceTime: inferenceTime,
+        poseLandmarks: result.landmarks,
+        poseWorldLandmarks: result.worldLandmarks
+      )
     } catch {
       print("Failed to detect pose in image: \(error)")
       // Можно передать ошибку наружу, если нужно
@@ -332,7 +337,8 @@ class PoseLandmarkerHelper: NSObject {
 
     return ResultBundle(
       inferenceTime: averageInferenceTime,
-      poseLandmarkerResult: resultsTuple.poseLandmarkerResults.first.flatMap { $0 }
+      poseLandmarks: resultsTuple.poseLandmarkerResults.first.flatMap { $0 }?.landmarks,
+      poseWorldLandmarks: resultsTuple.poseLandmarkerResults.first.flatMap { $0 }?.worldLandmarks
     )
   }
 
@@ -422,7 +428,6 @@ extension PoseLandmarkerHelper: PoseLandmarkerLiveStreamDelegate {
       print("Pose detection error from MediaPipe: \(error!.localizedDescription)")
       // Передаем ошибку нашему внешнему делегату
       liveStreamDelegate?.poseLandmarkerHelper(self, didFinishDetection: nil, error: error)
-      // НЕ очищаем currentLiveStreamImage
       return
     }
 
@@ -431,7 +436,6 @@ extension PoseLandmarkerHelper: PoseLandmarkerLiveStreamDelegate {
       print("Pose detection finished with no results for timestamp \(timestampInMilliseconds).")
       // Передаем nil результат (без ошибки) нашему делегату
       liveStreamDelegate?.poseLandmarkerHelper(self, didFinishDetection: nil, error: nil)
-       // НЕ очищаем currentLiveStreamImage
       return
     }
 
@@ -446,10 +450,11 @@ extension PoseLandmarkerHelper: PoseLandmarkerLiveStreamDelegate {
      self.currentLiveStreamImage = nil
      */
 
-    // 4. Создаем ResultBundle БЕЗ размера
+    // 4. Создаем ResultBundle с обоими типами landmarks
     let resultBundle = ResultBundle(
       inferenceTime: Date().timeIntervalSince1970 * 1000 - Double(timestampInMilliseconds),
-      poseLandmarkerResult: poseResult
+      poseLandmarks: poseResult.landmarks,
+      poseWorldLandmarks: poseResult.worldLandmarks
     )
 
     // 5. Уведомляем наш внешний делегат (LevelingViewController)

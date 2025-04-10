@@ -188,11 +188,17 @@ class LevelingCoordinator: Coordinator {
     var childCoordinators: [Coordinator] = []
     init(navigationController: UINavigationController) { self.navigationController = navigationController }
     func start() {
-        let vc = LevelingViewController() // Используем твой ViewController или заглушку
-        vc.view.backgroundColor = .darkGray
-        vc.title = "Leveling (stub)"
-        navigationController.setViewControllers([vc], animated: false)
+        // Стартуем с экрана выбора упражнений
+        let selectionVC = ExerciseSelectionViewController()
+        // TODO: Позже передадим ViewModel и настроим делегата
+        // let viewModel = ExerciseSelectionViewModel(coordinatorDelegate: self) 
+        // selectionVC.viewModel = viewModel
+        selectionVC.title = "Упражнения"
+        navigationController.setViewControllers([selectionVC], animated: false)
     }
+    
+    // TODO: Добавить методы для навигации к ExerciseExecutionViewController
+    // Например, func showExerciseExecution(exercise: Exercise) { ... }
 }
 
 class RankCoordinator: Coordinator {

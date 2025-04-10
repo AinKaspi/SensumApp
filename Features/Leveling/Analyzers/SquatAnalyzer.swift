@@ -1,5 +1,7 @@
 import Foundation
 import MediaPipeTasksVision // Импортируем для доступа к типам вроде NormalizedLandmark
+// Импортируем simd для работы с 3D-векторами
+import simd
 
 // MARK: - Squat Analyzer Delegate Protocol -
 
@@ -63,7 +65,8 @@ class SquatAnalyzer {
     private var hipAngleHistory: [Float] = []
 
     // MARK: - Constants (для индексов точек)
-    private enum Landmark { // Используем вложенный enum для ясности
+    // Переименовываем enum, чтобы избежать конфликта с типом Landmark из MediaPipe
+    private enum LandmarkIndex { // Используем вложенный enum для ясности
         static let leftShoulder = 11
         static let rightShoulder = 12
         static let leftHip = 23
@@ -100,81 +103,77 @@ class SquatAnalyzer {
     // MARK: - Analysis Method
 
     /**
-     Анализирует переданный набор точек тела (landmarks).
-     Этот метод будет вызываться для каждого кадра с результатами от MediaPipe.
-     - Parameter landmarks: Массив точек тела (`NormalizedLandmark`) для одного обнаруженного человека.
-                            Предполагается, что это `result.landmarks[0]`, если `numPoses = 1`.
+     Анализирует переданный набор 3D точек тела (world landmarks).
+     - Parameter worldLandmarks: Массив 3D точек тела (`Landmark` из MediaPipe) для одного обнаруженного человека.
+                                Landmark содержит x, y, z в метрах и visibility/presence.
      */
-    func analyze(landmarks: [NormalizedLandmark]) {
+    // Уточняем тип параметра, используя полное имя с модулем
+    func analyze(worldLandmarks: [MediaPipeTasksVision.Landmark]) {
         // Убедимся, что у нас достаточно точек для анализа
-        guard landmarks.count > Landmark.rightAnkle else { // Проверяем по максимальному индексу
-            // print("SquatAnalyzer: Not enough landmarks to analyze (\(landmarks.count))")
-            // Возможно, стоит сбросить состояние или уведомить об ошибке
-            // updateState(newState: "error: not enough landmarks")
+        // Используем новое имя enum для индексов
+        guard worldLandmarks.count > LandmarkIndex.rightAnkle else {
             return
         }
 
-        // --- 1. Извлекаем необходимые точки --- 
-        // Получаем точки по индексам. Они NormalizedLandmark, содержат x, y, z, visibility, presence.
-        let leftHip = landmarks[Landmark.leftHip]
-        let rightHip = landmarks[Landmark.rightHip]
-        let leftKnee = landmarks[Landmark.leftKnee]
-        let rightKnee = landmarks[Landmark.rightKnee]
-        let leftAnkle = landmarks[Landmark.leftAnkle]
-        let rightAnkle = landmarks[Landmark.rightAnkle]
-        // Плечи нужны для расчета угла наклона корпуса (или угла бедра относительно плеча)
-        let leftShoulder = landmarks[Landmark.leftShoulder]
-        let rightShoulder = landmarks[Landmark.rightShoulder]
+        // --- 1. Извлекаем необходимые точки (теперь типа Landmark) --- 
+        // Используем новое имя enum для индексов
+        let leftHip = worldLandmarks[LandmarkIndex.leftHip]
+        let rightHip = worldLandmarks[LandmarkIndex.rightHip]
+        let leftKnee = worldLandmarks[LandmarkIndex.leftKnee]
+        let rightKnee = worldLandmarks[LandmarkIndex.rightKnee]
+        let leftAnkle = worldLandmarks[LandmarkIndex.leftAnkle]
+        let rightAnkle = worldLandmarks[LandmarkIndex.rightAnkle]
+        let leftShoulder = worldLandmarks[LandmarkIndex.leftShoulder]
+        let rightShoulder = worldLandmarks[LandmarkIndex.rightShoulder]
 
-        // TODO: Добавить проверку visibility/presence для ключевых точек?
-        // Если, например, колено не видно (visibility < порога), расчет угла будет неверным.
+        // Проверяем видимость ключевых точек (теперь используем visibility из Landmark)
+        // Порог можно оставить прежним или скорректировать
+        // Используем .floatValue для конвертации NSNumber? в Float
+        guard (leftHip.visibility?.floatValue ?? 0.0) > Thresholds.visibility,
+              (rightHip.visibility?.floatValue ?? 0.0) > Thresholds.visibility,
+              (leftKnee.visibility?.floatValue ?? 0.0) > Thresholds.visibility,
+              (rightKnee.visibility?.floatValue ?? 0.0) > Thresholds.visibility,
+              (leftAnkle.visibility?.floatValue ?? 0.0) > Thresholds.visibility,
+              (rightAnkle.visibility?.floatValue ?? 0.0) > Thresholds.visibility,
+              (leftShoulder.visibility?.floatValue ?? 0.0) > Thresholds.visibility,
+              (rightShoulder.visibility?.floatValue ?? 0.0) > Thresholds.visibility else
+        {
+            // Если ключевые точки не видны, пропускаем кадр
+            // Можно также сбросить состояние или установить в .unknown
+             print("SquatAnalyzer (3D): Skipping frame due to invisible key landmarks.")
+             updateState(newState: .unknown) // Сбрасываем в unknown для надежности
+            return
+        }
 
-        // --- 2. Рассчитываем углы --- 
-        // Рассчитаем углы, только если все точки видны
-        let leftKneeAngle = angle(
+        // --- 2. Рассчитываем углы в 3D --- 
+        // Используем новую функцию angle3D
+        let leftKneeAngle = angle3D(
             firstPoint: leftHip,
             midPoint: leftKnee,
             lastPoint: leftAnkle
         )
         
-        let rightKneeAngle = angle(
+        let rightKneeAngle = angle3D(
             firstPoint: rightHip,
             midPoint: rightKnee,
             lastPoint: rightAnkle
         )
         
-        let leftHipAngle = angle(
+        let leftHipAngle = angle3D(
             firstPoint: leftShoulder,
             midPoint: leftHip,
             lastPoint: leftKnee
         )
         
-        let rightHipAngle = angle(
+        let rightHipAngle = angle3D(
             firstPoint: rightShoulder,
             midPoint: rightHip,
             lastPoint: rightKnee
         )
         
-        // Собираем валидные углы
-        var validKneeAngles: [Float] = []
-        if let angle = leftKneeAngle { validKneeAngles.append(angle) }
-        if let angle = rightKneeAngle { validKneeAngles.append(angle) }
-        
-        var validHipAngles: [Float] = []
-        if let angle = leftHipAngle { validHipAngles.append(angle) }
-        if let angle = rightHipAngle { validHipAngles.append(angle) }
-
-        // Если нет валидных углов для коленей или бедер, пропускаем анализ этого кадра
-        guard !validKneeAngles.isEmpty, !validHipAngles.isEmpty else {
-            // print("SquatAnalyzer: Skipping frame due to invisible key landmarks.")
-            // Возможно, стоит установить состояние .unknown или оставить как есть?
-            // updateState(newState: .unknown)
-            return
-        }
-
-        // Используем средние из ВАЛИДНЫХ углов
-        let averageKneeAngle = validKneeAngles.reduce(0, +) / Float(validKneeAngles.count)
-        let averageHipAngle = validHipAngles.reduce(0, +) / Float(validHipAngles.count)
+        // Используем средние из рассчитанных углов (теперь они не опциональны, т.к. видимость проверена)
+        let averageKneeAngle = (leftKneeAngle + rightKneeAngle) / 2.0
+        let averageHipAngle = (leftHipAngle + rightHipAngle) / 2.0
 
         // --- Сглаживание углов ---
         addAngleToHistory(&kneeAngleHistory, angle: averageKneeAngle)
@@ -273,42 +272,52 @@ class SquatAnalyzer {
     // MARK: - Private Helper Methods
     
     /**
-     Рассчитывает угол между тремя точками (в градусах).
+     Рассчитывает угол между тремя 3D точками (в градусах).
      Угол измеряется в `midPoint`.
      - Parameters:
-       - firstPoint: Первая точка.
-       - midPoint: Центральная точка (вершина угла).
-       - lastPoint: Конечная точка.
-     - Returns: Угол в градусах (0-180) или `nil`, если одна из точек не видна.
+       - firstPoint: Первая точка (Landmark).
+       - midPoint: Центральная точка (Landmark, вершина угла).
+       - lastPoint: Конечная точка (Landmark).
+     - Returns: Угол в градусах (0-180).
      */
-    private func angle(firstPoint: NormalizedLandmark, midPoint: NormalizedLandmark, lastPoint: NormalizedLandmark) -> Float? {
-        // Проверяем видимость всех трех точек
-        // ОСТАВЛЯЕМ ЭТО ПОКА
-        guard firstPoint.visibility as! Float > Thresholds.visibility,
-              midPoint.visibility as! Float > Thresholds.visibility,
-              lastPoint.visibility as! Float > Thresholds.visibility else {
-            return nil // Возвращаем nil, если хотя бы одна точка не видна
+    // Уточняем тип параметров, используя полное имя с модулем
+    private func angle3D(firstPoint: MediaPipeTasksVision.Landmark, midPoint: MediaPipeTasksVision.Landmark, lastPoint: MediaPipeTasksVision.Landmark) -> Float {
+        // Конвертируем точки в 3D векторы (используя simd)
+        let firstVec = simd_float3(firstPoint.x, firstPoint.y, firstPoint.z)
+        let midVec = simd_float3(midPoint.x, midPoint.y, midPoint.z)
+        let lastVec = simd_float3(lastPoint.x, lastPoint.y, lastPoint.z)
+        
+        // Находим векторы от mid к first и от mid к last
+        let vector1 = firstVec - midVec
+        let vector2 = lastVec - midVec
+        
+        // Рассчитываем скалярное произведение
+        let dotProduct = simd_dot(vector1, vector2)
+        
+        // Рассчитываем длины векторов
+        let magnitude1 = simd_length(vector1)
+        let magnitude2 = simd_length(vector2)
+        
+        // Избегаем деления на ноль, если точки совпадают
+        guard magnitude1 > .ulpOfOne && magnitude2 > .ulpOfOne else {
+            // Если длина одного из векторов близка к нулю, угол не определен или 0
+            print("Warning: Zero length vector detected in angle3D calculation. Returning 0 degrees.")
+            return 0.0
         }
         
-        // Напрямую используем координаты, так как они должны быть Float
-        let fx = firstPoint.x
-        let fy = firstPoint.y
-        let mx = midPoint.x
-        let my = midPoint.y
-        let lx = lastPoint.x
-        let ly = lastPoint.y
+        // Рассчитываем косинус угла
+        let cosAngle = dotProduct / (magnitude1 * magnitude2)
         
-        // Явно преобразуем к Float прямо перед использованием в atan2,
-        // чтобы обойти ошибку компилятора
-        let radians = atan2(Float(ly - my), Float(lx - mx)) - atan2(Float(fy - my), Float(fx - mx))
-        var degrees = abs(radians * 180.0 / .pi)
+        // Ограничиваем значение косинуса диапазоном [-1, 1] из-за возможных ошибок точности
+        let clampedCosAngle = max(-1.0, min(1.0, cosAngle))
         
-        // Угол должен быть <= 180
-        if degrees > 180.0 {
-            degrees = 360.0 - degrees
-        }
+        // Находим угол в радианах с помощью арккосинуса
+        let angleRad = acos(clampedCosAngle)
         
-        return degrees
+        // Конвертируем радианы в градусы
+        let angleDeg = angleRad * (180.0 / .pi)
+        
+        return angleDeg
     }
     
     /**
