@@ -68,7 +68,7 @@ class PoseOverlayView: UIView {
          guard let context = UIGraphicsGetCurrentContext() else { return }
          context.saveGState()
          context.setLineWidth(Constants.lineWidth)
-         // Возвращаем стандартный цвет линии
+         // Используем стандартный цвет линии
          context.setStrokeColor(Constants.lineColor.cgColor)
 
          for (poseIndex, pose) in landmarks.enumerated() {
@@ -84,9 +84,7 @@ class PoseOverlayView: UIView {
                  guard startVisibility > Constants.visibilityThreshold,
                        endVisibility > Constants.visibilityThreshold else { continue }
                  
-                 // Убираем определение цвета линии по видимости
-                 // let connectionColor = color(forVisibility: min(startVisibility, endVisibility)).cgColor
-                 // context.setStrokeColor(connectionColor)
+                 // Убрано определение цвета линии по видимости
 
                  let startPoint = normalizedPoint(from: startLandmark, imageSize: imageSize, viewRect: rect)
                  let endPoint = normalizedPoint(from: endLandmark, imageSize: imageSize, viewRect: rect)
@@ -133,6 +131,12 @@ class PoseOverlayView: UIView {
 
          return CGPoint(x: viewPointX, y: viewPointY)
      }
+
+    // Добавляем хелпер для определения цвета по видимости (он не используется сейчас, но оставим)
+    private func color(forVisibility visibility: Float) -> UIColor {
+        // Заглушка, т.к. мы используем стандартные цвета
+        return Constants.pointFillColor 
+    }
 
     private enum Constants {
         static let pointRadius: CGFloat = 5.0
