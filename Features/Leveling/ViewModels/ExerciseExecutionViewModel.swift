@@ -314,7 +314,8 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
                 if kalmanFilters[i] == nil {
                     // Инициализируем фильтр при первом появлении точки
                     // Передаем measurementNoise (можно сделать настраиваемым)
-                    kalmanFilters[i] = KalmanFilter3D(initialMeasurement: measurementVec, measurementNoise: 0.1)
+                    // Используем Double для initialMeasurement
+                    kalmanFilters[i] = KalmanFilter3D(initialMeasurement: simd_float3(measurementVec), measurementNoise: 0.1)
                 } else {
                     // Шаг предсказания
                     kalmanFilters[i]!.predict(deltaTime: deltaTime)
@@ -322,8 +323,8 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
                 
                 // Шаг обновления, только если точка видима
                 if isVisible {
-                    // Передаем deltaTime в update
-                    kalmanFilters[i]!.update(measurement: measurementVec, deltaTime: deltaTime)
+                    // Убираем deltaTime из вызова update
+                    kalmanFilters[i]!.update(measurement: measurementVec)
                 }
                 
                 // Получаем отфильтрованную позицию
