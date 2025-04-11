@@ -14,28 +14,21 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         
-        print("--- SceneDelegate: scene(_:willConnectTo:options:) CALLED ---")
         
         // Первое, получаем "сцену" - это как бы экран, на котором всё будет происходить.
         guard let windowScene = (scene as? UIWindowScene) else { 
-            print("--- SceneDelegate: FAILED to get windowScene ---")
             return 
         }
-        print("--- SceneDelegate: Got windowScene ---")
         
         // Создаем самое ГЛАВНОЕ ОКНО для нашего приложения.
         let window = UIWindow(windowScene: windowScene)
-        print("--- SceneDelegate: Created UIWindow ---")
         
         // Создаем главный координатор и запускаем его
         appCoordinator = AppCoordinator(window: window)
-        print("--- SceneDelegate: Created AppCoordinator ---")
         appCoordinator?.start()
-        print("--- SceneDelegate: Called appCoordinator.start() ---")
 
         // Устанавливаем фон окна в желтый для отладки
         window.backgroundColor = .systemYellow 
-        print("--- SceneDelegate: Set window background to YELLOW ---")
 
         // Сохраняем ссылку на это окно, чтобы оно не пропало.
         self.window = window
@@ -132,12 +125,10 @@ class AppCoordinator: Coordinator { // Делаем AppCoordinator соотве�
             storeCoordinator.navigationController
         ]
         
-        print("--- AppCoordinator: Assigned viewControllers to TabBarController: \(tabBarController.viewControllers?.count ?? 0) items ---")
         
         // 6. Настраиваем внешний вид TabBar с помощью Appearance API
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground() // Делаем фон непрозрачным
-        print("--- AppCoordinator: Configuring TabBar Appearance ---")
         appearance.backgroundColor = UIColor(white: 0.1, alpha: 1.0) // Цвет фона (темно-серый, как у карточек)
 
         // Настройка цвета иконок и текста
@@ -164,7 +155,6 @@ class AppCoordinator: Coordinator { // Делаем AppCoordinator соотве�
         
         // 7. Устанавливаем TabBarController как корневой для окна
         window.rootViewController = tabBarController
-        print("--- AppCoordinator: SET TabBarController as rootViewController for window ---")
     }
 }
 
@@ -200,7 +190,6 @@ class LevelingCoordinator: Coordinator, ExerciseSelectionViewModelCoordinatorDel
     
     // Реализуем метод делегата
     func exerciseSelectionViewModelDidSelect(exercise: Exercise) {
-        print("--- LevelingCoordinator: Получено событие выбора упражнения: \(exercise.name) ---")
         // Создаем и показываем экран выполнения
         let executionVC = ExerciseExecutionViewController()
         // Создаем ViewModel, передавая упражнение и делегата (сам VC)

@@ -65,7 +65,6 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
         self.userProfile = DataManager.shared.getCurrentUserProfile()
         self.viewDelegate = viewDelegate // Сохраняем делегата
         super.init() // Нужно вызвать super.init(), так как наследуемся от NSObject
-        print("ExerciseExecutionViewModel initialized for exercise: \(exercise.name)")
         
         // Создаем нужный анализатор в зависимости от упражнения
         setupAnalyzer(for: exercise)
@@ -78,17 +77,14 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
         }
         // Сообщаем View начальное время (00:00)
         viewDelegate?.viewModelDidUpdateTimer(timeString: "00:00")
-        print("--- ExerciseExecutionVM: Таймер запущен --- ")
     }
     
     // MARK: - Public Methods (для View Controller)
     func viewDidLoad() {
-        print("ExerciseExecutionViewModel: viewDidLoad")
         // Логика viewDidLoad, если нужна (например, первичная загрузка данных)
     }
     
     func viewDidAppear() {
-        print("ExerciseExecutionViewModel: viewDidAppear")
         // Запускаем таймер ПОДГОТОВКИ, а не основной
         startPreparationTimer()
         /*
@@ -101,7 +97,6 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     }
     
     func viewWillDisappear() {
-        print("ExerciseExecutionViewModel: viewWillDisappear")
         stopTimer() // Останавливаем основной таймер
         stopPreparationTimer() // Останавливаем таймер подготовки
         // TODO: Остановить сессию камеры (если она управляется отсюда)
@@ -112,7 +107,6 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     private func setupPoseLandmarker() {
         // Убедимся, что файл модели существует
         guard let modelPath = Bundle.main.path(forResource: self.modelPath, ofType: nil) else {
-            print("ExerciseExecutionViewModel Ошибка: Файл модели MediaPipe не найден (\(self.modelPath)).")
             // TODO: Обработать ошибку (например, сообщить View)
             return
         }
@@ -129,10 +123,8 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
         )
         
         if poseLandmarkerHelper == nil {
-            print("ExerciseExecutionViewModel Ошибка: Ошибка инициализации PoseLandmarkerHelper.")
             // TODO: Обработать ошибку
         } else {
-            print("ExerciseExecutionViewModel: PoseLandmarkerHelper успешно инициализирован.")
         }
     }
     
@@ -141,13 +133,11 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     private func setupAnalyzer(for exercise: Exercise) {
         switch exercise.id {
         case "squats":
-            print("--- ExerciseExecutionVM: Создание SquatAnalyzer3D ---")
             self.analyzer = SquatAnalyzer3D(delegate: self)
         // TODO: Добавить кейсы для других упражнений
         // case "pushups":
         //    self.analyzer = PushupAnalyzer(delegate: self)
         default:
-            print("--- ExerciseExecutionVM ВНИМАНИЕ: Неизвестный ID упражнения ('\(exercise.id)') - анализатор не создан. ---")
             self.analyzer = nil
         }
     }
@@ -174,14 +164,12 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     private func startPreparationTimer() {
         guard !isPreparing else { return } // Не запускаем, если уже идет
         
-        print("--- ExerciseExecutionVM: Запуск таймера подготовки --- ")
         isPreparing = true
         countdownValue = 3 // Начальное значение
         stopPreparationTimer() // На всякий случай остановим старый
         
         // Сообщаем View, чтобы показала обратный отсчет
         // TODO: viewDelegate?.viewModelDidStartPreparation(initialValue: countdownValue)
-        print("--- ExerciseExecutionVM: Сообщено View о начале подготовки (Значение: \(countdownValue)) ---")
         
         countdownTimer = Timer.scheduledTimer(timeInterval: 1.0,
                                               target: self,
@@ -197,7 +185,6 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     
     @objc private func updatePreparationTimer() {
         countdownValue -= 1
-        print("--- ExerciseExecutionVM: Тик таймера подготовки: \(countdownValue) ---")
         
         if countdownValue > 0 {
             // Сообщаем View новое значение
@@ -208,7 +195,6 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
             isPreparing = false
             // Сообщаем View, что можно начинать (например, показать "Старт!")
             // TODO: viewDelegate?.viewModelDidFinishPreparation()
-             print("--- ExerciseExecutionVM: Подготовка завершена, запускаем основной таймер --- ")
             // Запускаем основной таймер сессии
             startTimer()
              // Сбрасываем анализатор перед началом
@@ -223,7 +209,6 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
         sessionStartDate = Date()
         // Сообщаем View начальное время (00:00)
         // TODO: viewDelegate?.viewModelDidUpdateTime(timeString: "00:00")
-        print("--- ExerciseExecutionVM: Таймер запущен --- ")
         
         sessionTimer = Timer.scheduledTimer(timeInterval: timerUpdateInterval,
                                             target: self,
@@ -235,7 +220,6 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     private func stopTimer() {
         sessionTimer?.invalidate()
         sessionTimer = nil
-        print("--- ExerciseExecutionVM: Таймер остановлен --- ")
     }
 
     @objc private func updateTimer() {
@@ -246,7 +230,6 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
         let timeString = String(format: "%02d:%02d", minutes, seconds)
         // Сообщаем View обновленное время
         viewDelegate?.viewModelDidUpdateTimer(timeString: timeString)
-        print("--- ExerciseExecutionVM: Тик таймера: \(timeString) ---")
     }
 }
 
@@ -272,21 +255,18 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
         let currentTime = Date().timeIntervalSince1970
         let shouldLog = (currentTime - lastPoseLogTime >= poseLogInterval)
         if shouldLog { 
-            print("--- ExerciseExecutionVM: Получен результат от PoseLandmarkerHelper (Time: \(String(format: "%.2f", currentTime))) ---") 
             lastPoseLogTime = currentTime // Обновляем время последнего лога
         }
         // -----------------------
         
         // Обработка ошибки
         if let error = error {
-            print("ExerciseExecutionVM Ошибка детекции поз: \(error.localizedDescription)")
             // TODO: Сообщить View об ошибке? Очистить оверлей?
             return
         }
         
         // Обработка результата
         guard let resultBundle = resultBundle else {
-             print("--- ExerciseExecutionVM: Результат детекции пуст (nil). ---")
             // TODO: Очистить оверлей?
             // viewDelegate?.viewModelDidUpdatePose(landmarks: nil, frameSize: self.currentFrameSize) // Передаем nil для очистки?
             return
@@ -342,7 +322,6 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
                 } // ------------------------------------------------
                 
                 if shouldLog {
-                    print("--- ExerciseExecutionVM: 3D worldLandmarks переданы в анализатор. ---")
                 }
             }
         } else {
@@ -351,7 +330,6 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
                 analyzer?.reset() // Сбрасываем анализатор, если точек нет
                 // Логируем сброс анализатора только если логируем сам результат
                 if shouldLog {
-                    print("--- ExerciseExecutionVM: Не найдены 3D worldLandmarks. Анализатор сброшен. ---")
                 }
             }
         }
@@ -360,7 +338,6 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
         // Используем сохраненный размер кадра self.currentFrameSize
         if shouldLog { // Логируем передаваемые данные только с заданной частотой
             let landmarksCount = resultBundle.poseLandmarks?.first?.count ?? 0
-            print("--- ExerciseExecutionVM: Передача в View -> Landmarks: \(landmarksCount > 0 ? "OK (\(landmarksCount))" : "NIL или пусто"), FrameSize: \(self.currentFrameSize) ---")
         }
         viewDelegate?.viewModelDidUpdatePose(landmarks: resultBundle.poseLandmarks, frameSize: self.currentFrameSize)
         // ----------------------------------------------------
@@ -371,11 +348,9 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
 extension ExerciseExecutionViewModel: ExerciseAnalyzerDelegate {
     // Метод вызывается новым протоколом
     func exerciseAnalyzer(_ analyzer: ExerciseAnalyzer, didCountRepetition newTotalCount: Int) {
-        print("--- ExerciseExecutionVM: Анализатор засчитал повторение #\(newTotalCount) ---")
         
         // Получаем текущий профиль (он должен быть загружен в init)
         guard var profile = userProfile else {
-            print("ExerciseExecutionVM Ошибка: User profile is nil в exerciseAnalyzer delegate.")
             return
         }
         
@@ -391,12 +366,10 @@ extension ExerciseExecutionViewModel: ExerciseAnalyzerDelegate {
         let calculatedXP = Int(round(baseXP * xpMultiplier))
         let finalXP = max(1, calculatedXP)
         
-        print("--- ExerciseExecutionVM: Расчет XP: База=\(Int(baseXP)), Мощь=\(powerStat), БазСтат=\(baseStatValue), Множ=x\(String(format: "%.2f", xpMultiplier)), Итог=\(finalXP) ---")
         
         // 3. Добавляем опыт
         let didLevelUpBasic = profile.addXP(finalXP)
         if didLevelUpBasic {
-            print("--- ExerciseExecutionVM: Обнаружено повышение уровня после базового XP! ---")
             // TODO: Сообщить View о повышении уровня
         }
         
@@ -409,21 +382,17 @@ extension ExerciseExecutionViewModel: ExerciseAnalyzerDelegate {
         
         // 5. Продвигаем сессионную прогрессивную цель
         squatsTowardsProgressiveGoal += 1
-        print("--- ExerciseExecutionVM: Прогресс к цели: \(squatsTowardsProgressiveGoal)/\(progressiveSquatGoal) ---")
         
         if squatsTowardsProgressiveGoal >= progressiveSquatGoal {
-            print("--- ExerciseExecutionVM: Progressive Goal #\(progressiveSquatGoal) Reached! --- ")
             // Добавляем бонусный опыт
             let didLevelUpBonus = profile.addXP(bonusXPForGoal)
             if didLevelUpBonus {
-                print("--- ExerciseExecutionVM: Обнаружено повышение уровня после БОНУСНОГО XP! ---")
                 // TODO: Сообщить View о повышении уровня (возможно, особым образом)
             }
             
             // Увеличиваем следующую цель и сбрасываем счетчик
             progressiveSquatGoal += progressiveGoalIncrement
             squatsTowardsProgressiveGoal = 0
-            print("--- ExerciseExecutionVM: Новая цель: \(progressiveSquatGoal) приседаний --- ")
             // TODO: Сообщить View об обновлении цели
             viewDelegate?.viewModelDidUpdateGoal(current: squatsTowardsProgressiveGoal, target: progressiveSquatGoal)
         } else {
@@ -450,7 +419,6 @@ extension ExerciseExecutionViewModel: ExerciseAnalyzerDelegate {
     
     // Метод вызывается новым протоколом
     func exerciseAnalyzer(_ analyzer: ExerciseAnalyzer, didChangeState newState: String) {
-        print("--- ExerciseExecutionVM: Анализатор сменил состояние на \(newState) ---")
         // Передаем информацию об изменении состояния во View
         viewDelegate?.viewModelDidUpdateDebugState(newState)
         

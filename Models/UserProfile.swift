@@ -117,7 +117,6 @@ struct UserProfile: Codable { // Codable для сохранения/загру�
             level += 1
             // Рассчитываем XP для НОВОГО следующего уровня
             xpToNextLevel = DataManager.calculateXPForLevel(level)
-            print("LEVEL UP! Reached level \(level). Next level at \(xpToNextLevel) XP.")
             // TODO: Добавить уведомление или вызов делегата о повышении уровня?
         }
         return leveledUp
@@ -132,7 +131,6 @@ struct UserProfile: Codable { // Codable для сохранения/загру�
     ///   - balGain: Прирост баланса.
     ///   - flxGain: Прирост гибкости.
     mutating func gainAttributes(strGain: Int = 0, conGain: Int = 0, accGain: Int = 0, spdGain: Int = 0, balGain: Int = 0, flxGain: Int = 0) {
-        print("--- UserProfile gainAttributes: Попытка добавить очки атрибутов (STR:+\(strGain), CON:+\(conGain), ACC:+\(accGain), SPD:+\(spdGain), BAL:+\(balGain), FLX:+\(flxGain)) ---")
         
         // Добавляем очки к каждому атрибуту и сразу ограничиваем сверху 100
         // Ограничение снизу (0) не нужно, так как прирост предполагается положительным, а начальные > 0
@@ -143,7 +141,6 @@ struct UserProfile: Codable { // Codable для сохранения/загру�
         balance = min(100, balance + balGain)
         flexibility = min(100, flexibility + flxGain)
         
-        print("--- UserProfile gainAttributes: Новые атрибуты: STR:\(strength), CON:\(constitution), ACC:\(accuracy), SPD:\(speed), BAL:\(balance), FLX:\(flexibility) ---")
     }
 
     // TODO: Добавить другие методы, например:

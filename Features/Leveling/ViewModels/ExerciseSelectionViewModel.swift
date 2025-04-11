@@ -40,10 +40,8 @@ class ExerciseSelectionViewModel {
     /// Вызывается, когда пользователь выбрал упражнение по индексу
     func didSelectExercise(at index: Int) {
         guard let exercise = exercise(at: index) else {
-            print("--- ExerciseSelectionVM: Ошибка: Неверный индекс \(index) при выборе упражнения ---")
             return
         }
-        print("--- ExerciseSelectionVM: Выбрано упражнение \(exercise.name), сообщаем координатору ---")
         coordinatorDelegate?.exerciseSelectionViewModelDidSelect(exercise: exercise)
     }
     
@@ -52,6 +50,5 @@ class ExerciseSelectionViewModel {
     // Принимаем делегата координатора в инициализаторе
     init(coordinatorDelegate: ExerciseSelectionViewModelCoordinatorDelegate?) {
         self.coordinatorDelegate = coordinatorDelegate
-        print("ExerciseSelectionViewModel initialized")
     }
 }
