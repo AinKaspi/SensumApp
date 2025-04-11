@@ -1,6 +1,9 @@
-import UIKit
 import AVFoundation
 import MediaPipeTasksVision
+// Удаляем импорты AR, добавляем SceneKit
+// import RealityKit
+// import ARKit
+import SceneKit
 
 // MARK: - LevelingViewController Class
 
@@ -12,34 +15,31 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
     // Оставляем только объявление viewModel. Он будет установлен координатором.
     var viewModel: ExerciseExecutionViewModel!
     
-    // Удаляем свойства, связанные с MediaPipe и анализом
-    // private var poseLandmarkerHelper: PoseLandmarkerHelper?
-    // private let squatAnalyzer: SquatAnalyzer = SquatAnalyzer() 
-
-    // MARK: - AVFoundation Properties
+    // Возвращаем свойства AVFoundation, включая previewLayer
     private var captureSession = AVCaptureSession()
-    private lazy var previewLayer: AVCaptureVideoPreviewLayer = {
-        let layer = AVCaptureVideoPreviewLayer(session: self.captureSession)
-        layer.videoGravity = .resizeAspectFill
-        return layer
-    }()
     private var videoDataOutput = AVCaptureVideoDataOutput()
-    private let sessionQueue = DispatchQueue(label: "com.sensum.sessionQueue")
+    private let sessionQueue = DispatchQueue(label: "com.sensum.sessionQueue.exec") // Новая очередь
 
-    // Удаляем свойства MediaPipe
-    /*
-    private let modelPath = "pose_landmarker_full.task"
-    // ... остальные параметры ... 
-    */
+    // Свойства для SceneKit и скелета
+    private var skeletonNode: SCNNode? // Корневой узел для всего скелета
+    private var jointNodes: [Int: SCNNode] = [:] // Словарь для узлов суставов [Индекс: Узел]
+    private var boneNodes: [Int: SCNNode] = [:] // Словарь для узлов костей [Хэш_пары_индексов: Узел]
 
     // MARK: - UI Elements
-    // Отображение скелета
-    private lazy var poseOverlayView: PoseOverlayView = {
+    // Возвращаем PoseOverlayView для 2D отрисовки
+    private lazy var poseOverlayView: PoseOverlayView = { // Используем имя PoseOverlayView
         let overlayView = PoseOverlayView()
         overlayView.translatesAutoresizingMaskIntoConstraints = false
         overlayView.backgroundColor = .clear
         overlayView.clearsContextBeforeDrawing = true
         return overlayView
+    }()
+    
+    // Возвращаем AVCaptureVideoPreviewLayer для фона
+    private lazy var previewLayer: AVCaptureVideoPreviewLayer = {
+        let layer = AVCaptureVideoPreviewLayer(session: self.captureSession)
+        layer.videoGravity = .resizeAspectFill
+        return layer
     }()
 
     private lazy var xpProgressBar: UIProgressView = {
@@ -92,6 +92,30 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
         return stackView
     }()
 
+    // Добавляем лейблы для отладочной информации
+    private lazy var debugStateLabel: UILabel = createDebugLabel()
+    private lazy var debugAnglesLabel: UILabel = createDebugLabel()
+    private lazy var debugRepCountLabel: UILabel = createDebugLabel()
+    private lazy var debugVisibilityLabel: UILabel = createDebugLabel()
+    
+    private lazy var debugStackView: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [
+            debugStateLabel,
+            debugAnglesLabel,
+            debugRepCountLabel,
+            debugVisibilityLabel
+        ])
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .vertical
+        stackView.alignment = .leading
+        stackView.spacing = 4
+        stackView.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        stackView.layer.cornerRadius = 5
+        stackView.isLayoutMarginsRelativeArrangement = true
+        stackView.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 5, leading: 5, bottom: 5, trailing: 5)
+        return stackView
+    }()
+
     // MARK: - State Properties
 
     private var currentXP: Int = 0
@@ -124,73 +148,70 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
         
         setupViews()
         setupConstraints()
-        // Удаляем назначение делегата анализатору, ViewModel сама это сделает
-        // squatAnalyzer.delegate = self
-        // Удаляем resetSessionState, логика состояния переедет в ViewModel
-        // resetSessionState()
-
-        // Настраиваем AVFoundation (остается здесь, т.к. управляет View)
+        // Удаляем вызов addTapGestures
+        // addTapGestures()
+        
+        // Возвращаем настройку AVCaptureSession
         setupAVSession()
-        // Удаляем запуск настройки MediaPipe, ViewModel сама запустит
-        /*
-        sessionQueue.async { [weak self] in
-            self?.setupPoseLandmarker()
-        }
-        */
+        
         // Сообщаем ViewModel, что View загрузилась
         viewModel.viewDidLoad()
+        
+        // Удаляем setupSkeletonNodes
+        // setupSkeletonNodes()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        startSession() // Запускаем камеру (остается здесь)
-        // Удаляем запуск таймера и сброс анализатора
-        /*
-        if sessionStartDate == nil { 
-            startTimer()
-            squatAnalyzer.reset() 
-        }
-        */
+        // Возвращаем запуск AVCaptureSession
+        startSession() 
+        
         // Сообщаем ViewModel
         viewModel.viewDidAppear()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        stopSession() // Останавливаем камеру (остается здесь)
-        // Удаляем остановку таймера
-        // stopTimer()
+        // Возвращаем остановку AVCaptureSession
+        stopSession() 
+        // Удаляем паузу AR сессии
+        // pauseARSession()
+        
         // Сообщаем ViewModel
         viewModel.viewWillDisappear()
     }
     
+    // Возвращаем viewDidLayoutSubviews для установки frame previewLayer
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        // Обновляем frame previewLayer при изменении layout'а
+        // Обновляем frame previewLayer
         previewLayer.frame = view.bounds
-        poseOverlayView.frame = view.bounds // Обновляем frame overlay тоже
+        // Обновляем frame overlayView (хотя он должен растягиваться констрейнтами, но на всякий случай)
+        poseOverlayView.frame = view.bounds
     }
 
     // MARK: - UI Setup
 
     private func setupViews() {
         view.backgroundColor = .black // Фон для камеры
+        // Добавляем previewLayer
         view.layer.addSublayer(previewLayer)
-        view.addSubview(poseOverlayView) // Добавляем overlay
+        // Добавляем poseOverlayView
+        view.addSubview(poseOverlayView)
 
         view.addSubview(xpProgressBar)
         view.addSubview(bottomStatsStackView)
         
-        // Поднимаем UI поверх слоя камеры
+        // Добавляем стек отладки поверх всего
+        view.addSubview(debugStackView)
+        view.bringSubviewToFront(debugStackView)
+        // Поднимаем UI поверх слоя камеры и оверлея
         view.bringSubviewToFront(xpProgressBar)
         view.bringSubviewToFront(bottomStatsStackView)
     }
 
     private func setupConstraints() {
-        // Констрейнты для previewLayer (на весь экран)
-        // previewLayer констрейнтов не имеет, устанавливается через frame
-        
-        // Констрейнты для poseOverlayView (раскомментировано)
+        // Констрейнты для poseOverlayView
         NSLayoutConstraint.activate([
             poseOverlayView.topAnchor.constraint(equalTo: view.topAnchor),
             poseOverlayView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -212,11 +233,15 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
             bottomStatsStackView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
             bottomStatsStackView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -15),
         ])
-    }
 
-    // MARK: - Session State Management (удаляем или переносим во ViewModel)
-    // private func resetSessionState() { ... }
-    // private func updateUI() { ... } // ViewModel будет давать команды на обновление
+        // Constraints for Debug Stack View (в левом верхнем углу)
+        NSLayoutConstraint.activate([
+            debugStackView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
+            debugStackView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 10),
+            // Ограничим ширину, чтобы не растягивался сильно
+            debugStackView.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, multiplier: 0.6)
+        ])
+    }
 
     // MARK: - Camera Setup & Control
     
@@ -224,26 +249,39 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
             self.captureSession.beginConfiguration()
-            self.captureSession.sessionPreset = .high
+            // Устанавливаем качество
+            self.captureSession.sessionPreset = .high // Или другое подходящее
 
-            guard let captureDevice = self.getDefaultCamera(),
+            // --- ЯВНО ВЫБИРАЕМ ФРОНТАЛЬНУЮ КАМЕРУ ---
+            guard let captureDevice = AVCaptureDevice.default(.builtInWideAngleCamera, 
+                                                              for: .video, 
+                                                              position: .front), // Ищем фронтальную
                   let captureDeviceInput = try? AVCaptureDeviceInput(device: captureDevice),
                   self.captureSession.canAddInput(captureDeviceInput)
             else {
-                print("Ошибка: Не удалось настроить ввод камеры.")
+                print("ExerciseExecutionVC Ошибка: Не удалось найти или настроить фронтальную камеру.")
+                // TODO: Показать ошибку пользователю
                 self.captureSession.commitConfiguration()
                 return
             }
             self.captureSession.addInput(captureDeviceInput)
+            print("--- ExerciseExecutionVC: Фронтальная камера добавлена --- ")
+            // ----------------------------------------
 
+            // Настраиваем вывод видео данных
             if self.captureSession.canAddOutput(self.videoDataOutput) {
                 self.videoDataOutput.setSampleBufferDelegate(self, queue: self.sessionQueue)
+                // Оставляем BGRA, т.к. MediaPipe его ожидает, и конвертация из CVPixelBuffer работала
+                // Если возникнут проблемы с производительностью, можно попробовать получить YUV 
+                // и передавать его в MPImage (pixelBuffer:), но BGRA надежнее для старта.
                 self.videoDataOutput.videoSettings = [(kCVPixelBufferPixelFormatTypeKey as String): kCVPixelFormatType_32BGRA]
                 self.videoDataOutput.alwaysDiscardsLateVideoFrames = true
                 self.captureSession.addOutput(self.videoDataOutput)
-                self.updateVideoOutputOrientation()
+                // Настраиваем ориентацию вывода (важно для фронталки)
+                self.updateVideoOutputOrientation(for: self.videoDataOutput.connection(with: .video))
+                 print("--- ExerciseExecutionVC: Вывод видео настроен (BGRA) --- ")
             } else {
-                print("Ошибка: Не удалось добавить вывод видео данных.")
+                print("ExerciseExecutionVC Ошибка: Не удалось добавить вывод видео данных.")
                 self.captureSession.commitConfiguration()
                 return
             }
@@ -254,20 +292,25 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
     private func startSession() {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
-             // Проверка прав доступа к камере (упрощенная для примера, добавь полную обработку)
+             // Проверка прав доступа к камере 
              switch AVCaptureDevice.authorizationStatus(for: .video) {
              case .authorized:
                 if !self.captureSession.isRunning {
                     self.captureSession.startRunning()
-                    print("AVCaptureSession запущена.")
+                    print("--- ExerciseExecutionVC: AVCaptureSession запущена --- ")
                 }
-            case .notDetermined:
+             case .notDetermined:
                 AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-                    if granted { self?.startSession() } // Повторный вызов после получения прав
-                    else { print("Доступ к камере запрещен.") }
+                    if granted { 
+                        self?.startSession() // Повторный вызов после получения прав
+                    } else { 
+                        print("ExerciseExecutionVC Ошибка: Доступ к камере запрещен.")
+                        // TODO: Показать пользователю сообщение
+                    }
                 }
-            default:
-                 print("Доступ к камере запрещен или ограничен.")
+             default:
+                 print("ExerciseExecutionVC Ошибка: Доступ к камере запрещен или ограничен.")
+                 // TODO: Показать пользователю сообщение
              }
         }
     }
@@ -277,42 +320,181 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
             guard let self = self else { return }
             if self.captureSession.isRunning {
                 self.captureSession.stopRunning()
-                print("AVCaptureSession остановлена.")
+                print("--- ExerciseExecutionVC: AVCaptureSession остановлена --- ")
             }
         }
     }
-
+    
     // MARK: - Helper Methods
+    // Удаляем getDefaultCamera
     
-    private func getDefaultCamera() -> AVCaptureDevice? {
-        if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) {
-            return device
-        }
-        if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
-            return device
-        }
-        return nil
-    }
-    
-    private func updateVideoOutputOrientation() {
-        guard let connection = videoDataOutput.connection(with: .video), connection.isVideoOrientationSupported else { return }
+    // Возвращаем updateVideoOutputOrientation
+    private func updateVideoOutputOrientation(for connection: AVCaptureConnection?) {
+        guard let connection = connection, connection.isVideoOrientationSupported else { return }
+        
+        // Устанавливаем портретную ориентацию
         connection.videoOrientation = .portrait
-        if connection.isVideoMirroringSupported, let input = captureSession.inputs.first as? AVCaptureDeviceInput, input.device.position == .front {
+        
+        // Включаем зеркалирование для фронтальной камеры
+        if connection.isVideoMirroringSupported {
             connection.isVideoMirrored = true
+            print("--- ExerciseExecutionVC: Зеркалирование видео включено --- ")
         }
     }
     
+    // Оставляем uiImageOrientation, но теперь он используется в captureOutput
     private func uiImageOrientation(from videoOrientation: AVCaptureVideoOrientation) -> UIImage.Orientation {
         switch videoOrientation {
-            case .portrait: return .right // MediaPipe ожидает right для портрета с фронталки
+            case .portrait: return .right 
             case .portraitUpsideDown: return .left
-            case .landscapeRight: return .down
             case .landscapeLeft: return .up
+            case .landscapeRight: return .down
             @unknown default: return .up
         }
     }
 
-} // Конец class ExerciseExecutionViewController
+    // MARK: - SceneKit Setup (Новый раздел)
+    private func setupSceneKitScene(scnView: SCNView) {
+        print("--- ExerciseExecutionVC: Настройка сцены SceneKit --- ")
+        let scene = SCNScene()
+        
+        // 2. Создаем и добавляем камеру
+        let cameraNode = SCNNode()
+        cameraNode.camera = SCNCamera()
+        cameraNode.camera?.fieldOfView = 80 
+        // Вернем камеру чуть ближе для начала
+        cameraNode.position = SCNVector3(x: 0, y: 0.3, z: 1.8) 
+        scene.rootNode.addChildNode(cameraNode)
+        
+        // 3. Назначаем сцену для view
+        scnView.scene = scene
+        
+        // 4. НЕ устанавливаем previewLayer как фон сцены, он будет под ней
+        // scene.background.contents = self.previewLayer
+        
+        // 5. (Опционально) Добавляем простой свет
+        // let lightNode = SCNNode()
+        // lightNode.light = SCNLight()
+        // lightNode.light!.type = .omni
+        // lightNode.position = SCNVector3(x: 0, y: 10, z: 10)
+        // scene.rootNode.addChildNode(lightNode)
+        
+        print("--- ExerciseExecutionVC: Сцена SceneKit настроена с видеофоном --- ")
+        
+        // TODO: Создать корневой узел для скелета и узлы для суставов/костей
+        // setupSkeletonNodes()
+    }
+    
+    /// Создает начальные узлы для суставов и костей скелета
+    private func setupSkeletonNodes() {
+        print("--- ExerciseExecutionVC: Создание узлов скелета SceneKit --- ")
+        // 1. Удаляем старый скелет, если он был
+        skeletonNode?.removeFromParentNode()
+        jointNodes.removeAll()
+        boneNodes.removeAll()
+        
+        // 2. Создаем корневой узел
+        let rootNode = SCNNode()
+        self.skeletonNode = rootNode
+        // Удаляем добавление узла в scnView.scene, т.к. scnView больше нет
+        // scnView.scene?.rootNode.addChildNode(rootNode)
+        // Вместо этого, нужно будет добавить его в сцену, которая будет рендериться (если вернем SceneKit)
+        
+        // 3. Создаем материалы (можно вынести в константы)
+        let jointMaterial = SCNMaterial()
+        jointMaterial.diffuse.contents = UIColor.yellow.withAlphaComponent(0.8)
+        
+        let boneMaterial = SCNMaterial()
+        boneMaterial.diffuse.contents = UIColor.cyan.withAlphaComponent(0.8)
+        
+        // 4. Создаем узлы для СУСТАВОВ (33 точки)
+        let jointRadius: CGFloat = 0.015 // Радиус сферы сустава в метрах
+        for i in 0..<33 { // Предполагаем 33 точки, как в MediaPipe Pose
+            let jointSphere = SCNSphere(radius: jointRadius)
+            jointSphere.materials = [jointMaterial]
+            let jointNode = SCNNode(geometry: jointSphere)
+            jointNode.isHidden = true // Изначально скрыты, пока не придут данные
+            rootNode.addChildNode(jointNode)
+            jointNodes[i] = jointNode
+        }
+        print("--- ExerciseExecutionVC: Создано \(jointNodes.count) узлов суставов --- ")
+        
+        // 5. Создаем узлы для КОСТЕЙ
+        let boneRadius: CGFloat = 0.01 // Радиус цилиндра кости
+        for connection in PoseConnections.connections { // Используем константы соединений
+            guard let startNode = jointNodes[connection.start],
+                  let endNode = jointNodes[connection.end] else { continue }
+            
+            // Создаем узел для кости (пока просто пустой, геометрия будет обновляться)
+            let boneNode = SCNNode()
+            boneNode.isHidden = true // Изначально скрыты
+            // Используем цилиндр как базовую геометрию, его длину и ориентацию будем менять
+            // Длина 1.0 - нормализованная, будем масштабировать
+            let boneGeometry = SCNCylinder(radius: boneRadius, height: 1.0)
+            boneGeometry.materials = [boneMaterial]
+            boneNode.geometry = boneGeometry
+            // Поворачиваем цилиндр, чтобы он лежал вдоль оси Z (по умолчанию он вдоль Y)
+            boneNode.eulerAngles = SCNVector3(Float.pi / 2, 0, 0)
+            
+            rootNode.addChildNode(boneNode)
+            // Сохраняем узел кости по уникальному ключу (хэш пары индексов)
+            let connectionHash = connection.start * 100 + connection.end // Простой способ хеширования
+            boneNodes[connectionHash] = boneNode
+        }
+         print("--- ExerciseExecutionVC: Создано \(boneNodes.count) узлов костей --- ")
+    }
+    
+    // Обновляем узлы скелета на основе новых данных landmarks
+    private func updateSkeletonNodes(with landmarks: [Landmark]) {
+        guard let skeletonNode = skeletonNode else { return }
+        
+        // Масштабный коэффициент - ставим большой для видимости
+        let skeletonScaleFactor: Float = 400.0 
+        
+        // 1. Обновляем позиции и видимость СУСТАВОВ
+        for (index, jointNode) in jointNodes {
+            guard index < landmarks.count else { continue }
+            
+            let landmark = landmarks[index]
+            let isVisible = (landmark.visibility?.floatValue ?? 0.0) > PoseConnections.visibilityThreshold
+            
+            jointNode.isHidden = !isVisible
+            
+            if isVisible {
+                // Применяем преобразование координат (X, -Y, -Z) и масштаб
+                jointNode.position = SCNVector3(
+                    landmark.x * skeletonScaleFactor, 
+                    -landmark.y * skeletonScaleFactor, 
+                    -landmark.z * skeletonScaleFactor 
+                )
+            }
+        }
+        
+        // 2. ВРЕМЕННО ОТКЛЮЧАЕМ обновление костей
+        for connection in PoseConnections.connections {
+             let connectionHash = connection.start * 100 + connection.end
+             if let boneNode = boneNodes[connectionHash] {
+                 boneNode.isHidden = true // Просто скрываем все кости
+             }
+        }
+        /* // Старый код обновления костей
+        for connection in PoseConnections.connections {
+           ...
+        }
+        */
+    }
+
+    // Вспомогательная функция для создания лейблов отладки
+    private func createDebugLabel() -> UILabel {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        label.textColor = .white
+        label.numberOfLines = 0 // Для возможного переноса строк
+        label.text = "--"
+        return label
+    }
+}
 
 // MARK: - ExerciseExecutionViewModelViewDelegate
 extension ExerciseExecutionViewController: ExerciseExecutionViewModelViewDelegate {
@@ -341,197 +523,94 @@ extension ExerciseExecutionViewController: ExerciseExecutionViewModelViewDelegat
         }
     }
     
+    // Новый метод для приема 2D-координат от ViewModel
+    func viewModelDidUpdatePose(landmarks: [[NormalizedLandmark]]?, frameSize: CGSize) {
+        // Логируем получение данных
+        let landmarksCount = landmarks?.first?.count ?? 0
+        print("--- ExerciseExecutionVC: Получены данные от VM -> Landmarks: \(landmarksCount > 0 ? "OK (\(landmarksCount))" : "NIL или пусто"), FrameSize: \(frameSize) ---")
+            
+        // Обновляем UI в главном потоке
+        DispatchQueue.main.async {
+            // Передаем 2D-данные в PoseOverlayView для отрисовки
+            print("--- ExerciseExecutionVC: Вызов poseOverlayView.drawResult --- ")
+            self.poseOverlayView.drawResult(landmarks: landmarks, frameSize: frameSize)
+        }
+    }
+    
+    // MARK: - Debug Info Updates
+    
+    func viewModelDidUpdateDebugState(_ state: String) {
+        DispatchQueue.main.async {
+            self.debugStateLabel.text = "State: \(state)"
+        }
+    }
+    
+    func viewModelDidUpdateDebugAngles(knee: Float, hip: Float) {
+        DispatchQueue.main.async {
+            self.debugAnglesLabel.text = String(format: "Angles: K=%.1f H=%.1f", knee, hip)
+        }
+    }
+    
+    func viewModelDidUpdateDebugRepCount(_ count: Int) {
+        DispatchQueue.main.async {
+            self.debugRepCountLabel.text = "Reps: \(count)"
+        }
+    }
+    
+    func viewModelDidUpdateDebugVisibility(keyPointsVisible: Bool, averageVisibility: Float) {
+        DispatchQueue.main.async {
+            let visibilityText = keyPointsVisible ? "OK" : "BAD"
+            self.debugVisibilityLabel.text = String(format: "Vis: %@ (avg %.2f)", visibilityText, averageVisibility)
+            self.debugVisibilityLabel.textColor = keyPointsVisible ? .green : .red
+        }
+    }
+    
     // TODO: Реализовать другие методы делегата (level up, error, etc.)
 }
 
 // MARK: - Delegates
 
-// AVCaptureVideoDataOutputSampleBufferDelegate остается здесь, но передает кадр во ViewModel
+// Возвращаем AVCaptureVideoDataOutputSampleBufferDelegate (оставляем ТОЛЬКО здесь)
 extension ExerciseExecutionViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         // Выполняется в sessionQueue
-        guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
-            print("Error: Failed to get CVPixelBuffer from CMSampleBuffer.")
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+            print("ExerciseExecutionVC Error: Failed to get CVPixelBuffer from CMSampleBuffer.")
             return
         }
-        // Сохраняем размер кадра для отрисовки
-        lastFrameSize = CGSize(width: CVPixelBufferGetWidth(imageBuffer), height: CVPixelBufferGetHeight(imageBuffer))
+        
+        // СНАЧАЛА обновляем lastFrameSize
+        lastFrameSize = CGSize(width: CVPixelBufferGetWidth(pixelBuffer), height: CVPixelBufferGetHeight(pixelBuffer))
+        // ТЕПЕРЬ безопасно извлекаем актуальный размер
+        guard let currentFrameSize = lastFrameSize else { 
+            // Эта проверка почти не нужна теперь, но оставим на всякий случай
+            print("ExerciseExecutionVC Error: Failed to get currentFrameSize.")
+            return 
+        }
 
-        let orientation = uiImageOrientation(from: connection.videoOrientation)
+        let imageOrientation: UIImage.Orientation = .right 
         let frameTimestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         let milliseconds = Int(CMTimeGetSeconds(frameTimestamp) * 1000)
 
-        // Передаем кадр во ViewModel для обработки
+        // Передаем CVPixelBuffer напрямую во ViewModel, добавляем frameSize
         viewModel.processVideoFrame(
-            sampleBuffer: sampleBuffer, 
-            orientation: orientation, 
-            timeStamps: milliseconds
+            pixelBuffer: pixelBuffer, 
+            orientation: imageOrientation, 
+            timeStamps: milliseconds,
+            frameSize: currentFrameSize // Передаем актуальный размер
         )
     }
 }
 
-// Удаляем реализацию PoseLandmarkerHelperLiveStreamDelegate отсюда
+// MARK: - AR Session Management & Rendering (Удаляем)
 /*
-extension ExerciseExecutionViewController: PoseLandmarkerHelperLiveStreamDelegate {
-    func poseLandmarkerHelper(...) { ... }
+extension ExerciseExecutionViewController {
+    private func setupARSession() { ... }
+    private func pauseARSession() { ... }
+    private func setupSkeletonEntities() { ... }
+    private func updateSkeletonEntities(with landmarks: [Landmark]) { ... }
 }
 */
-
-// Удаляем реализацию SquatAnalyzerDelegate отсюда
-/*
-extension ExerciseExecutionViewController: SquatAnalyzerDelegate {
-    func squatAnalyzer(...) { ... }
-}
-*/
-
-// MARK: - PoseOverlayView (остается здесь, т.к. это View)
-
-// TODO: Этот код можно вынести в отдельный файл Views/PoseOverlayView.swift
-class PoseOverlayView: UIView {
-
-    private var currentResult: ResultBundle?
-    // Добавляем свойство для хранения размера кадра
-    private var currentFrameSize: CGSize = .zero
-
-    override func draw(_ rect: CGRect) {
-        super.draw(rect)
-        // Используем Optional Chaining и guard для безопасности
-        // Изменяем доступ к данным: берем 2D poseLandmarks из ResultBundle
-        guard let landmarks2D = currentResult?.poseLandmarks else { return }
-
-        // Отрисовка позы
-        // Используем currentFrameSize для нормализации
-        // Передаем landmarks2D вместо poseResult.landmarks
-        drawLandmarks(landmarks2D, in: rect, imageSize: currentFrameSize)
-        drawConnections(landmarks2D, in: rect, imageSize: currentFrameSize)
-    }
-
-    /**
-     Рисует точки (landmarks) на вью.
-     - Parameters:
-       - landmarks: Массив точек [[NormalizedLandmark]].
-       - rect: Границы текущего UIView.
-       - imageSize: Размер исходного изображения/кадра, к которому нормализованы landmarks.
-     */
-    private func drawLandmarks(_ landmarks: [[NormalizedLandmark]], in rect: CGRect, imageSize: CGSize) {
-        guard let context = UIGraphicsGetCurrentContext(), !landmarks.isEmpty else { return }
-
-        context.saveGState()
-        context.setFillColor(Constants.pointFillColor.cgColor)
-
-        // Landmarks - это [[NormalizedLandmark]], итерируем по внешнему массиву (хотя у нас он один)
-        for poseLandmarks in landmarks {
-            for landmark in poseLandmarks {
-                // Пропускаем отрисовку, если точка не видна достаточно хорошо (опционально)
-                guard landmark.visibility?.floatValue ?? 0 > 0.1 else { continue }
-                
-                let viewPoint = normalizedPoint(from: landmark, imageSize: imageSize, viewRect: rect)
-                let pointRect = CGRect(x: viewPoint.x - Constants.pointRadius, y: viewPoint.y - Constants.pointRadius, width: Constants.pointRadius * 2, height: Constants.pointRadius * 2)
-                context.fillEllipse(in: pointRect)
-            }
-        }
-        context.restoreGState()
-    }
-
-    /**
-     Рисует линии соединений между точками.
-     - Parameters:
-       - landmarks: Массив точек [[NormalizedLandmark]].
-       - rect: Границы текущего UIView.
-       - imageSize: Размер исходного изображения/кадра, к которому нормализованы landmarks.
-     */
-    private func drawConnections(_ landmarks: [[NormalizedLandmark]], in rect: CGRect, imageSize: CGSize) {
-        guard let context = UIGraphicsGetCurrentContext(), !landmarks.isEmpty else { return }
-
-        context.saveGState()
-        context.setLineWidth(Constants.lineWidth)
-        context.setStrokeColor(Constants.lineColor.cgColor)
-
-        // Итерируем по внешнему массиву поз
-        for poseLandmarks in landmarks { // poseLandmarks здесь типа [NormalizedLandmark]
-            for connection in Constants.poseConnections {
-                guard let startLandmark = poseLandmarks[safe: connection.start],
-                      let endLandmark = poseLandmarks[safe: connection.end] else {
-                    continue // Пропускаем, если индексы некорректны
-                }
-                
-                // Проверяем видимость обеих точек для соединения (опционально)
-                guard startLandmark.visibility?.floatValue ?? 0 > 0.1,
-                      endLandmark.visibility?.floatValue ?? 0 > 0.1 else {
-                    continue
-                }
-
-                let startPoint = normalizedPoint(from: startLandmark, imageSize: imageSize, viewRect: rect)
-                let endPoint = normalizedPoint(from: endLandmark, imageSize: imageSize, viewRect: rect)
-
-                context.move(to: startPoint)
-                context.addLine(to: endPoint)
-                context.strokePath()
-            }
-        }
-        context.restoreGState()
-    }
-
-    // MARK: - Public Methods
-    /**
-     Устанавливает результат для отрисовки и вызывает перерисовку.
-     - Parameter result: Результат от PoseLandmarkerHelper.
-     */
-    func drawResult(_ result: ResultBundle?, frameSize: CGSize) {
-        self.currentResult = result
-        // Сохраняем размер кадра
-        self.currentFrameSize = frameSize
-        self.setNeedsDisplay()
-    }
-
-    /**
-     Очищает текущий результат и перерисовывает (становится пустым).
-     */
-    func clearOverlay() {
-        self.currentResult = nil
-        self.setNeedsDisplay()
-    }
-
-    // MARK: - Helper Methods
-    /**
-     Преобразует нормализованную точку из координат изображения в координаты UIView.
-     */
-    private func normalizedPoint(from normalizedLandmark: NormalizedLandmark, imageSize: CGSize, viewRect: CGRect) -> CGPoint {
-        guard imageSize.width > 0, imageSize.height > 0 else { return .zero }
-
-        let absoluteX = CGFloat(normalizedLandmark.x) * imageSize.width
-        let absoluteY = CGFloat(normalizedLandmark.y) * imageSize.height
-
-        let viewWidth = viewRect.width
-        let viewHeight = viewRect.height
-        let scaleX = viewWidth / imageSize.width
-        let scaleY = viewHeight / imageSize.height
-        let scale = max(scaleX, scaleY) // .resizeAspectFill
-
-        let offsetX = (viewWidth - imageSize.width * scale) / 2.0
-        let offsetY = (viewHeight - imageSize.height * scale) / 2.0
-
-        let viewPointX = absoluteX * scale + offsetX
-        let viewPointY = absoluteY * scale + offsetY
-
-        return CGPoint(x: viewPointX, y: viewPointY)
-    }
-
-    // MARK: - Constants
-    private enum Constants {
-        static let pointRadius: CGFloat = 5.0
-        static let pointFillColor: UIColor = .yellow
-        static let lineWidth: CGFloat = 2.0
-        static let lineColor: UIColor = .green
-
-        static let poseConnections: [(start: Int, end: Int)] = [
-            (start: 11, end: 12), (start: 11, end: 23), (start: 12, end: 24), (start: 23, end: 24),
-            (start: 11, end: 13), (start: 13, end: 15), (start: 12, end: 14), (start: 14, end: 16),
-            (start: 23, end: 25), (start: 25, end: 27), (start: 24, end: 26), (start: 26, end: 28)
-            // Добавь другие соединения при необходимости
-        ]
-    }
-}
 
 // Добавляем утилиту безопасного доступа к массиву, если ее нет в другом месте
 extension Array {

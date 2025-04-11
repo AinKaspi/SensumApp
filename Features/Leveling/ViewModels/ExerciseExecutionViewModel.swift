@@ -9,6 +9,13 @@ protocol ExerciseExecutionViewModelViewDelegate: AnyObject {
     func viewModelDidUpdateTimer(timeString: String)
     func viewModelDidUpdateProgress(currentXP: Int, xpToNextLevel: Int)
     func viewModelDidUpdateGoal(current: Int, target: Int)
+    // Изменяем метод для передачи 2D-координат и размера кадра
+    func viewModelDidUpdatePose(landmarks: [[NormalizedLandmark]]?, frameSize: CGSize)
+    // Добавляем методы для отладочной информации
+    func viewModelDidUpdateDebugState(_ state: String)
+    func viewModelDidUpdateDebugAngles(knee: Float, hip: Float)
+    func viewModelDidUpdateDebugRepCount(_ count: Int)
+    func viewModelDidUpdateDebugVisibility(keyPointsVisible: Bool, averageVisibility: Float)
     // TODO: Добавить методы для сообщения о повышении уровня, ошибках и т.д.
 }
 
@@ -46,10 +53,9 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     private let progressiveGoalIncrement: Int = 5
     private var squatsTowardsProgressiveGoal: Int = 0
     private let bonusXPForGoal: Int = 50 // Базовый бонус за цель
+    // Добавляем свойство для хранения размера кадра
+    private var currentFrameSize: CGSize = .zero
     
-    // TODO: Добавить свойства для счетчиков прогрессивной цели
-    // private var progressiveSquatGoal: Int = 5 ...
-
     // MARK: - Delegate
     weak var viewDelegate: ExerciseExecutionViewModelViewDelegate?
 
@@ -146,11 +152,14 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     }
     
     /// Метод для получения кадра от ViewController
-    func processVideoFrame(sampleBuffer: CMSampleBuffer, orientation: UIImage.Orientation, timeStamps: Int) {
-        // Передаем кадр в хелпер (выполняется в очереди ViewController'а, но сам detectAsync - асинхронный)
+    func processVideoFrame(pixelBuffer: CVPixelBuffer, orientation: UIImage.Orientation, timeStamps: Int, frameSize: CGSize) {
+        // Сохраняем размер кадра
+        self.currentFrameSize = frameSize
+        
+        // Передаем пиксельный буфер в хелпер 
          poseLandmarkerHelper?.detectAsync(
-            sampleBuffer: sampleBuffer,
-            orientation: orientation,
+            pixelBuffer: pixelBuffer,
+            orientation: orientation, 
             timeStamps: timeStamps
         )
     }
@@ -278,18 +287,56 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
         guard let resultBundle = resultBundle else {
              print("--- ExerciseExecutionVM: Результат детекции пуст (nil). ---")
             // TODO: Очистить оверлей?
+            // viewDelegate?.viewModelDidUpdatePose(landmarks: nil, frameSize: self.currentFrameSize) // Передаем nil для очистки?
             return
         }
         
-        // Передаем 3D точки в анализатор
+        // --- ТЕПЕРЬ ОБРАБАТЫВАЕМ РЕЗУЛЬТАТ, Т.К. ОН НЕ NIL ---
+        
+        // Передаем 3D точки в анализатор и получаем информацию для отладки
         if let worldLandmarks = resultBundle.poseWorldLandmarks,
            let firstPoseWorldLandmarks = worldLandmarks.first,
            !firstPoseWorldLandmarks.isEmpty {
+            
+            // Перемещаем проверку видимости СЮДА, после guard let resultBundle
+            // --- Собираем информацию о видимости --- 
+            var visibleCount = 0
+            var totalVisibility: Float = 0.0
+            // Используем PoseConnections.LandmarkIndex
+            let keyIndices = [PoseConnections.LandmarkIndex.leftHip, PoseConnections.LandmarkIndex.rightHip, 
+                              PoseConnections.LandmarkIndex.leftKnee, PoseConnections.LandmarkIndex.rightKnee, 
+                              PoseConnections.LandmarkIndex.leftAnkle, PoseConnections.LandmarkIndex.rightAnkle, 
+                              PoseConnections.LandmarkIndex.leftShoulder, PoseConnections.LandmarkIndex.rightShoulder]
+            var allKeyPointsVisible = true
+            for index in keyIndices {
+                if index < firstPoseWorldLandmarks.count {
+                    // Используем PoseConnections.visibilityThreshold
+                    let visibility = firstPoseWorldLandmarks[index].visibility?.floatValue ?? 0.0
+                    if visibility > PoseConnections.visibilityThreshold {
+                        visibleCount += 1
+                        totalVisibility += visibility
+                    } else {
+                        allKeyPointsVisible = false
+                    }
+                } else {
+                    allKeyPointsVisible = false
+                }
+            }
+            let averageVisibility = (visibleCount > 0) ? totalVisibility / Float(visibleCount) : 0.0
+            // Сообщаем View о видимости
+            viewDelegate?.viewModelDidUpdateDebugVisibility(keyPointsVisible: allKeyPointsVisible, averageVisibility: averageVisibility)
+            // -----------------------------------------
+            
             // Добавляем явную проверку isPreparing перед вызовом анализа
             if !isPreparing {
-                // TODO: Убедиться, что analyzer инициализирован
+                // --- Вызываем анализ --- 
                 analyzer?.analyze(worldLandmarks: firstPoseWorldLandmarks)
-                // Логируем передачу в анализатор только если логируем сам результат
+                
+                // --- Передаем углы для отладки ПОСЛЕ анализа --- 
+                if let squatAnalyzer = analyzer as? SquatAnalyzer3D {
+                   viewDelegate?.viewModelDidUpdateDebugAngles(knee: squatAnalyzer.currentSmoothedKneeAngle, hip: squatAnalyzer.currentSmoothedHipAngle)
+                } // ------------------------------------------------
+                
                 if shouldLog {
                     print("--- ExerciseExecutionVM: 3D worldLandmarks переданы в анализатор. ---")
                 }
@@ -305,8 +352,14 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
             }
         }
         
-        // TODO: Передать данные для отрисовки (2D или 3D) во View Controller
-        // viewDelegate?.viewModelDidUpdatePose(landmarks: resultBundle.poseLandmarks, worldLandmarks: resultBundle.poseWorldLandmarks)
+        // Передаем 2D-данные и РАЗМЕР КАДРА для отрисовки во View Controller
+        // Используем сохраненный размер кадра self.currentFrameSize
+        if shouldLog { // Логируем передаваемые данные только с заданной частотой
+            let landmarksCount = resultBundle.poseLandmarks?.first?.count ?? 0
+            print("--- ExerciseExecutionVM: Передача в View -> Landmarks: \(landmarksCount > 0 ? "OK (\(landmarksCount))" : "NIL или пусто"), FrameSize: \(self.currentFrameSize) ---")
+        }
+        viewDelegate?.viewModelDidUpdatePose(landmarks: resultBundle.poseLandmarks, frameSize: self.currentFrameSize)
+        // ----------------------------------------------------
     }
 }
 
@@ -387,12 +440,23 @@ extension ExerciseExecutionViewModel: ExerciseAnalyzerDelegate {
         viewDelegate?.viewModelDidUpdateProgress(currentXP: profile.currentXP, xpToNextLevel: profile.xpToNextLevel)
         // Сообщаем View об обновлении цели (после if/else)
         viewDelegate?.viewModelDidUpdateGoal(current: squatsTowardsProgressiveGoal, target: progressiveSquatGoal)
+        // Сообщаем View о новом счетчике повторений
+        viewDelegate?.viewModelDidUpdateDebugRepCount(newTotalCount)
     }
     
     // Метод вызывается новым протоколом
     func exerciseAnalyzer(_ analyzer: ExerciseAnalyzer, didChangeState newState: String) {
         print("--- ExerciseExecutionVM: Анализатор сменил состояние на \(newState) ---")
-        // TODO: Передать информацию об изменении состояния во View?
-        // viewDelegate?.viewModelDidChangeState(newState)
+        // Передаем информацию об изменении состояния во View
+        viewDelegate?.viewModelDidUpdateDebugState(newState)
+        
+        // Удаляем передачу углов отсюда
+        /*
+        if let squatAnalyzer = analyzer as? SquatAnalyzer3D {
+           viewDelegate?.viewModelDidUpdateDebugAngles(knee: squatAnalyzer.currentSmoothedKneeAngle, hip: squatAnalyzer.currentSmoothedHipAngle)
+        } else {
+            // ...
+        }
+        */
     }
 }

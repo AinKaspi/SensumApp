@@ -251,12 +251,12 @@ class PoseLandmarkerHelper: NSObject {
   /**
    Performs asynchronous pose detection on a sample buffer (live stream mode).
    - Parameters:
-     - sampleBuffer: The CMSampleBuffer containing the video frame.
+     - pixelBuffer: The CVPixelBuffer containing the video frame.
      - orientation: The orientation of the image within the buffer.
      - timeStamps: The timestamp of the frame in milliseconds.
    */
   func detectAsync(
-    sampleBuffer: CMSampleBuffer,
+    pixelBuffer: CVPixelBuffer,
     orientation: UIImage.Orientation,
     timeStamps: Int) {
 
@@ -271,16 +271,12 @@ class PoseLandmarkerHelper: NSObject {
         return
     }
 
-    // Создаем MPImage из буфера
-    guard let image = try? MPImage(sampleBuffer: sampleBuffer, orientation: orientation) else {
-      print("Error: Failed to create MPImage from CMSampleBuffer.")
-      // Уведомляем об ошибке создания кадра
-       liveStreamDelegate?.poseLandmarkerHelper(self, didFinishDetection: nil, error: PoseLandmarkerHelperError.failedToCreateMPImage)
+    // Создаем MPImage НАПРЯМУЮ из CVPixelBuffer
+    guard let image = try? MPImage(pixelBuffer: pixelBuffer, orientation: orientation) else {
+      print("Error: Failed to create MPImage from CVPixelBuffer.")
+      liveStreamDelegate?.poseLandmarkerHelper(self, didFinishDetection: nil, error: PoseLandmarkerHelperError.failedToCreateMPImage)
       return
     }
-
-    // НЕ сохраняем currentLiveStreamImage
-    // self.currentLiveStreamImage = image
 
     // Вызываем асинхронную детекцию
     do {
@@ -289,8 +285,6 @@ class PoseLandmarkerHelper: NSObject {
       print("Failed to call detectAsync: \(error)")
       // Уведомляем об ошибке вызова детекции
       liveStreamDelegate?.poseLandmarkerHelper(self, didFinishDetection: nil, error: error)
-      // НЕ очищаем currentLiveStreamImage, так как его нет
-      // self.currentLiveStreamImage = nil
     }
   }
 
@@ -438,17 +432,6 @@ extension PoseLandmarkerHelper: PoseLandmarkerLiveStreamDelegate {
       liveStreamDelegate?.poseLandmarkerHelper(self, didFinishDetection: nil, error: nil)
       return
     }
-
-    // 3. НЕ получаем размер здесь
-    /*
-     guard let currentFrame = self.currentLiveStreamImage else {
-          print("Error: Could not retrieve current MPImage to get frame size.")
-          // ... обработка ошибки ...
-          return
-     }
-     let frameSize = currentFrame.imageSize
-     self.currentLiveStreamImage = nil
-     */
 
     // 4. Создаем ResultBundle с обоими типами landmarks
     let resultBundle = ResultBundle(
