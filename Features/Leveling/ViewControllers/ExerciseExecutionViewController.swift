@@ -557,11 +557,41 @@ extension ExerciseExecutionViewController: ExerciseExecutionViewModelViewDelegat
         }
     }
     
-    func viewModelDidUpdateDebugVisibility(keyPointsVisible: Bool, averageVisibility: Float) {
+    // Обновляем метод для приема массива видимостей
+    func viewModelDidUpdateDebugVisibility(visibilities: [Float]?) {
         DispatchQueue.main.async {
-            let visibilityText = keyPointsVisible ? "OK" : "BAD"
+            guard let visibilities = visibilities, !visibilities.isEmpty else {
+                self.debugVisibilityLabel.text = "Vis: N/A"
+                self.debugVisibilityLabel.textColor = .white
+                return
+            }
+            // Проверяем видимость ключевых точек (индексы из PoseConnections)
+            let keyIndices = [PoseConnections.LandmarkIndex.leftHip, PoseConnections.LandmarkIndex.rightHip, 
+                              PoseConnections.LandmarkIndex.leftKnee, PoseConnections.LandmarkIndex.rightKnee, 
+                              PoseConnections.LandmarkIndex.leftAnkle, PoseConnections.LandmarkIndex.rightAnkle, 
+                              PoseConnections.LandmarkIndex.leftShoulder, PoseConnections.LandmarkIndex.rightShoulder]
+            var allKeyPointsVisible = true
+            var visibleCount = 0
+            var totalVisibility: Float = 0.0
+            
+            for index in keyIndices {
+                if index < visibilities.count {
+                    let visibility = visibilities[index]
+                    if visibility > PoseConnections.visibilityThreshold {
+                        visibleCount += 1
+                        totalVisibility += visibility
+                    } else {
+                        allKeyPointsVisible = false
+                    }
+                } else {
+                    allKeyPointsVisible = false // Индекс вне диапазона
+                }
+            }
+            let averageVisibility = (visibleCount > 0) ? totalVisibility / Float(visibleCount) : 0.0
+            
+            let visibilityText = allKeyPointsVisible ? "OK" : "BAD (\(visibleCount)/\(keyIndices.count))"
             self.debugVisibilityLabel.text = String(format: "Vis: %@ (avg %.2f)", visibilityText, averageVisibility)
-            self.debugVisibilityLabel.textColor = keyPointsVisible ? .green : .red
+            self.debugVisibilityLabel.textColor = allKeyPointsVisible ? .green : .orange // Оранжевый вместо красного
         }
     }
     

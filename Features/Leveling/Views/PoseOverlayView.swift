@@ -6,6 +6,8 @@ class PoseOverlayView: UIView {
 
     private var poseLandmarks: [[NormalizedLandmark]]?
     private var frameSize: CGSize = .zero
+    // Добавляем хранилище для видимостей
+    private var landmarkVisibilities: [Float]?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -36,11 +38,23 @@ class PoseOverlayView: UIView {
     private func drawLandmarks(_ landmarks: [[NormalizedLandmark]], in rect: CGRect, imageSize: CGSize) {
         guard let context = UIGraphicsGetCurrentContext() else { return }
         context.saveGState()
-        context.setFillColor(Constants.pointFillColor.cgColor)
+        // Убираем единый цвет заливки отсюда
+        // context.setFillColor(Constants.pointFillColor.cgColor)
 
-        for pose in landmarks {
-            for landmark in pose {
-                 guard landmark.visibility?.floatValue ?? 0.0 > Constants.visibilityThreshold else { continue }
+        for (poseIndex, pose) in landmarks.enumerated() {
+            // Получаем видимости для текущей позы (если есть)
+            let visibilitiesForPose = (landmarkVisibilities != nil && landmarkVisibilities!.count == pose.count) ? landmarkVisibilities : nil
+            
+            for (landmarkIndex, landmark) in pose.enumerated() {
+                 let visibility = visibilitiesForPose?[landmarkIndex] ?? (landmark.visibility?.floatValue ?? 0.0) // Берем точную видимость, если есть, иначе из landmark
+                 
+                 // Пропускаем отрисовку, если видимость ниже порога
+                 guard visibility > Constants.visibilityThreshold else { continue }
+                 
+                 // Определяем цвет точки в зависимости от видимости
+                 let pointColor = color(forVisibility: visibility).cgColor
+                 context.setFillColor(pointColor)
+                 
                  let viewPoint = normalizedPoint(from: landmark, imageSize: imageSize, viewRect: rect)
                  let pointRect = CGRect(x: viewPoint.x - Constants.pointRadius, y: viewPoint.y - Constants.pointRadius, width: Constants.pointRadius * 2, height: Constants.pointRadius * 2)
                  context.fillEllipse(in: pointRect)
@@ -53,15 +67,27 @@ class PoseOverlayView: UIView {
          guard let context = UIGraphicsGetCurrentContext() else { return }
          context.saveGState()
          context.setLineWidth(Constants.lineWidth)
-         context.setStrokeColor(Constants.lineColor.cgColor)
+         // Убираем единый цвет линии отсюда
+         // context.setStrokeColor(Constants.lineColor.cgColor)
 
-         for pose in landmarks {
+         for (poseIndex, pose) in landmarks.enumerated() {
+             let visibilitiesForPose = (landmarkVisibilities != nil && landmarkVisibilities!.count == pose.count) ? landmarkVisibilities : nil
+             
              for connection in Constants.poseConnections {
                  guard let startLandmark = pose[safe: connection.start],
                        let endLandmark = pose[safe: connection.end] else { continue }
+                 
+                 // Получаем видимости для связанных точек
+                 let startVisibility = visibilitiesForPose?[connection.start] ?? (startLandmark.visibility?.floatValue ?? 0.0)
+                 let endVisibility = visibilitiesForPose?[connection.end] ?? (endLandmark.visibility?.floatValue ?? 0.0)
 
-                 guard (startLandmark.visibility?.floatValue ?? 0.0) > Constants.visibilityThreshold,
-                       (endLandmark.visibility?.floatValue ?? 0.0) > Constants.visibilityThreshold else { continue }
+                 // Рисуем линию только если ОБЕ точки достаточно видны
+                 guard startVisibility > Constants.visibilityThreshold,
+                       endVisibility > Constants.visibilityThreshold else { continue }
+                 
+                 // Определяем цвет линии на основе МИНИМАЛЬНОЙ видимости из двух точек
+                 let connectionColor = color(forVisibility: min(startVisibility, endVisibility)).cgColor
+                 context.setStrokeColor(connectionColor)
 
                  let startPoint = normalizedPoint(from: startLandmark, imageSize: imageSize, viewRect: rect)
                  let endPoint = normalizedPoint(from: endLandmark, imageSize: imageSize, viewRect: rect)
@@ -74,18 +100,37 @@ class PoseOverlayView: UIView {
          context.restoreGState()
      }
 
-
+    // Обновляем метод, чтобы он принимал и сохранял видимости
     func drawResult(landmarks: [[NormalizedLandmark]]?, frameSize: CGSize) {
-        let landmarksCount = landmarks?.first?.count ?? 0
-        print("--- PoseOverlayView: drawResult вызван -> Landmarks: \(landmarksCount > 0 ? "OK (\(landmarksCount))" : "NIL или пусто"), FrameSize: \(frameSize) ---")
         self.poseLandmarks = landmarks
+        // Извлекаем и сохраняем видимости из первого набора landmarks
+        self.landmarkVisibilities = landmarks?.first?.map { $0.visibility?.floatValue ?? 0.0 }
         self.frameSize = frameSize
+        // Лог оставляем как есть или убираем
+        // let landmarksCount = landmarks?.first?.count ?? 0
+        // print("--- PoseOverlayView: drawResult вызван -> Landmarks: \(landmarksCount > 0 ? "OK (\(landmarksCount))" : "NIL или пусто"), FrameSize: \(frameSize) ---")
         self.setNeedsDisplay()
     }
 
     func clearOverlay() {
         self.poseLandmarks = nil
+        self.landmarkVisibilities = nil // Очищаем видимости тоже
         self.setNeedsDisplay()
+    }
+    
+    // Добавляем хелпер для определения цвета по видимости
+    private func color(forVisibility visibility: Float) -> UIColor {
+        // Простая градиентная логика: от красного к зеленому
+        if visibility < 0.3 {
+            return .systemRed
+        } else if visibility < 0.6 {
+            return .systemOrange
+        } else {
+            return .systemGreen // Используем зеленый для линий, желтый для точек оставим
+        }
+        // Альтернатива: можно использовать HSB для плавного градиента
+        // let hue = CGFloat(visibility) * 0.33 // 0.0 (красный) до 0.33 (зеленый)
+        // return UIColor(hue: hue, saturation: 0.8, brightness: 0.9, alpha: 0.8)
     }
 
     private func normalizedPoint(from normalizedLandmark: NormalizedLandmark, imageSize: CGSize, viewRect: CGRect) -> CGPoint {

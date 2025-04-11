@@ -15,7 +15,8 @@ protocol ExerciseExecutionViewModelViewDelegate: AnyObject {
     func viewModelDidUpdateDebugState(_ state: String)
     func viewModelDidUpdateDebugAngles(knee: Float, hip: Float)
     func viewModelDidUpdateDebugRepCount(_ count: Int)
-    func viewModelDidUpdateDebugVisibility(keyPointsVisible: Bool, averageVisibility: Float)
+    // Обновляем метод видимости: передаем массив видимостей для всех точек
+    func viewModelDidUpdateDebugVisibility(visibilities: [Float]?)
     // TODO: Добавить методы для сообщения о повышении уровня, ошибках и т.д.
 }
 
@@ -324,7 +325,10 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
             }
             let averageVisibility = (visibleCount > 0) ? totalVisibility / Float(visibleCount) : 0.0
             // Сообщаем View о видимости
-            viewDelegate?.viewModelDidUpdateDebugVisibility(keyPointsVisible: allKeyPointsVisible, averageVisibility: averageVisibility)
+            // viewDelegate?.viewModelDidUpdateDebugVisibility(keyPointsVisible: allKeyPointsVisible, averageVisibility: averageVisibility)
+            // Передаем массив видимостей всех 2D точек (если они есть)
+            let allVisibilities = resultBundle.poseLandmarks?.first?.map { $0.visibility?.floatValue ?? 0.0 }
+            viewDelegate?.viewModelDidUpdateDebugVisibility(visibilities: allVisibilities)
             // -----------------------------------------
             
             // Добавляем явную проверку isPreparing перед вызовом анализа
