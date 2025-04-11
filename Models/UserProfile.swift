@@ -35,19 +35,17 @@ struct UserProfile: Codable { // Codable для сохранения/загру�
     var flexibility: Int   // FLX: Гибкость
 
     // --- Главные Статы (Вычисляемые) ---
-    // Стат = База (20) + Бонус_от_Атрибута1 + Бонус_от_Атрибута2
-    // Бонус = Атрибут / 10
-    /// Мощь (PWR) = 20 + (STR/10) + (SPD/10)
+    /// Мощь (PWR) = База + (STR/10) + (SPD/10).
     var power: Int { UserProfile.baseStatValue + (strength / 10) + (speed / 10) }
-    /// Контроль (CTL) = 20 + (ACC/10) + (BAL/10)
+    /// Контроль (CTL) = База + (ACC/10) + (BAL/10).
     var control: Int { UserProfile.baseStatValue + (accuracy / 10) + (balance / 10) }
-    /// Стойкость (END) = 20 + (CON/10) + (STR/10)
+    /// Стойкость (END) = База + (CON/10) + (STR/10).
     var endurance: Int { UserProfile.baseStatValue + (constitution / 10) + (strength / 10) }
-    /// Проворство (AGI) = 20 + (SPD/10) + (BAL/10)
+    /// Проворство (AGI) = База + (SPD/10) + (BAL/10).
     var agility: Int { UserProfile.baseStatValue + (speed / 10) + (balance / 10) }
-    /// Мобильность (MOB) = 20 + (FLX/10) + (ACC/10)
+    /// Мобильность (MOB) = База + (FLX/10) + (ACC/10).
     var mobility: Int { UserProfile.baseStatValue + (flexibility / 10) + (accuracy / 10) }
-    /// Здоровье (WLN) = 20 + (CON/10) + (FLX/10)
+    /// Здоровье (WLN) = База + (CON/10) + (FLX/10).
     var wellness: Int { UserProfile.baseStatValue + (constitution / 10) + (flexibility / 10) }
 
     // TODO: Заменить String на более конкретные типы для предметов
@@ -101,39 +99,28 @@ struct UserProfile: Codable { // Codable для сохранения/загру�
 
     /// Добавляет опыт пользователю и обрабатывает повышение уровня.
     /// - Parameter amount: Количество добавляемого опыта.
-    /// - Returns: True, если пользователь повысил уровень, иначе false.
+    /// - Returns: `true`, если пользователь повысил уровень, иначе `false`.
     mutating func addXP(_ amount: Int) -> Bool {
-        guard amount > 0 else { return false } // Не добавляем отрицательный опыт
+        guard amount > 0 else { return false }
         
         currentXP += amount
         var leveledUp = false
         
-        // Проверяем повышение уровня (может быть несколько за раз)
         while currentXP >= xpToNextLevel {
             leveledUp = true
-            // Вычитаем XP, необходимый для текущего уровня
             currentXP -= xpToNextLevel
-            // Повышаем уровень
             level += 1
-            // Рассчитываем XP для НОВОГО следующего уровня
             xpToNextLevel = DataManager.calculateXPForLevel(level)
-            // TODO: Добавить уведомление или вызов делегата о повышении уровня?
+            // Опционально: Можно добавить логирование повышения уровня здесь
+            // print("LEVEL UP! Reached level \(level). Next level at \(xpToNextLevel) XP.")
         }
         return leveledUp
     }
 
     /// Добавляет очки к базовым атрибутам, ограничивая их максимальным значением 100.
-    /// - Parameters:
-    ///   - strGain: Прирост силы.
-    ///   - conGain: Прирост выносливости.
-    ///   - accGain: Прирост точности.
-    ///   - spdGain: Прирост скорости.
-    ///   - balGain: Прирост баланса.
-    ///   - flxGain: Прирост гибкости.
     mutating func gainAttributes(strGain: Int = 0, conGain: Int = 0, accGain: Int = 0, spdGain: Int = 0, balGain: Int = 0, flxGain: Int = 0) {
+        // print("--- UserProfile gainAttributes: Попытка добавить очки атрибутов...") // Убираем лог
         
-        // Добавляем очки к каждому атрибуту и сразу ограничиваем сверху 100
-        // Ограничение снизу (0) не нужно, так как прирост предполагается положительным, а начальные > 0
         strength = min(100, strength + strGain)
         constitution = min(100, constitution + conGain)
         accuracy = min(100, accuracy + accGain)
@@ -141,6 +128,7 @@ struct UserProfile: Codable { // Codable для сохранения/загру�
         balance = min(100, balance + balGain)
         flexibility = min(100, flexibility + flxGain)
         
+        // print("--- UserProfile gainAttributes: Новые атрибуты: ...") // Убираем лог
     }
 
     // TODO: Добавить другие методы, например:

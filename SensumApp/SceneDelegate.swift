@@ -195,7 +195,6 @@ class LevelingCoordinator: Coordinator, ExerciseSelectionViewModelCoordinatorDel
         // Создаем ViewModel, передавая упражнение и делегата (сам VC)
         let executionViewModel = ExerciseExecutionViewModel(exercise: exercise, viewDelegate: executionVC)
         executionVC.viewModel = executionViewModel // Устанавливаем ViewModel для VC
-        executionVC.selectedExercise = exercise // Передаем выбранное упражнение (может быть уже не нужно, если VM всем рулит)
         executionVC.title = exercise.name // Устанавливаем заголовок
         navigationController.pushViewController(executionVC, animated: true)
     }
@@ -225,6 +224,8 @@ class StoreCoordinator: Coordinator {
     }
 }
 
+// Удаляем закомментированные заглушки ViewController'ов
+/*
 // ----- ViewController'ы-заглушки для других вкладок -----
 // TODO: Перенести эти классы в соответствующие папки Features/.../Scenes/
 
@@ -233,4 +234,5 @@ class StoreCoordinator: Coordinator {
 // class LevelingViewController: UIViewController {}
 // class RankViewController: UIViewController {}
 // class StoreViewController: UIViewController {}
+*/
 

@@ -526,13 +526,15 @@ extension ExerciseExecutionViewController: ExerciseExecutionViewModelViewDelegat
     // Новый метод для приема 2D-координат от ViewModel
     func viewModelDidUpdatePose(landmarks: [[NormalizedLandmark]]?, frameSize: CGSize) {
         // Логируем получение данных
-        let landmarksCount = landmarks?.first?.count ?? 0
-        print("--- ExerciseExecutionVC: Получены данные от VM -> Landmarks: \(landmarksCount > 0 ? "OK (\(landmarksCount))" : "NIL или пусто"), FrameSize: \(frameSize) ---")
+        // let landmarksCount = landmarks?.first?.count ?? 0
+        // print("--- ExerciseExecutionVC: Получены данные от VM -> Landmarks: \(landmarksCount > 0 ? "OK (\(landmarksCount))" : "NIL или пусто"), FrameSize: \(frameSize) ---") // Убираем лог
             
         // Обновляем UI в главном потоке
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
             // Передаем 2D-данные в PoseOverlayView для отрисовки
-            print("--- ExerciseExecutionVC: Вызов poseOverlayView.drawResult --- ")
+            // print("--- ExerciseExecutionVC: Вызов poseOverlayView.drawResult --- ") // Убираем лог
             self.poseOverlayView.drawResult(landmarks: landmarks, frameSize: frameSize)
         }
     }

@@ -55,10 +55,6 @@ class SquatAnalyzer3D: ExerciseAnalyzer {
     /// Текущее состояние пользователя.
     private var currentState: State = .unknown
 
-    /// Время последнего вывода углов в лог (для троттлинга).
-    private var lastAngleLogTime: TimeInterval = 0
-    private let angleLogInterval: TimeInterval = 0.25 // Интервал вывода лога (в секундах)
-
     // --- Свойства для сглаживания углов ---
     /// Размер окна для скользящего среднего.
     private let smoothingWindowSize = 3
@@ -188,10 +184,38 @@ class SquatAnalyzer3D: ExerciseAnalyzer {
         currentSmoothedKneeAngle = calculateSmoothedAngle(from: kneeAngleHistory)
         currentSmoothedHipAngle = calculateSmoothedAngle(from: hipAngleHistory)
 
-        // --- Троттлинг Отладочных Логгов --- 
-        let currentTime = Date().timeIntervalSince1970
-        let shouldLog = (currentTime - lastAngleLogTime >= angleLogInterval)
-        // --------------------------------------
+        // Определение состояния
+        let potentialState: State
+        if currentSmoothedKneeAngle >= Thresholds.kneeUp && currentSmoothedHipAngle >= Thresholds.hipUp {
+            potentialState = .up
+        } else if currentSmoothedKneeAngle <= Thresholds.kneeDown && currentSmoothedHipAngle <= Thresholds.hipDown {
+            potentialState = .down
+        } else {
+            potentialState = currentState != .unknown ? currentState : .unknown 
+        }
+        
+        // Обновляем состояние и счетчик (без лишних логов)
+         switch currentState {
+         case .unknown:
+             if potentialState == .up {
+                 updateState(newState: .up)
+             } else if potentialState == .down {
+                 updateState(newState: .down)
+             }
+         case .up:
+             if potentialState == .down {
+                 updateState(newState: .down)
+             }
+         case .down:
+             if potentialState == .up { // Проверяем переход в .up по potentialState
+                 // Только если переход действительно в UP (по порогам), считаем присед
+                 if currentSmoothedKneeAngle >= Thresholds.kneeUpTransition && currentSmoothedHipAngle >= Thresholds.hipUpTransition {
+                     updateState(newState: .up)
+                     squatCount += 1
+                     delegate?.exerciseAnalyzer(self, didCountRepetition: squatCount)
+                 }
+             }
+         }
     }
 
     // MARK: - Reset Method
@@ -263,15 +287,9 @@ class SquatAnalyzer3D: ExerciseAnalyzer {
      Обновляет текущее состояние и уведомляет делегата, если состояние изменилось.
      */
     private func updateState(newState: State) {
-        // Не обновляем, если новое состояние неизвестно и текущее уже было установлено
-        if newState == .unknown && currentState != .unknown {
-            return 
-        }
-        
+        if newState == .unknown && currentState != .unknown { return }
         if newState != currentState {
             currentState = newState
-            // Передаем rawValue (строку) делегату
-            // Вызываем новый метод делегата
             delegate?.exerciseAnalyzer(self, didChangeState: currentState.rawValue)
         }
     }

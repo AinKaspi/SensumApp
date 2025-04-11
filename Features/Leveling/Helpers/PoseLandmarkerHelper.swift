@@ -120,7 +120,7 @@ class PoseLandmarkerHelper: NSObject {
         self.poseLandmarker = try PoseLandmarker(options: options)
 
     } catch {
-        print("Failed to create Pose Landmarker: \(error)")
+        print("PoseLandmarkerHelper Ошибка: Failed to create Pose Landmarker: \(error)") // Оставляем ошибку
         return nil // Возвращаем nil, если инициализация не удалась
     }
   }
@@ -138,7 +138,7 @@ class PoseLandmarkerHelper: NSObject {
     computeDelegate: Delegate) -> PoseLandmarkerHelper? {
 
       guard let modelPath = modelPath else {
-          print("Error: Model path cannot be nil.")
+          // print("Error: Model path cannot be nil.")
           return nil
       }
 
@@ -165,7 +165,7 @@ class PoseLandmarkerHelper: NSObject {
     computeDelegate: Delegate) -> PoseLandmarkerHelper? {
 
       guard let modelPath = modelPath else {
-          print("Error: Model path cannot be nil.")
+          // print("Error: Model path cannot be nil.")
           return nil
       }
 
@@ -191,7 +191,7 @@ class PoseLandmarkerHelper: NSObject {
     computeDelegate: Delegate) -> PoseLandmarkerHelper? {
 
       guard let modelPath = modelPath else {
-          print("Error: Model path cannot be nil.")
+          // print("Error: Model path cannot be nil.")
           return nil
       }
 
@@ -218,15 +218,15 @@ class PoseLandmarkerHelper: NSObject {
    */
   func detect(image: UIImage) -> ResultBundle? {
     guard runningMode == .image else {
-        print("Error: PoseLandmarkerHelper is not configured for image mode.")
+        // print("Error: PoseLandmarkerHelper is not configured for image mode.")
         return nil
     }
     guard let landmarker = self.poseLandmarker else {
-        print("Error: Pose Landmarker is not initialized.")
+        // print("Error: Pose Landmarker is not initialized.")
         return nil
     }
     guard let mpImage = try? MPImage(uiImage: image) else {
-      print("Error: Failed to create MPImage from UIImage.")
+      // print("Error: Failed to create MPImage from UIImage.")
       return nil
     }
 
@@ -241,7 +241,7 @@ class PoseLandmarkerHelper: NSObject {
         poseWorldLandmarks: result.worldLandmarks
       )
     } catch {
-      print("Failed to detect pose in image: \(error)")
+      print("PoseLandmarkerHelper Ошибка: Failed to detect pose in image: \(error)") // Оставляем ошибку
       // Можно передать ошибку наружу, если нужно
       // liveStreamDelegate?.poseLandmarkerHelper(self, didFinishDetection: nil, error: error)
       return nil
@@ -261,11 +261,11 @@ class PoseLandmarkerHelper: NSObject {
     timeStamps: Int) {
 
     guard runningMode == .liveStream else {
-        print("Error: PoseLandmarkerHelper is not configured for live stream mode.")
+        // print("Error: PoseLandmarkerHelper is not configured for live stream mode.")
         return
     }
     guard let landmarker = self.poseLandmarker else {
-        print("Error: Pose Landmarker is not initialized.")
+        // print("Error: Pose Landmarker is not initialized.")
         // Уведомляем об ошибке, если landmarker не создан
         liveStreamDelegate?.poseLandmarkerHelper(self, didFinishDetection: nil, error: PoseLandmarkerHelperError.landmarkerNotInitialized)
         return
@@ -273,7 +273,7 @@ class PoseLandmarkerHelper: NSObject {
 
     // Создаем MPImage НАПРЯМУЮ из CVPixelBuffer
     guard let image = try? MPImage(pixelBuffer: pixelBuffer, orientation: orientation) else {
-      print("Error: Failed to create MPImage from CVPixelBuffer.")
+      print("PoseLandmarkerHelper Ошибка: Failed to create MPImage from CVPixelBuffer.") // Оставляем ошибку
       liveStreamDelegate?.poseLandmarkerHelper(self, didFinishDetection: nil, error: PoseLandmarkerHelperError.failedToCreateMPImage)
       return
     }
@@ -282,7 +282,7 @@ class PoseLandmarkerHelper: NSObject {
     do {
       try landmarker.detectAsync(image: image, timestampInMilliseconds: timeStamps)
     } catch {
-      print("Failed to call detectAsync: \(error)")
+      print("PoseLandmarkerHelper Ошибка: Failed to call detectAsync: \(error)") // Оставляем ошибку
       // Уведомляем об ошибке вызова детекции
       liveStreamDelegate?.poseLandmarkerHelper(self, didFinishDetection: nil, error: error)
     }
@@ -302,11 +302,11 @@ class PoseLandmarkerHelper: NSObject {
     inferenceIntervalInMilliseconds: Double) async -> ResultBundle? {
 
     guard runningMode == .video else {
-        print("Error: PoseLandmarkerHelper is not configured for video mode.")
+        // print("Error: PoseLandmarkerHelper is not configured for video mode.")
         return nil
     }
      guard let landmarker = self.poseLandmarker else {
-        print("Error: Pose Landmarker is not initialized.")
+        // print("Error: Pose Landmarker is not initialized.")
         return nil
     }
 
@@ -366,7 +366,7 @@ class PoseLandmarkerHelper: NSObject {
         do {
             frameImage = try await assetGenerator.image(at: time).image
         } catch {
-            print("Failed to generate image at time \(timestampMs): \(error)")
+            // print("Failed to generate image at time \(timestampMs): \(error)")
             poseLandmarkerResults.append(nil) // Добавляем nil, чтобы сохранить порядок
             continue // Пропускаем кадр
         }
@@ -381,7 +381,7 @@ class PoseLandmarkerHelper: NSObject {
         if videoSize == .zero { videoSize = uiImage.size } // Запоминаем размер первого кадра
 
         guard let mpImage = try? MPImage(uiImage: uiImage) else {
-            print("Failed to create MPImage for video frame at time \(timestampMs)")
+            // print("Failed to create MPImage for video frame at time \(timestampMs)")
             poseLandmarkerResults.append(nil)
             continue
         }
@@ -395,7 +395,7 @@ class PoseLandmarkerHelper: NSObject {
                  videoDelegate?.poseLandmarkerHelper(self, didFinishDetectionOnVideoFrame: i)
             }
         } catch {
-            print("Failed to detect pose in video frame at time \(timestampMs): \(error)")
+            print("PoseLandmarkerHelper Ошибка: Failed to detect pose in video frame at time \(timestampMs): \(error)") // Оставляем ошибку
             poseLandmarkerResults.append(nil)
             // Не прерываем цикл, обрабатываем остальные кадры
         }
@@ -419,7 +419,7 @@ extension PoseLandmarkerHelper: PoseLandmarkerLiveStreamDelegate {
 
     // 1. Проверяем наличие ошибки от MediaPipe
     guard error == nil else {
-      print("Pose detection error from MediaPipe: \(error!.localizedDescription)")
+      // print("Pose detection error from MediaPipe: \(error!.localizedDescription)")
       // Передаем ошибку нашему внешнему делегату
       liveStreamDelegate?.poseLandmarkerHelper(self, didFinishDetection: nil, error: error)
       return
@@ -427,7 +427,7 @@ extension PoseLandmarkerHelper: PoseLandmarkerLiveStreamDelegate {
 
     // 2. Проверяем, есть ли результат (может быть nil, если позы не найдены)
     guard let poseResult = result else {
-      print("Pose detection finished with no results for timestamp \(timestampInMilliseconds).")
+      // print("Pose detection finished with no results for timestamp \(timestampInMilliseconds).")
       // Передаем nil результат (без ошибки) нашему делегату
       liveStreamDelegate?.poseLandmarkerHelper(self, didFinishDetection: nil, error: nil)
       return

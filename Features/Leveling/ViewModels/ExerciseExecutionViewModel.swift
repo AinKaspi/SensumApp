@@ -45,6 +45,12 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     // Троттлинг логов
     private var lastPoseLogTime: TimeInterval = 0
     private let poseLogInterval: TimeInterval = 0.5
+    // Таймер для логгирования видимости
+    private var visibilityLogTimer: Timer?
+    private let visibilityLogInterval: TimeInterval = 0.5
+    // Хранение последней известной информации о видимости (ВОЗВРАЩАЕМ)
+    private var lastVisibilityStatus: (allVisible: Bool, average: Float)?
+    
     // Состояние подготовки и обратного отсчета
     private(set) var isPreparing: Bool = false // Флаг, что идет подготовка
     private var countdownTimer: Timer?
@@ -65,6 +71,7 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
         self.userProfile = DataManager.shared.getCurrentUserProfile()
         self.viewDelegate = viewDelegate // Сохраняем делегата
         super.init() // Нужно вызвать super.init(), так как наследуемся от NSObject
+        print("[ViewModel INIT] viewDelegate is \(viewDelegate == nil ? "NIL" : "SET")") // Проверяем делегат
         
         // Создаем нужный анализатор в зависимости от упражнения
         setupAnalyzer(for: exercise)
@@ -193,11 +200,10 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
             // Обратный отсчет завершен
             stopPreparationTimer()
             isPreparing = false
-            // Сообщаем View, что можно начинать (например, показать "Старт!")
-            // TODO: viewDelegate?.viewModelDidFinishPreparation()
-            // Запускаем основной таймер сессии
+            print("--- ExerciseExecutionVM: Подготовка завершена --- ")
             startTimer()
-             // Сбрасываем анализатор перед началом
+             // Запускаем таймер видимости ПОСЛЕ подготовки
+             startVisibilityLogTimer() 
              analyzer?.reset() 
         }
     }
@@ -220,6 +226,7 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     private func stopTimer() {
         sessionTimer?.invalidate()
         sessionTimer = nil
+        stopVisibilityLogTimer()
     }
 
     @objc private func updateTimer() {
@@ -231,6 +238,33 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
         // Сообщаем View обновленное время
         viewDelegate?.viewModelDidUpdateTimer(timeString: timeString)
     }
+
+    // --- Таймер логгирования видимости ---
+    private func startVisibilityLogTimer() {
+        stopVisibilityLogTimer() // Остановим предыдущий, если был
+        print("[ViewModel TIMER] Starting visibility log timer...") // Лог запуска таймера
+        visibilityLogTimer = Timer.scheduledTimer(timeInterval: visibilityLogInterval,
+                                              target: self,
+                                              selector: #selector(logVisibility),
+                                              userInfo: nil,
+                                              repeats: true)
+    }
+
+    private func stopVisibilityLogTimer() {
+        if visibilityLogTimer != nil { print("[ViewModel TIMER] Stopping visibility log timer.") }
+        visibilityLogTimer?.invalidate()
+        visibilityLogTimer = nil
+    }
+
+    @objc private func logVisibility() {
+        if let status = lastVisibilityStatus {
+            let statusText = status.allVisible ? "OK" : "BAD"
+            // Раскомментируем лог видимости
+            print(String(format: "[VISIBILITY LOG] Status: %@, Average: %.2f", statusText, status.average))
+        } else {
+            // print("[VISIBILITY LOG] No visibility data yet.")
+        }
+    }
 }
 
 // TODO: Добавить реализацию делегатов (PoseLandmarkerHelper, ExerciseAnalyzer) в extension
@@ -240,38 +274,27 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
     func poseLandmarkerHelper(_ poseLandmarkerHelper: PoseLandmarkerHelper, 
                               didFinishDetection resultBundle: ResultBundle?, 
                               error: Error?) {
-        // Этот метод теперь будет вызываться здесь, в ViewModel
-        // Выполняется в основном потоке (или в потоке, заданном хелпером)
+        // print("[ViewModel DELEGATE] poseLandmarkerHelper callback received.")
         
-        // --- Игнорируем обработку, если идет подготовка --- 
-        guard !isPreparing else {
-            // Опционально: можно очищать оверлей во время подготовки
-            // viewDelegate?.viewModelShouldClearOverlay()
-            return // Ничего не делаем, пока идет обратный отсчет
-        }
-        // ----------------------------------------------------
+        guard !isPreparing else { return }
         
-        // --- Троттлинг логов --- 
-        let currentTime = Date().timeIntervalSince1970
-        let shouldLog = (currentTime - lastPoseLogTime >= poseLogInterval)
-        if shouldLog { 
-            lastPoseLogTime = currentTime // Обновляем время последнего лога
-        }
-        // -----------------------
-        
-        // Обработка ошибки
         if let error = error {
-            // TODO: Сообщить View об ошибке? Очистить оверлей?
+            print("ExerciseExecutionVM Ошибка детекции поз: \(error.localizedDescription)")
             return
         }
         
-        // Обработка результата
+        // --- Логируем результат --- 
         guard let resultBundle = resultBundle else {
-            // TODO: Очистить оверлей?
-            // viewDelegate?.viewModelDidUpdatePose(landmarks: nil, frameSize: self.currentFrameSize) // Передаем nil для очистки?
+             print("[ViewModel DELEGATE] resultBundle is NIL")
+            // Передаем nil во View для очистки
+            viewDelegate?.viewModelDidUpdatePose(landmarks: nil, frameSize: self.currentFrameSize)
             return
         }
         
+        let landmarksForLog = resultBundle.poseLandmarks
+        let worldLandmarksForLog = resultBundle.poseWorldLandmarks
+        let landmarksCount = landmarksForLog?.first?.count ?? 0
+        let worldLandmarksCount = worldLandmarksForLog?.first?.count ?? 0
         // --- ТЕПЕРЬ ОБРАБАТЫВАЕМ РЕЗУЛЬТАТ, Т.К. ОН НЕ NIL ---
         
         // Передаем 3D точки в анализатор и получаем информацию для отладки
@@ -320,27 +343,21 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
                 if let squatAnalyzer = analyzer as? SquatAnalyzer3D {
                    viewDelegate?.viewModelDidUpdateDebugAngles(knee: squatAnalyzer.currentSmoothedKneeAngle, hip: squatAnalyzer.currentSmoothedHipAngle)
                 } // ------------------------------------------------
-                
-                if shouldLog {
-                }
             }
+            
+            // Сохраняем последнюю информацию о видимости
+            self.lastVisibilityStatus = (allVisible: allKeyPointsVisible, average: averageVisibility)
+             // -----------------------------------------
         } else {
              // Добавляем явную проверку isPreparing перед сбросом
              if !isPreparing {
                 analyzer?.reset() // Сбрасываем анализатор, если точек нет
-                // Логируем сброс анализатора только если логируем сам результат
-                if shouldLog {
-                }
             }
         }
         
         // Передаем 2D-данные и РАЗМЕР КАДРА для отрисовки во View Controller
         // Используем сохраненный размер кадра self.currentFrameSize
-        if shouldLog { // Логируем передаваемые данные только с заданной частотой
-            let landmarksCount = resultBundle.poseLandmarks?.first?.count ?? 0
-        }
         viewDelegate?.viewModelDidUpdatePose(landmarks: resultBundle.poseLandmarks, frameSize: self.currentFrameSize)
-        // ----------------------------------------------------
     }
 }
 
@@ -351,6 +368,7 @@ extension ExerciseExecutionViewModel: ExerciseAnalyzerDelegate {
         
         // Получаем текущий профиль (он должен быть загружен в init)
         guard var profile = userProfile else {
+            print("ExerciseExecutionVM Ошибка: User profile is nil...") // Оставляем ошибку
             return
         }
         

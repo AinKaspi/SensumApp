@@ -320,17 +320,14 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIIma
     // --- Обновление UI при появлении ---
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        print("--- PersonVC viewWillAppear ---")
         updateProfileDisplay() // Обновляем данные профиля перед показом
     }
 
     // --- Обновление данных профиля ---
     /// Загружает актуальные данные из DataManager и обновляет UI элементы профиля.
     private func updateProfileDisplay() {
-        print("--- PersonVC updateProfileDisplay: Запрос данных из DataManager ---")
         // 1. Получаем самый свежий профиль пользователя
         let profile = DataManager.shared.getCurrentUserProfile()
-        print("--- PersonVC updateProfileDisplay: Получен профиль: Уровень \(profile.level), XP \(profile.currentXP)/\(profile.xpToNextLevel), Ранг \(profile.rank.rawValue) ---")
 
         // 2. Обновляем UI элементы, связанные с уровнем и XP
         // Устанавливаем текст для лейбла уровня
@@ -347,7 +344,6 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIIma
         } else {
             // Если xpToNextLevel равен 0 (теоретически возможно при очень высоких уровнях или ошибках), устанавливаем прогресс в 0
             progress = 0.0
-            print("--- PersonVC updateProfileDisplay: ВНИМАНИЕ! xpToNextLevel равен 0. Прогресс установлен в 0. ---")
         }
 
         // 4. Ограничиваем значение прогресса диапазоном от 0.0 до 1.0
@@ -512,12 +508,10 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIIma
 
     // --- Обработчики нажатий ---
     @objc private func achievementsHeaderTapped() {
-        print("Нажата область заголовка/карточки достижений")
         delegate?.personViewControllerDidRequestShowAllAchievements(self)
     }
 
     @objc private func feedHeaderTapped() {
-        print("Нажата область заголовка/карточки ленты")
         delegate?.personViewControllerDidRequestShowAllFeed(self)
     }
 
@@ -578,7 +572,6 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIIma
         radarChartView.rotationEnabled = false
         radarChartView.legend.enabled = false // Отключаем легенду
         
-        print("--- PersonVC setupRadarChartAppearance: Внешний вид RadarChartView настроен ---")
     }
 }
 
@@ -587,7 +580,6 @@ class PersonViewController: UIViewController, UIGestureRecognizerDelegate, UIIma
 extension PersonViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         let countToShow = min(userAchievements.count, 12)
-        print("Количество ачивок для отображения: \(countToShow) (из \(userAchievements.count))")
         return countToShow
     }
 
@@ -606,12 +598,10 @@ extension PersonViewController: UICollectionViewDataSource {
 extension PersonViewController: UITableViewDataSource {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         let countToShow = min(feedEvents.count, 3)
-        print("Feed UITableView: numberOfRowsInSection возвращает \(countToShow) (из \(feedEvents.count))")
         return countToShow
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        print("Feed UITableView: Запрос ячейки для строки \(indexPath.row)")
         guard let cell = tableView.dequeueReusableCell(withIdentifier: FeedEventCell.identifier, for: indexPath) as? FeedEventCell else {
             fatalError("Unable to dequeue FeedEventCell")
         }
@@ -669,7 +659,6 @@ extension PersonViewController {
     private func getAvatarFileURL(forUserID userID: UUID) -> URL? {
         // Получаем URL папки Documents для текущего пользователя
         guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            print("--- PersonVC getAvatarFileURL: Ошибка: Не удалось получить доступ к папке Documents ---")
             return nil
         }
         // Формируем имя файла, используя UUID пользователя, чтобы оно было уникальным
@@ -743,16 +732,14 @@ extension PersonViewController {
     
     // MARK: - Форматтеры для Radar Chart
     // Форматтер для оси X (названия статов) - используем IndexAxisValueFormatter стандартный
-    // Указываем модуль для родительского класса
+    // Раскомментируем этот класс, он нужен для начальной настройки
     class RadarChartXAxisValueFormatter: DGCharts.IndexAxisValueFormatter {
         // Оставляем пустым, будем использовать стандартный IndexAxisValueFormatter
     }
 
     // Форматтер для оси Y (значения 0-100)
-    // Указываем модуль для протокола и родительского класса
-    class YAxisValueFormatter: NSObject, DGCharts.AxisValueFormatter {
-        // Указываем модуль для AxisBase
-        func stringForValue(_ value: Double, axis: DGCharts.AxisBase?) -> String {
+    class YAxisValueFormatter: AxisValueFormatter {
+        func stringForValue(_ value: Double, axis: AxisBase?) -> String {
             // Показываем значения кратные 20 (0, 20, 40, 60, 80, 100)
             if value.truncatingRemainder(dividingBy: 20) == 0 {
                 return String(format: "%.0f", value)
@@ -820,7 +807,6 @@ extension PersonViewController {
         // Главные статы теперь в диапазоне ~0-40. НЕ НУЖНО делить на 2.
         // Просто конвертируем в Double
         let entries = stats.map { DGCharts.RadarChartDataEntry(value: Double($0.1)) } 
-        print("--- PersonVC updateRadarChart: Подготовлены записи для графика: \\(entries.map { $0.value }) ---")
 
         // 3. Создаем набор данных (DataSet)
         // Указываем модуль для типа RadarChartDataSet
@@ -852,6 +838,5 @@ extension PersonViewController {
         radarChartView.data = data
         radarChartView.notifyDataSetChanged() // Уведомляем об изменениях
 
-        print("--- PersonVC updateRadarChart: Данные установлены, график обновлен --- ")
     }
 }
