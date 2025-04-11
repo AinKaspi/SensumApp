@@ -3,6 +3,7 @@ import AVFoundation // Для AVFoundation типов, если понадобя
 // Добавляем необходимые импорты
 import MediaPipeTasksVision
 import UIKit // Для UIImage
+import simd // Для Фильтра Калмана
 
 // Определяем протокол для связи ViewModel -> View
 protocol ExerciseExecutionViewModelViewDelegate: AnyObject {
@@ -62,6 +63,9 @@ class ExerciseExecutionViewModel: NSObject { // Наследуемся от NSOb
     private let bonusXPForGoal: Int = 50 // Базовый бонус за цель
     // Добавляем свойство для хранения размера кадра
     private var currentFrameSize: CGSize = .zero
+    // Фильтры Калмана для 3D точек
+    private var kalmanFilters: [KalmanFilter3D?] = Array(repeating: nil, count: 33) // 33 точки позы
+    private var lastFrameTimestamp: TimeInterval? = nil
     
     // MARK: - Delegate
     weak var viewDelegate: ExerciseExecutionViewModelViewDelegate?
@@ -274,90 +278,111 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
     func poseLandmarkerHelper(_ poseLandmarkerHelper: PoseLandmarkerHelper, 
                               didFinishDetection resultBundle: ResultBundle?, 
                               error: Error?) {
-        // print("[ViewModel DELEGATE] poseLandmarkerHelper callback received.")
         
         guard !isPreparing else { return }
         
         if let error = error {
-            print("ExerciseExecutionVM Ошибка детекции поз: \(error.localizedDescription)")
+            print("ExerciseExecutionVM Ошибка детекции поз: \(error.localizedDescription)") 
+            // Сбрасываем временную метку при ошибке
+            lastFrameTimestamp = nil
             return
         }
         
-        // --- Логируем результат --- 
         guard let resultBundle = resultBundle else {
-             print("[ViewModel DELEGATE] resultBundle is NIL")
-            // Передаем nil во View для очистки
-            viewDelegate?.viewModelDidUpdatePose(landmarks: nil, frameSize: self.currentFrameSize)
+             // Передаем nil во View для очистки
+             viewDelegate?.viewModelDidUpdatePose(landmarks: nil, frameSize: self.currentFrameSize)
+             // Сбрасываем временную метку при отсутствии результата
+             lastFrameTimestamp = nil
             return
         }
         
-        let landmarksForLog = resultBundle.poseLandmarks
-        let worldLandmarksForLog = resultBundle.poseWorldLandmarks
-        let landmarksCount = landmarksForLog?.first?.count ?? 0
-        let worldLandmarksCount = worldLandmarksForLog?.first?.count ?? 0
-        // --- ТЕПЕРЬ ОБРАБАТЫВАЕМ РЕЗУЛЬТАТ, Т.К. ОН НЕ NIL ---
+        // --- Фильтрация Калмана для worldLandmarks --- 
+        var filteredWorldLandmarks: [Landmark]? = nil
+        let currentTimestamp = Date().timeIntervalSince1970 // Используем текущее время для deltaTime
+        let deltaTime = (lastFrameTimestamp != nil) ? currentTimestamp - lastFrameTimestamp! : 0.0
         
-        // Передаем 3D точки в анализатор и получаем информацию для отладки
         if let worldLandmarks = resultBundle.poseWorldLandmarks,
            let firstPoseWorldLandmarks = worldLandmarks.first,
            !firstPoseWorldLandmarks.isEmpty {
             
-            // Перемещаем проверку видимости СЮДА, после guard let resultBundle
-            // --- Собираем информацию о видимости --- 
+            var poseFiltered: [Landmark] = []
+            for i in 0..<firstPoseWorldLandmarks.count {
+                let measurement = firstPoseWorldLandmarks[i]
+                let measurementVec = simd_float3(measurement.x, measurement.y, measurement.z)
+                let isVisible = (measurement.visibility?.floatValue ?? 0.0) > PoseConnections.visibilityThreshold
+                
+                if kalmanFilters[i] == nil {
+                    // Инициализируем фильтр при первом появлении точки
+                    kalmanFilters[i] = KalmanFilter3D(initialMeasurement: measurementVec)
+                } else {
+                    // Шаг предсказания
+                    kalmanFilters[i]!.predict(deltaTime: deltaTime)
+                }
+                
+                // Шаг обновления, только если точка видима
+                if isVisible {
+                    kalmanFilters[i]!.update(measurement: measurementVec)
+                }
+                
+                // Получаем отфильтрованную позицию
+                let filteredPosition = kalmanFilters[i]!.filteredPosition
+                
+                // Создаем новый Landmark с отфильтрованными координатами
+                // Копируем остальные свойства (visibility, presence) из оригинального landmark
+                let filteredLandmark = Landmark(x: filteredPosition.x, 
+                                                y: filteredPosition.y, 
+                                                z: filteredPosition.z, 
+                                                visibility: measurement.visibility, 
+                                                presence: measurement.presence
+                                                /* name: measurement.name */)
+                poseFiltered.append(filteredLandmark)
+            }
+            filteredWorldLandmarks = poseFiltered
+            
+            // --- Собираем информацию о видимости (теперь из отфильтрованных данных?) --- 
+            // Или лучше использовать видимость из исходных данных? Оставим пока из исходных.
             var visibleCount = 0
             var totalVisibility: Float = 0.0
-            // Используем PoseConnections.LandmarkIndex
-            let keyIndices = [PoseConnections.LandmarkIndex.leftHip, PoseConnections.LandmarkIndex.rightHip, 
-                              PoseConnections.LandmarkIndex.leftKnee, PoseConnections.LandmarkIndex.rightKnee, 
-                              PoseConnections.LandmarkIndex.leftAnkle, PoseConnections.LandmarkIndex.rightAnkle, 
-                              PoseConnections.LandmarkIndex.leftShoulder, PoseConnections.LandmarkIndex.rightShoulder]
+            let keyIndices = [PoseConnections.LandmarkIndex.leftHip, /* ... */ PoseConnections.LandmarkIndex.rightShoulder]
             var allKeyPointsVisible = true
             for index in keyIndices {
                 if index < firstPoseWorldLandmarks.count {
-                    // Используем PoseConnections.visibilityThreshold
                     let visibility = firstPoseWorldLandmarks[index].visibility?.floatValue ?? 0.0
                     if visibility > PoseConnections.visibilityThreshold {
                         visibleCount += 1
                         totalVisibility += visibility
-                    } else {
-                        allKeyPointsVisible = false
-                    }
-                } else {
-                    allKeyPointsVisible = false
-                }
+                    } else { allKeyPointsVisible = false }
+                } else { allKeyPointsVisible = false }
             }
             let averageVisibility = (visibleCount > 0) ? totalVisibility / Float(visibleCount) : 0.0
-            // Сообщаем View о видимости
-            // viewDelegate?.viewModelDidUpdateDebugVisibility(keyPointsVisible: allKeyPointsVisible, averageVisibility: averageVisibility)
-            // Передаем массив видимостей всех 2D точек (если они есть)
-            let allVisibilities = resultBundle.poseLandmarks?.first?.map { $0.visibility?.floatValue ?? 0.0 }
-            viewDelegate?.viewModelDidUpdateDebugVisibility(visibilities: allVisibilities)
-            // -----------------------------------------
-            
-            // Добавляем явную проверку isPreparing перед вызовом анализа
-            if !isPreparing {
-                // --- Вызываем анализ --- 
-                analyzer?.analyze(worldLandmarks: firstPoseWorldLandmarks)
-                
-                // --- Передаем углы для отладки ПОСЛЕ анализа --- 
-                if let squatAnalyzer = analyzer as? SquatAnalyzer3D {
-                   viewDelegate?.viewModelDidUpdateDebugAngles(knee: squatAnalyzer.currentSmoothedKneeAngle, hip: squatAnalyzer.currentSmoothedHipAngle)
-                } // ------------------------------------------------
-            }
-            
             // Сохраняем последнюю информацию о видимости
             self.lastVisibilityStatus = (allVisible: allKeyPointsVisible, average: averageVisibility)
-             // -----------------------------------------
-        } else {
-             // Добавляем явную проверку isPreparing перед сбросом
-             if !isPreparing {
-                analyzer?.reset() // Сбрасываем анализатор, если точек нет
+            // -----------------------------------------
+            
+            // --- Передаем ОТФИЛЬТРОВАННЫЕ 3D точки в анализатор --- 
+            if !isPreparing {
+                 analyzer?.analyze(worldLandmarks: poseFiltered) // Используем poseFiltered
             }
+        } else {
+             if !isPreparing {
+                analyzer?.reset()
+             }
+             // Сбрасываем фильтры, если поза не найдена
+             resetKalmanFilters()
         }
         
-        // Передаем 2D-данные и РАЗМЕР КАДРА для отрисовки во View Controller
-        // Используем сохраненный размер кадра self.currentFrameSize
+        // --- Обновляем временную метку --- 
+        lastFrameTimestamp = currentTimestamp
+        
+        // Передаем ИСХОДНЫЕ 2D-данные для отрисовки
         viewDelegate?.viewModelDidUpdatePose(landmarks: resultBundle.poseLandmarks, frameSize: self.currentFrameSize)
+    }
+    
+    // Метод для сброса фильтров Калмана
+    private func resetKalmanFilters() {
+        kalmanFilters = Array(repeating: nil, count: 33)
+        lastFrameTimestamp = nil
+        // print("[ViewModel] Kalman filters reset.")
     }
 }
 
