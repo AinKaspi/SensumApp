@@ -4,13 +4,15 @@ import MediaPipeTasksVision // Нужен для Landmark
 
 struct PoseValidator {
 
-    // Допустимые отклонения (можно сделать настраиваемыми)
-    let boneRatioTolerance: Float = 0.5
-    let lengthRatioTolerance: Float = 0.7 // Более широкая для сравнения с торсом
-    let minKneeAngle: Float = 5.0
-    let maxKneeAngle: Float = 185.0
-    let minElbowAngle: Float = 5.0
+    // Допустимые отклонения
+    let boneRatioTolerance: Float = 0.4 // Соотношение внутри конечности (40%)
+    let lengthRatioTolerance: Float = 0.6 // Длина конечности к торсу (60%)
+    // Уточненные диапазоны углов
+    let minKneeAngle: Float = 10.0
+    let maxKneeAngle: Float = 185.0 
+    let minElbowAngle: Float = 10.0
     let maxElbowAngle: Float = 185.0
+    // TODO: Добавить диапазоны для плеч и бедер
 
     // Основной метод проверки
     func isPoseValid(landmarks: [Landmark]) -> Bool {
@@ -24,31 +26,62 @@ struct PoseValidator {
     // MARK: - Private Check Methods
 
     private func checkBoneLengthRatios(landmarks: [Landmark]) -> Bool {
-        guard let torsoLength = getAverageTorsoLength(landmarks: landmarks) else { return true }
-        if torsoLength < 0.1 { return true }
-
-        // Ноги
-        if let leftThigh = getLength(PoseConnections.LandmarkIndex.leftHip, PoseConnections.LandmarkIndex.leftKnee, landmarks: landmarks),
-           let leftShin = getLength(PoseConnections.LandmarkIndex.leftKnee, PoseConnections.LandmarkIndex.leftAnkle, landmarks: landmarks) {
-            if !isRatioValid(leftThigh, leftShin, boneRatioTolerance) { /*print("[Pose Check FAIL] Left Leg Ratio");*/ return false }
-            if !isLengthValid(leftThigh + leftShin, relativeTo: torsoLength * 1.5, tolerance: lengthRatioTolerance) { /*print("[Pose Check FAIL] Left Leg Length");*/ return false }
-        }
-        if let rightThigh = getLength(PoseConnections.LandmarkIndex.rightHip, PoseConnections.LandmarkIndex.rightKnee, landmarks: landmarks),
-           let rightShin = getLength(PoseConnections.LandmarkIndex.rightKnee, PoseConnections.LandmarkIndex.rightAnkle, landmarks: landmarks) {
-            if !isRatioValid(rightThigh, rightShin, boneRatioTolerance) { /*print("[Pose Check FAIL] Right Leg Ratio");*/ return false }
-            if !isLengthValid(rightThigh + rightShin, relativeTo: torsoLength * 1.5, tolerance: lengthRatioTolerance) { /*print("[Pose Check FAIL] Right Leg Length");*/ return false }
+        // Опорная длина - средняя длина торса (плечо-бедро)
+        guard let torsoLength = getAverageTorsoLength(landmarks: landmarks), torsoLength > 0.1 else { 
+            // print("[Pose Check WARN] Torso not visible or too small for length check.")
+            return true // Пропускаем проверку, если торс не виден
         }
 
-        // Руки
-        if let leftUpperArm = getLength(PoseConnections.LandmarkIndex.leftShoulder, PoseConnections.LandmarkIndex.leftElbow, landmarks: landmarks),
-           let leftForearm = getLength(PoseConnections.LandmarkIndex.leftElbow, PoseConnections.LandmarkIndex.leftWrist, landmarks: landmarks) {
-            if !isRatioValid(leftUpperArm, leftForearm, boneRatioTolerance) { /*print("[Pose Check FAIL] Left Arm Ratio");*/ return false }
-            if !isLengthValid(leftUpperArm + leftForearm, relativeTo: torsoLength * 1.2, tolerance: lengthRatioTolerance) { /*print("[Pose Check FAIL] Left Arm Length");*/ return false }
+        // --- Ноги --- 
+        if let leftThigh = getLength(.leftHip, .leftKnee, landmarks: landmarks),
+           let leftShin = getLength(.leftKnee, .leftAnkle, landmarks: landmarks) {
+            // 1. Соотношение бедро/голень
+            if !isRatioValid(leftThigh, leftShin, boneRatioTolerance) { 
+                 print("[Pose Check FAIL] Left Leg Ratio: Thigh=\(leftThigh), Shin=\(leftShin)")
+                return false 
+            }
+            // 2. Длина всей ноги относительно торса (Нога обычно ~1.5-1.8 торса? Уточнить)
+            if !isLengthValid(leftThigh + leftShin, relativeTo: torsoLength * 1.6, tolerance: lengthRatioTolerance) { 
+                 print("[Pose Check FAIL] Left Leg Length: \(leftThigh + leftShin), Torso: \(torsoLength)")
+                return false 
+            }
         }
-         if let rightUpperArm = getLength(PoseConnections.LandmarkIndex.rightShoulder, PoseConnections.LandmarkIndex.rightElbow, landmarks: landmarks),
-           let rightForearm = getLength(PoseConnections.LandmarkIndex.rightElbow, PoseConnections.LandmarkIndex.rightWrist, landmarks: landmarks) {
-            if !isRatioValid(rightUpperArm, rightForearm, boneRatioTolerance) { /*print("[Pose Check FAIL] Right Arm Ratio");*/ return false }
-            if !isLengthValid(rightUpperArm + rightForearm, relativeTo: torsoLength * 1.2, tolerance: lengthRatioTolerance) { /*print("[Pose Check FAIL] Right Arm Length");*/ return false }
+        if let rightThigh = getLength(.rightHip, .rightKnee, landmarks: landmarks),
+           let rightShin = getLength(.rightKnee, .rightAnkle, landmarks: landmarks) {
+            if !isRatioValid(rightThigh, rightShin, boneRatioTolerance) { 
+                 print("[Pose Check FAIL] Right Leg Ratio: Thigh=\(rightThigh), Shin=\(rightShin)")
+                return false 
+            }
+            if !isLengthValid(rightThigh + rightShin, relativeTo: torsoLength * 1.6, tolerance: lengthRatioTolerance) { 
+                print("[Pose Check FAIL] Right Leg Length: \(rightThigh + rightShin), Torso: \(torsoLength)")
+                return false 
+            }
+        }
+
+        // --- Руки --- 
+        if let leftUpperArm = getLength(.leftShoulder, .leftElbow, landmarks: landmarks),
+           let leftForearm = getLength(.leftElbow, .leftWrist, landmarks: landmarks) {
+            // 1. Соотношение плечо/предплечье
+            if !isRatioValid(leftUpperArm, leftForearm, boneRatioTolerance) { 
+                 print("[Pose Check FAIL] Left Arm Ratio: Upper=\(leftUpperArm), Forearm=\(leftForearm)")
+                return false 
+            }
+             // 2. Длина всей руки относительно торса (Рука обычно ~1.0-1.2 торса? Уточнить)
+            if !isLengthValid(leftUpperArm + leftForearm, relativeTo: torsoLength * 1.1, tolerance: lengthRatioTolerance) { 
+                 print("[Pose Check FAIL] Left Arm Length: \(leftUpperArm + leftForearm), Torso: \(torsoLength)")
+                return false 
+            }
+        }
+         if let rightUpperArm = getLength(.rightShoulder, .rightElbow, landmarks: landmarks),
+           let rightForearm = getLength(.rightElbow, .rightWrist, landmarks: landmarks) {
+            if !isRatioValid(rightUpperArm, rightForearm, boneRatioTolerance) { 
+                print("[Pose Check FAIL] Right Arm Ratio: Upper=\(rightUpperArm), Forearm=\(rightForearm)")
+                return false 
+            }
+            if !isLengthValid(rightUpperArm + rightForearm, relativeTo: torsoLength * 1.1, tolerance: lengthRatioTolerance) { 
+                 print("[Pose Check FAIL] Right Arm Length: \(rightUpperArm + rightForearm), Torso: \(torsoLength)")
+                return false 
+            }
         }
 
         return true
@@ -57,18 +90,32 @@ struct PoseValidator {
     private func checkJointAngles(landmarks: [Landmark]) -> Bool {
         // Колени
         if let leftKneeAngle = getAngle(.leftHip, .leftKnee, .leftAnkle, landmarks: landmarks) {
-            if leftKneeAngle < minKneeAngle || leftKneeAngle > maxKneeAngle { /*print("[Pose Check FAIL] Left Knee Angle: \(leftKneeAngle)")*/ return false }
+            if leftKneeAngle < minKneeAngle || leftKneeAngle > maxKneeAngle { 
+                print("[Pose Check FAIL] Left Knee Angle: \(leftKneeAngle)")
+                return false 
+            }
         }
         if let rightKneeAngle = getAngle(.rightHip, .rightKnee, .rightAnkle, landmarks: landmarks) {
-            if rightKneeAngle < minKneeAngle || rightKneeAngle > maxKneeAngle { /*print("[Pose Check FAIL] Right Knee Angle: \(rightKneeAngle)")*/ return false }
+            if rightKneeAngle < minKneeAngle || rightKneeAngle > maxKneeAngle { 
+                print("[Pose Check FAIL] Right Knee Angle: \(rightKneeAngle)")
+                return false 
+            }
         }
         // Локти
          if let leftElbowAngle = getAngle(.leftShoulder, .leftElbow, .leftWrist, landmarks: landmarks) {
-             if leftElbowAngle < minElbowAngle || leftElbowAngle > maxElbowAngle { /*print("[Pose Check FAIL] Left Elbow Angle: \(leftElbowAngle)")*/ return false }
+            if leftElbowAngle < minElbowAngle || leftElbowAngle > maxElbowAngle { 
+                print("[Pose Check FAIL] Left Elbow Angle: \(leftElbowAngle)")
+                return false 
+            }
         }
         if let rightElbowAngle = getAngle(.rightShoulder, .rightElbow, .rightWrist, landmarks: landmarks) {
-            if rightElbowAngle < minElbowAngle || rightElbowAngle > maxElbowAngle { /*print("[Pose Check FAIL] Right Elbow Angle: \(rightElbowAngle)")*/ return false }
+            if rightElbowAngle < minElbowAngle || rightElbowAngle > maxElbowAngle { 
+                print("[Pose Check FAIL] Right Elbow Angle: \(rightElbowAngle)")
+                return false 
+            }
         }
+        // TODO: Добавить проверки для плеч (Shoulder-Elbow-Hip) и бедер (Shoulder-Hip-Knee)?
+        
         return true
     }
 

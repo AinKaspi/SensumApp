@@ -45,6 +45,12 @@ class ExerciseExecutionViewModel: NSObject {
     private let kalmanProcessNoise: Double = 0.01
     private let kalmanMeasurementNoise: Double = 0.2 // Базовый шум (для visibility = 1.0)
 
+    // --- Параметры MediaPipe --- 
+    // Пробуем lite-модель для ускорения инициализации
+    private let modelPath = "pose_landmarker_lite.task" 
+    private let numPoses = 1
+    private let minPoseDetectionConfidence: Float = 0.5
+
     // MARK: - State
     private var sessionStartDate: Date?
     private var sessionTimer: Timer?

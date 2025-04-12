@@ -26,7 +26,7 @@ struct KalmanFilter3D {
     // --- Инициализация ---
     init(initialMeasurement: simd_float3,
          initialUncertainty P0: Double = 10.0,
-         processNoise q: Double = 0.01,
+         processNoise q: Double = 0.1,
          measurementNoise r: Double = 0.2) { // Оставим увеличенное r по умолчанию
 
         // Начальное состояние
