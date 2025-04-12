@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		0BEC571AAD9BAB36845AF4F7 /* Pods_SensumApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F08A7153A835D56D39470A7D /* Pods_SensumApp.framework */; };
 		B10F642B2DA992B80002F8FD /* Surge in Frameworks */ = {isa = PBXBuildFile; productRef = B10F642A2DA992B80002F8FD /* Surge */; };
-		B11327172DA7476A009315D3 /* DGCharts in Frameworks */ = {isa = PBXBuildFile; productRef = B11327162DA7476A009315D3 /* DGCharts */; };
 		B1A6E6E62DA74B4500E9E9EB /* DGCharts in Frameworks */ = {isa = PBXBuildFile; productRef = B1A6E6E52DA74B4500E9E9EB /* DGCharts */; };
 		B1A6E6EA2DA7F0F500E9E9EB /* ROADMAP.md in Resources */ = {isa = PBXBuildFile; fileRef = B1A6E6E92DA7F0F500E9E9EB /* ROADMAP.md */; };
 		B1BE36972DA6A6ED00BF1C55 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BE36962DA6A6ED00BF1C55 /* UserProfile.swift */; };
@@ -58,7 +57,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				B1A6E6E62DA74B4500E9E9EB /* DGCharts in Frameworks */,
-				B11327172DA7476A009315D3 /* DGCharts in Frameworks */,
 				0BEC571AAD9BAB36845AF4F7 /* Pods_SensumApp.framework in Frameworks */,
 				B10F642B2DA992B80002F8FD /* Surge in Frameworks */,
 			);
@@ -458,11 +456,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B10F64292DA992B80002F8FD /* XCRemoteSwiftPackageReference "Surge" */;
 			productName = Surge;
-		};
-		B11327162DA7476A009315D3 /* DGCharts */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B11327152DA7476A009315D3 /* XCRemoteSwiftPackageReference "Charts" */;
-			productName = DGCharts;
 		};
 		B1A6E6E52DA74B4500E9E9EB /* DGCharts */ = {
 			isa = XCSwiftPackageProductDependency;

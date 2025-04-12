@@ -97,13 +97,19 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
     private lazy var debugAnglesLabel: UILabel = createDebugLabel()
     private lazy var debugRepCountLabel: UILabel = createDebugLabel()
     private lazy var debugVisibilityLabel: UILabel = createDebugLabel()
+    // Добавляем лейбл для FPS
+    private lazy var debugFPSLabel: UILabel = createDebugLabel()
+    // Добавляем лейбл для StdDev
+    private lazy var debugStdDevLabel: UILabel = createDebugLabel()
     
     private lazy var debugStackView: UIStackView = {
         let stackView = UIStackView(arrangedSubviews: [
             debugStateLabel,
             debugAnglesLabel,
             debugRepCountLabel,
-            debugVisibilityLabel
+            debugVisibilityLabel,
+            debugFPSLabel, // Добавляем FPS в стек
+            debugStdDevLabel // Добавляем StdDev в стек
         ])
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.axis = .vertical
@@ -139,6 +145,13 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
     // Свойство для хранения текущего профиля пользователя
     private var userProfile: UserProfile?
 
+    // --- Переносим сюда свойства для FPS --- 
+    private var frameCount: Int = 0
+    private var fpsTimer: Timer?
+    private var lastFPSUpdateTime: TimeInterval = 0
+    private let fpsUpdateInterval: TimeInterval = 1.0 // Обновлять раз в секунду
+    // ---------------------------------------
+
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
@@ -168,6 +181,8 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
         
         // Сообщаем ViewModel
         viewModel.viewDidAppear()
+        // Запускаем таймер FPS
+        startFPSTimer()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -179,6 +194,8 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
         
         // Сообщаем ViewModel
         viewModel.viewWillDisappear()
+        // Останавливаем таймер FPS
+        stopFPSTimer()
     }
     
     // Возвращаем viewDidLayoutSubviews для установки frame previewLayer
@@ -525,9 +542,8 @@ extension ExerciseExecutionViewController: ExerciseExecutionViewModelViewDelegat
     
     // Новый метод для приема 2D-координат от ViewModel
     func viewModelDidUpdatePose(landmarks: [[NormalizedLandmark]]?, frameSize: CGSize) {
-        // Логируем получение данных
-        // let landmarksCount = landmarks?.first?.count ?? 0
-        // print("--- ExerciseExecutionVC: Получены данные от VM -> Landmarks: \(landmarksCount > 0 ? "OK (\(landmarksCount))" : "NIL или пусто"), FrameSize: \(frameSize) ---") // Убираем лог
+        // Инкрементируем счетчик кадров
+        frameCount += 1
             
         // Обновляем UI в главном потоке
         DispatchQueue.main.async { [weak self] in
@@ -577,8 +593,8 @@ extension ExerciseExecutionViewController: ExerciseExecutionViewModelViewDelegat
             var totalVisibility: Float = 0.0
             
             for index in keyIndices {
-                if index < visibilities.count {
-                    let visibility = visibilities[index]
+                if index.rawValue < visibilities.count {
+                    let visibility = visibilities[index.rawValue]
                     if visibility > PoseConnections.visibilityThreshold {
                         visibleCount += 1
                         totalVisibility += visibility
@@ -597,7 +613,83 @@ extension ExerciseExecutionViewController: ExerciseExecutionViewModelViewDelegat
         }
     }
     
+    // Новый метод для стандартного отклонения
+    func viewModelDidUpdateDebugStdDev(positionStdDev: simd_float3) {
+        DispatchQueue.main.async {
+            // Отображаем X, Y, Z компоненты стандартного отклонения
+            self.debugStdDevLabel.text = String(format: "StdDev: x=%.2f y=%.2f z=%.2f", 
+                                                positionStdDev.x, 
+                                                positionStdDev.y, 
+                                                positionStdDev.z)
+        }
+    }
+    
+    // MARK: - Preparation Updates (Новые методы делегата)
+    
+    func viewModelDidStartPreparation(initialValue: Int) {
+        DispatchQueue.main.async {
+            print("--- ExerciseExecutionVC: Start Preparation (Value: \(initialValue)) ---")
+            // TODO: Показать UI обратного отсчета (например, большой лейбл)
+            // countdownLabel.text = "\(initialValue)"
+            // countdownLabel.isHidden = false
+        }
+    }
+    
+    func viewModelDidUpdateCountdown(value: Int) {
+        DispatchQueue.main.async {
+             print("--- ExerciseExecutionVC: Update Countdown (Value: \(value)) ---")
+            // TODO: Обновить текст лейбла обратного отсчета
+            // countdownLabel.text = "\(value)"
+        }
+    }
+    
+    func viewModelDidFinishPreparation() {
+        DispatchQueue.main.async {
+             print("--- ExerciseExecutionVC: Finish Preparation (START!) ---")
+            // TODO: Показать "Старт!" и/или скрыть UI обратного отсчета
+            // countdownLabel.text = "Старт!"
+            // DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            //     self?.countdownLabel.isHidden = true
+            // }
+        }
+    }
+    
     // TODO: Реализовать другие методы делегата (level up, error, etc.)
+}
+
+// MARK: - FPS Timer Logic (Новый раздел)
+extension ExerciseExecutionViewController {
+    
+    private func startFPSTimer() {
+        stopFPSTimer() // Останавливаем предыдущий, если был
+        frameCount = 0
+        lastFPSUpdateTime = Date().timeIntervalSince1970
+        fpsTimer = Timer.scheduledTimer(timeInterval: fpsUpdateInterval, 
+                                        target: self, 
+                                        selector: #selector(updateFPSLabel), 
+                                        userInfo: nil, 
+                                        repeats: true)
+    }
+    
+    private func stopFPSTimer() {
+        fpsTimer?.invalidate()
+        fpsTimer = nil
+    }
+    
+    @objc private func updateFPSLabel() {
+        let currentTime = Date().timeIntervalSince1970
+        let elapsedTime = currentTime - lastFPSUpdateTime
+        guard elapsedTime > 0 else { return } // Избегаем деления на ноль
+        
+        let fps = Double(frameCount) / elapsedTime
+        DispatchQueue.main.async {
+            self.debugFPSLabel.text = String(format: "FPS: %.1f", fps)
+        }
+        
+        // Сбрасываем для следующего интервала
+        frameCount = 0
+        lastFPSUpdateTime = currentTime
+    }
 }
 
 // MARK: - Delegates

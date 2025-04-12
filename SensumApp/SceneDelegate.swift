@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import MediaPipeTasksVision
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
@@ -173,10 +174,19 @@ class EventsCoordinator: Coordinator {
     }
 }
 
-class LevelingCoordinator: Coordinator, ExerciseSelectionViewModelCoordinatorDelegate { // Добавляем соответствие протоколу
+class LevelingCoordinator: Coordinator, ExerciseSelectionViewModelCoordinatorDelegate {
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
-    init(navigationController: UINavigationController) { self.navigationController = navigationController }
+    
+    // Создаем и храним PoseLandmarkerHelper на уровне координатора
+    private var poseLandmarkerHelper: PoseLandmarkerHelper?
+    private let sessionQueue = DispatchQueue(label: "com.sensum.poseHelperQueue") // Очередь для хелпера
+    
+    init(navigationController: UINavigationController) { 
+        self.navigationController = navigationController
+        // Запускаем инициализацию хелпера в фоне при создании координатора
+        setupPoseLandmarkerHelperInBackground()
+    }
     
     func start() {
         // Стартуем с экрана выбора упражнений
@@ -192,11 +202,51 @@ class LevelingCoordinator: Coordinator, ExerciseSelectionViewModelCoordinatorDel
     func exerciseSelectionViewModelDidSelect(exercise: Exercise) {
         // Создаем и показываем экран выполнения
         let executionVC = ExerciseExecutionViewController()
-        // Создаем ViewModel, передавая упражнение и делегата (сам VC)
-        let executionViewModel = ExerciseExecutionViewModel(exercise: exercise, viewDelegate: executionVC)
-        executionVC.viewModel = executionViewModel // Устанавливаем ViewModel для VC
-        executionVC.title = exercise.name // Устанавливаем заголовок
+        // Создаем ViewModel, передавая упражнение, ГОТОВЫЙ хелпер и делегата VC
+        let executionViewModel = ExerciseExecutionViewModel(exercise: exercise, 
+                                                          poseLandmarkerHelper: self.poseLandmarkerHelper,
+                                                          viewDelegate: executionVC)
+        executionVC.viewModel = executionViewModel 
+        executionVC.title = exercise.name
         navigationController.pushViewController(executionVC, animated: true)
+    }
+    
+    // Метод для инициализации PoseLandmarkerHelper в фоне
+    private func setupPoseLandmarkerHelperInBackground() {
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Параметры инициализации (можно вынести в константы)
+            let modelPathString = "pose_landmarker_full.task"
+            let numPoses = 1
+            let minPoseDetectionConfidence: Float = 0.5
+            let minPosePresenceConfidence: Float = 0.5
+            let minTrackingConfidence: Float = 0.5
+            let computeDelegate: Delegate = .GPU
+            
+            guard let modelPath = Bundle.main.path(forResource: modelPathString, ofType: nil) else {
+                print("LevelingCoordinator Ошибка: Файл модели MediaPipe не найден ('\(modelPathString)').")
+                return
+            }
+            
+            // Используем тот же статический инициализатор, но liveStreamDelegate будет nil
+            // Делегат будет назначен позже во ViewModel
+            self.poseLandmarkerHelper = PoseLandmarkerHelper.liveStreamPoseLandmarkerHelper(
+                modelPath: modelPath, 
+                numPoses: numPoses,
+                minPoseDetectionConfidence: minPoseDetectionConfidence, 
+                minPosePresenceConfidence: minPosePresenceConfidence, 
+                minTrackingConfidence: minTrackingConfidence, 
+                liveStreamDelegate: nil, // Делегат будет назначен во ViewModel
+                computeDelegate: computeDelegate
+            )
+            
+            if self.poseLandmarkerHelper == nil {
+                 print("LevelingCoordinator Ошибка: Ошибка инициализации PoseLandmarkerHelper.")
+            } else {
+                 print("--- LevelingCoordinator: PoseLandmarkerHelper инициализирован в фоне. ---")
+            }
+        }
     }
 }
 
