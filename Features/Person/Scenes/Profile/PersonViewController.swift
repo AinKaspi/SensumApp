@@ -33,14 +33,14 @@ class PersonViewController: UIViewController {
     // MARK: - Dependencies
     var viewModel: PersonViewModel!
     var coordinator: PersonCoordinator?
-    // Удаляем свойство delegate
+    // Удаляем старый PersonViewControllerDelegate
     // weak var delegate: PersonViewControllerDelegate?
 
     // MARK: - UI Properties
     private lazy var topMenuView: TopMenuView = {
         let view = TopMenuView()
         view.translatesAutoresizingMaskIntoConstraints = false
-        view.delegate = self // Назначаем делегата для обработки нажатий
+        view.delegate = self // Назначаем VC делегатом для TopMenuView
         return view
     }()
 
@@ -97,7 +97,7 @@ class PersonViewController: UIViewController {
         button.setTitleColor(.black, for: .normal)
         button.backgroundColor = .white
         button.layer.cornerRadius = 15
-        button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold) // Bold
+        button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
         button.addTarget(self, action: #selector(followButtonTapped), for: .touchUpInside)
         return button
     }()
@@ -189,6 +189,8 @@ class PersonViewController: UIViewController {
 
         // Назначаем обработчик нажатия на фоновый аватар
         setupAvatarTapGesture(for: backgroundImageView)
+        // Можно добавить и для маленького, если нужно
+        // setupAvatarTapGesture(for: miniAvatarImageView)
     }
 
     private func setupConstraints() {
@@ -261,25 +263,29 @@ class PersonViewController: UIViewController {
 
     // MARK: - Data Handling
     private func updateProfileDisplay() {
-        // TODO: Получать профиль из ViewModel, когда он будет реализован
-        let profile = DataManager.shared.getCurrentUserProfile() // Пока берем напрямую
+        // TODO: Получать профиль из ViewModel
+        let profile = DataManager.shared.getCurrentUserProfile()
 
+        // Загружаем и устанавливаем аватары
         if let avatar = loadAvatarImage(forUserID: profile.userID) {
             backgroundImageView.image = avatar
+            backgroundImageView.contentMode = .scaleAspectFill // Убедимся, что ContentMode правильный
             miniAvatarImageView.image = avatar
         } else {
-            // Устанавливаем плейсхолдер или дефолтное изображение
-            backgroundImageView.image = UIImage(systemName: "person.crop.circle.fill") // Системный плейсхолдер
-            backgroundImageView.tintColor = .gray
-            backgroundImageView.contentMode = .scaleAspectFit // Чтобы плейсхолдер не растягивался сильно
-             backgroundImageView.backgroundColor = .darkGray
+            // Устанавливаем плейсхолдер
+            backgroundImageView.image = UIImage(systemName: "person.crop.circle.fill") 
+            backgroundImageView.tintColor = .darkGray // Цвет плейсхолдера
+            backgroundImageView.contentMode = .scaleAspectFit // Чтобы плейсхолдер не растягивался
+            backgroundImageView.backgroundColor = UIColor(white: 0.1, alpha: 1.0) // Фон под плейсхолдер
             miniAvatarImageView.image = UIImage(systemName: "person.crop.circle.fill")
-             miniAvatarImageView.tintColor = .lightGray
-             miniAvatarImageView.backgroundColor = .darkGray
+            miniAvatarImageView.tintColor = .lightGray
+            miniAvatarImageView.backgroundColor = .darkGray 
         }
-
+        
         usernameLabel.text = profile.username ?? "Username"
-        statusLabel.text = "This is a status placeholder..." // Placeholder
+        // Убираем установку статуса, пока нет поля в модели
+        // statusLabel.text = profile.status ?? "Hello! Welcome to Sensum." 
+        statusLabel.text = "User status placeholder..." // Возвращаем плейсхолдер
         levelLabel.text = "Level \(profile.level)"
         xpLabel.text = "\(profile.currentXP)/\(profile.xpToNextLevel) XP"
 
@@ -292,12 +298,16 @@ class PersonViewController: UIViewController {
         // Убедимся, что старый жест удален, если он был
         imageView.gestureRecognizers?.forEach { imageView.removeGestureRecognizer($0) }
         
-        imageView.isUserInteractionEnabled = true
+        imageView.isUserInteractionEnabled = true // Убедимся, что интерактивность включена
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(avatarTapped))
         imageView.addGestureRecognizer(tapGesture)
     }
 
-    @objc private func avatarTapped() {
+    @objc private func avatarTapped(_ sender: UITapGestureRecognizer) {
+        // Определяем, по какому ImageView тапнули (если нужно будет разное поведение)
+        // let tappedImageView = sender.view as? UIImageView
+        // if tappedImageView == backgroundImageView { ... }
+        
         // TODO: Проверить права доступа к галерее
         let imagePickerController = UIImagePickerController()
         imagePickerController.delegate = self
@@ -323,16 +333,18 @@ class PersonViewController: UIViewController {
 // MARK: - UIImagePickerControllerDelegate & UINavigationControllerDelegate
 extension PersonViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        // Используем оригинал для лучшего качества
         guard let selectedImage = info[.originalImage] as? UIImage else {
             picker.dismiss(animated: true, completion: nil)
             return
         }
+        // Обновляем оба аватара
         backgroundImageView.image = selectedImage
         miniAvatarImageView.image = selectedImage
-        // Устанавливаем нормальный contentMode после выбора
+        // Возвращаем contentMode для фонового изображения
         backgroundImageView.contentMode = .scaleAspectFill
         
-        // TODO: Передать сохранение в ViewModel
+        // Сохраняем (логика остается)
         let userID = DataManager.shared.getCurrentUserProfile().userID
         _ = saveAvatarImage(selectedImage, forUserID: userID)
         picker.dismiss(animated: true, completion: nil)
@@ -379,16 +391,26 @@ extension PersonViewController {
 // MARK: - TopMenuViewDelegate
 extension PersonViewController: TopMenuViewDelegate {
     func topMenuViewDidSelect(segment: TopMenuView.Segment) {
-        print("Selected segment: \(segment)")
-        // TODO: Реализовать навигацию через координатора
+        print("--- PersonVC: Выбран сегмент меню: \(segment) ---")
+        // TODO: Реализовать переключение контента или навигацию
+        switch segment {
+        case .profile:
+            // Мы уже здесь
+            break
+        case .stats:
+            // TODO: Показать Stats View/ViewController
+            // coordinator?.showStats()
+            print("  -> Показать Stats")
+            break
+        // case .achievements: // Сегмент удален
+        //    break
+        }
     }
     
     func topMenuViewDidTapSettings() {
-        // print("--- PersonViewController: Settings tapped in TopMenuView, calling delegate --- ") // Убираем лог
-        // Напрямую вызываем координатора (если ссылка установлена)
-        coordinator?.showSettings() // Предполагаем, что у координатора будет такой метод
-        // Или используем старый делегат, если он остался для этой цели
-        // delegate?.personViewControllerDidTapSettings(self)
+        print("--- PersonVC: Нажата кнопка настроек --- ")
+        // Вызываем координатора
+        coordinator?.showSettings()
     }
 }
 

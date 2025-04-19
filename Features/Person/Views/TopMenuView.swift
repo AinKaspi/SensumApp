@@ -64,6 +64,8 @@ class TopMenuView: UIView {
     // --- Initialization ---
     override init(frame: CGRect) {
         super.init(frame: frame)
+        // Возвращаем прозрачный фон
+        backgroundColor = .clear 
         setupView()
         setupConstraints()
         updateButtonSelection() // Установить начальное выделение
@@ -125,9 +127,9 @@ class TopMenuView: UIView {
             
             // Индикатор - статичные констрейнты относительно profileButton
             selectionIndicatorView.heightAnchor.constraint(equalToConstant: 2),
-            selectionIndicatorView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            selectionIndicatorView.centerXAnchor.constraint(equalTo: profileButton.centerXAnchor), // Центрируем по X первой кнопки
-            selectionIndicatorView.widthAnchor.constraint(equalTo: profileButton.widthAnchor) // Ширина как у первой кнопки
+            selectionIndicatorView.bottomAnchor.constraint(equalTo: buttonStackView.bottomAnchor, constant: -4),
+            selectionIndicatorView.centerXAnchor.constraint(equalTo: profileButton.centerXAnchor),
+            selectionIndicatorView.widthAnchor.constraint(equalTo: profileButton.widthAnchor, constant: -20)
         ])
     }
     

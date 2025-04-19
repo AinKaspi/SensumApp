@@ -129,8 +129,9 @@ class AppCoordinator: Coordinator { // Делаем AppCoordinator соотве�
         
         // 6. Настраиваем внешний вид TabBar с помощью Appearance API
         let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground() // Делаем фон непрозрачным
-        appearance.backgroundColor = UIColor(white: 0.1, alpha: 1.0) // Цвет фона (темно-серый, как у карточек)
+        appearance.configureWithOpaqueBackground() 
+        // Устанавливаем черный цвет фона
+        appearance.backgroundColor = .black 
 
         // Настройка цвета иконок и текста
         let itemAppearance = UITabBarItemAppearance()
