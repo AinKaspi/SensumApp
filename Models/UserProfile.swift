@@ -25,6 +25,7 @@ struct UserProfile: Codable { // Codable для сохранения/загру�
     var xpToNextLevel: Int
     var rank: Rank
     var totalSquats: Int // Оставляем общий счетчик приседаний
+    var status: String?
     
     // --- Базовые Атрибуты (0-100) ---
     var strength: Int      // STR: Сила
@@ -61,9 +62,10 @@ struct UserProfile: Codable { // Codable для сохранения/загру�
          username: String? = nil,
          level: Int = 1,
          currentXP: Int = 0,
-         xpToNextLevel: Int = 100, // Начальное значение XP для уровня 2
+         xpToNextLevel: Int = DataManager.calculateXPForLevel(1),
          rank: Rank = .E,
          totalSquats: Int = 0,
+         status: String? = nil,
          // Устанавливаем начальные значения атрибутов в 0
          strength: Int = 0,
          constitution: Int = 0,
@@ -82,6 +84,7 @@ struct UserProfile: Codable { // Codable для сохранения/загру�
         self.xpToNextLevel = xpToNextLevel
         self.rank = rank
         self.totalSquats = totalSquats
+        self.status = status
         // Сохраняем начальные атрибуты
         self.strength = max(0, min(100, strength)) // Ограничиваем 0-100 при инициализации
         self.constitution = max(0, min(100, constitution))

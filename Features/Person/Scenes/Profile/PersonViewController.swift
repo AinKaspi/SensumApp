@@ -145,19 +145,25 @@ class PersonViewController: UIViewController {
     // --- Жизненный цикл и настройка ---
     override func viewDidLoad() {
         super.viewDidLoad()
-        assert(viewModel != nil, "ViewModel not set for PersonViewController") // Оставляем assert пока
+        // assert(viewModel != nil, "ViewModel not set for PersonViewController") 
+        // Вместо assert делаем guard, если viewModel опционален
+        guard viewModel != nil else {
+             fatalError("ViewModel not injected into PersonViewController") // Или другая обработка ошибки
+        }
+
         view.backgroundColor = .black
         setupViews()
         setupConstraints()
         setupAvatarTapGesture(for: backgroundImageView)
-        updateProfileDisplay() 
+        updateProfileDisplayFromViewModel() 
         // TODO: Настроить делегата для topMenuView
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
-        updateProfileDisplay() // Обновляем при каждом показе
+        // Обновляем UI ИЗ ViewModel
+        updateProfileDisplayFromViewModel()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -189,8 +195,8 @@ class PersonViewController: UIViewController {
 
         // Назначаем обработчик нажатия на фоновый аватар
         setupAvatarTapGesture(for: backgroundImageView)
-        // Можно добавить и для маленького, если нужно
-        // setupAvatarTapGesture(for: miniAvatarImageView)
+        // Назначаем обработчик нажатия на статус
+        setupStatusLabelTapGesture()
     }
 
     private func setupConstraints() {
@@ -262,35 +268,29 @@ class PersonViewController: UIViewController {
     }
 
     // MARK: - Data Handling
-    private func updateProfileDisplay() {
-        // TODO: Получать профиль из ViewModel
-        let profile = DataManager.shared.getCurrentUserProfile()
-
-        // Загружаем и устанавливаем аватары
-        if let avatar = loadAvatarImage(forUserID: profile.userID) {
+    private func updateProfileDisplayFromViewModel() {
+        // Получаем данные из ViewModel
+        usernameLabel.text = viewModel.usernameText
+        statusLabel.text = viewModel.statusText
+        levelLabel.text = viewModel.levelText
+        xpLabel.text = viewModel.xpText
+        xpProgressBar.setProgress(viewModel.xpProgress, animated: view.window != nil) // Анимируем только если view видима
+        
+        // Устанавливаем аватары из ViewModel
+        if let avatar = viewModel.avatarImage {
             backgroundImageView.image = avatar
-            backgroundImageView.contentMode = .scaleAspectFill // Убедимся, что ContentMode правильный
+            backgroundImageView.contentMode = .scaleAspectFill
             miniAvatarImageView.image = avatar
         } else {
-            // Устанавливаем плейсхолдер
-            backgroundImageView.image = UIImage(systemName: "person.crop.circle.fill") 
-            backgroundImageView.tintColor = .darkGray // Цвет плейсхолдера
-            backgroundImageView.contentMode = .scaleAspectFit // Чтобы плейсхолдер не растягивался
-            backgroundImageView.backgroundColor = UIColor(white: 0.1, alpha: 1.0) // Фон под плейсхолдер
+            // Устанавливаем плейсхолдеры
+            backgroundImageView.image = UIImage(systemName: "person.crop.circle.fill")
+            backgroundImageView.tintColor = .darkGray
+            backgroundImageView.contentMode = .scaleAspectFit 
+            backgroundImageView.backgroundColor = UIColor(white: 0.1, alpha: 1.0) 
             miniAvatarImageView.image = UIImage(systemName: "person.crop.circle.fill")
             miniAvatarImageView.tintColor = .lightGray
-            miniAvatarImageView.backgroundColor = .darkGray 
+            miniAvatarImageView.backgroundColor = .darkGray
         }
-        
-        usernameLabel.text = profile.username ?? "Username"
-        // Убираем установку статуса, пока нет поля в модели
-        // statusLabel.text = profile.status ?? "Hello! Welcome to Sensum." 
-        statusLabel.text = "User status placeholder..." // Возвращаем плейсхолдер
-        levelLabel.text = "Level \(profile.level)"
-        xpLabel.text = "\(profile.currentXP)/\(profile.xpToNextLevel) XP"
-
-        let progress = profile.xpToNextLevel > 0 ? Float(profile.currentXP) / Float(profile.xpToNextLevel) : 0
-        xpProgressBar.setProgress(max(0.0, min(1.0, progress)), animated: true)
     }
 
     // MARK: - Avatar Handling
@@ -316,6 +316,45 @@ class PersonViewController: UIViewController {
         present(imagePickerController, animated: true, completion: nil)
     }
     
+    // MARK: - Status Handling (Новый раздел)
+    private func setupStatusLabelTapGesture() {
+        statusLabel.isUserInteractionEnabled = true
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(statusLabelTapped))
+        statusLabel.addGestureRecognizer(tapGesture)
+    }
+    
+    @objc private func statusLabelTapped() {
+        // Показываем Alert для редактирования статуса
+        let alertController = UIAlertController(title: "Изменить статус", message: nil, preferredStyle: .alert)
+        
+        // Добавляем текстовое поле
+        alertController.addTextField { [weak self] textField in
+            textField.placeholder = "Введите новый статус..."
+            // Устанавливаем текущий статус как начальное значение
+            textField.text = self?.viewModel.statusText.contains("placeholder") ?? true ? "" : self?.viewModel.statusText
+        }
+        
+        // Кнопка Сохранить
+        let saveAction = UIAlertAction(title: "Сохранить", style: .default) { [weak self, weak alertController] _ in
+            guard let self = self, let textField = alertController?.textFields?.first else { return }
+            let newStatus = textField.text ?? "" // Получаем новый статус
+            
+            // Вызываем ViewModel для сохранения
+            self.viewModel.saveNewStatus(newStatus)
+            
+            // Обновляем UI (ViewModel должна была обновить свой userProfile)
+            self.updateProfileDisplayFromViewModel()
+        }
+        
+        // Кнопка Отмена
+        let cancelAction = UIAlertAction(title: "Отмена", style: .cancel, handler: nil)
+        
+        alertController.addAction(saveAction)
+        alertController.addAction(cancelAction)
+        
+        present(alertController, animated: true, completion: nil)
+    }
+    
     // MARK: - Actions
     @objc private func followButtonTapped() {
         print("Follow button tapped - Action Placeholder")
@@ -333,20 +372,17 @@ class PersonViewController: UIViewController {
 // MARK: - UIImagePickerControllerDelegate & UINavigationControllerDelegate
 extension PersonViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-        // Используем оригинал для лучшего качества
         guard let selectedImage = info[.originalImage] as? UIImage else {
             picker.dismiss(animated: true, completion: nil)
             return
         }
-        // Обновляем оба аватара
+        // Обновляем UI через ViewModel
+        viewModel.saveNewAvatar(selectedImage) 
+        // Обновляем UI немедленно (ViewModel сам обновит свое свойство avatarImage)
         backgroundImageView.image = selectedImage
         miniAvatarImageView.image = selectedImage
-        // Возвращаем contentMode для фонового изображения
         backgroundImageView.contentMode = .scaleAspectFill
         
-        // Сохраняем (логика остается)
-        let userID = DataManager.shared.getCurrentUserProfile().userID
-        _ = saveAvatarImage(selectedImage, forUserID: userID)
         picker.dismiss(animated: true, completion: nil)
     }
 
