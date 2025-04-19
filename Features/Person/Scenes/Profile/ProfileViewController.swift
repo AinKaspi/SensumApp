@@ -28,7 +28,7 @@ struct FeedEvent { // TODO: Вынести в Models
 // }
 
 // --- Класс ViewController ---
-class PersonViewController: UIViewController {
+class ProfileViewController: UIViewController {
 
     // MARK: - Dependencies
     var viewModel: PersonViewModel!
@@ -37,13 +37,6 @@ class PersonViewController: UIViewController {
     // weak var delegate: PersonViewControllerDelegate?
 
     // MARK: - UI Properties
-    private lazy var topMenuView: TopMenuView = {
-        let view = TopMenuView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        view.delegate = self // Назначаем VC делегатом для TopMenuView
-        return view
-    }()
-
     private lazy var backgroundImageView: UIImageView = {
         let imageView = UIImageView()
         imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -182,7 +175,6 @@ class PersonViewController: UIViewController {
     // MARK: - Setup
     private func setupViews() {
         view.addSubview(backgroundImageView)
-        view.addSubview(topMenuView)
         view.addSubview(bottomInfoContainerView)
 
         bottomInfoContainerView.addSubview(miniAvatarImageView)
@@ -206,14 +198,6 @@ class PersonViewController: UIViewController {
             backgroundImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             backgroundImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             backgroundImageView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
-
-        // Верхнее меню
-        NSLayoutConstraint.activate([
-            topMenuView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            topMenuView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            topMenuView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            topMenuView.heightAnchor.constraint(equalToConstant: 50)
         ])
 
         // Нижний блок информации
@@ -370,7 +354,7 @@ class PersonViewController: UIViewController {
 }
 
 // MARK: - UIImagePickerControllerDelegate & UINavigationControllerDelegate
-extension PersonViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+extension ProfileViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         guard let selectedImage = info[.originalImage] as? UIImage else {
             picker.dismiss(animated: true, completion: nil)
@@ -392,7 +376,7 @@ extension PersonViewController: UIImagePickerControllerDelegate, UINavigationCon
 }
 
 // MARK: - Avatar File Management Helpers
-extension PersonViewController {
+extension ProfileViewController {
     // Оставляем эти хелперы приватными для VC, пока ViewModel не реализована
     private func getAvatarFileURL(forUserID userID: UUID) -> URL? {
         guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
@@ -425,20 +409,19 @@ extension PersonViewController {
 }
 
 // MARK: - TopMenuViewDelegate
-extension PersonViewController: TopMenuViewDelegate {
+extension ProfileViewController: TopMenuViewDelegate {
     func topMenuViewDidSelect(segment: TopMenuView.Segment) {
         print("--- PersonVC: Выбран сегмент меню: \(segment) ---")
-        // TODO: Реализовать переключение контента или навигацию
+        // Вызываем методы координатора для навигации
         switch segment {
         case .profile:
-            // Мы уже здесь
+            // Ничего не делаем, мы уже здесь
+            // (Или можно обеспечить возврат, если были показаны Stats/Achievements модально)
             break
         case .stats:
-            // TODO: Показать Stats View/ViewController
-            // coordinator?.showStats()
-            print("  -> Показать Stats")
-            break
-        // case .achievements: // Сегмент удален
+            coordinator?.showStats()
+        // case .achievements: // Удалено
+        //    coordinator?.showAchievements()
         //    break
         }
     }
