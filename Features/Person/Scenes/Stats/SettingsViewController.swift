@@ -1,8 +1,10 @@
-//
-//  SettingsViewController.swift
-//  SensumApp
-//
-//  Created by Ain on 20/04/2025.
-//
+import UIKit
 
-import Foundation
+class SettingsViewController: UIViewController {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .systemTeal // Бирюзовый фон для заглушки
+        title = "Настройки"
+        // TODO: Добавить элементы настроек
+    }
+}

@@ -1,11 +1,8 @@
 import UIKit
 
-// Переносим протокол сюда
+// Протокол для навигации из VC (только для настроек)
 protocol PersonViewControllerDelegate: AnyObject {
-    func personViewControllerDidTapSettings(_ controller: PersonViewController)
-    // Методы для Achievements/Feed больше не нужны здесь
-    // func personViewControllerDidRequestShowAllAchievements(_ controller: PersonViewController)
-    // func personViewControllerDidRequestShowAllFeed(_ controller: PersonViewController)
+    func personViewControllerDidTapSettings(_ controller: UIViewController) // Используем UIViewController
 }
 
 class PersonCoordinator: Coordinator {
@@ -19,16 +16,10 @@ class PersonCoordinator: Coordinator {
     }
 
     func start() {
-        // Создаем ViewModel (если она нужна координатору или для DI)
-        let viewModel = PersonViewModel()
-        
-        // Создаем ViewController
-        let vc = PersonViewController()
-        vc.viewModel = viewModel // Инъекция ViewModel
-        vc.coordinator = self // Передаем ссылку на координатор (если VC ее ожидает)
-        
-        // Устанавливаем VC как корневой для UINavigationController координатора
-        navigationController.setViewControllers([vc], animated: false)
+        // Новый код: Метод start теперь ничего не делает, так как 
+        // PersonContainerViewController создается и устанавливается в AppCoordinator.
+        // Координатор просто существует, чтобы быть назначенным в containerVC.
+        print("--- PersonCoordinator started (now managed by AppCoordinator/TabBar) ---")
     }
     
     // Приватный метод для настройки Navigation Bar
@@ -37,6 +28,7 @@ class PersonCoordinator: Coordinator {
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = .black // Фон бара - черный
         appearance.shadowColor = .clear // Убираем тень (линию)
+        // appearance.isTranslucent = false // <-- Комментируем из-за ошибки компиляции
         // Устанавливаем белый цвет для заголовка и кнопок, если они понадобятся
         appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
         appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
@@ -48,26 +40,32 @@ class PersonCoordinator: Coordinator {
         navigationController.navigationBar.tintColor = .white 
     }
 
-    // Реализация метода делегата
+    // Метод для показа настроек (вызывается из PersonContainerViewController)
     func showSettings() {
-        // TODO: Реализовать навигацию к экрану настроек
         print("--- PersonCoordinator: Show Settings Tapped --- ")
-        // Закомментируем создание VC, пока он не существует
-        /*
         let settingsVC = SettingsViewController() // Предполагаем, что есть такой VC
         settingsVC.title = "Настройки"
+        // Прячем TabBar при пуше
+        settingsVC.hidesBottomBarWhenPushed = true 
         navigationController.pushViewController(settingsVC, animated: true)
-        */
     }
     
-    // TODO: Добавить другие методы координатора, если нужны (например, для показа Stats/Achievements)
+    // Удаляем неиспользуемый метод showStats
+    /*
+    // Показывает экран статистики
+    func showStats() {
+        let statsVC = StatsViewController() // Создаем заглушку
+        // Можно настроить presentation style, если нужно (например, modal)
+        navigationController.pushViewController(statsVC, animated: true)
+    }
+    */
+    
+    // Удаляем TODO для Achievements
+    // TODO: Добавить метод для показа Achievements, когда он вернется
+    // func showAchievements() { ... }
 }
 
-// Удаляем старое расширение для делегата
+// Удаляем старое расширение
 /*
-extension PersonCoordinator: PersonViewControllerDelegate {
-    func personViewControllerDidRequestShowAllAchievements(...) { ... }
-    func personViewControllerDidRequestShowAllFeed(...) { ... }
-    // Метод personViewControllerDidTapSettings теперь прямо в классе
-}
+extension PersonCoordinator: PersonViewControllerDelegate { ... }
 */ 

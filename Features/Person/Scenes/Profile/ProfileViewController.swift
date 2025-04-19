@@ -28,7 +28,8 @@ struct FeedEvent { // TODO: Вынести в Models
 // }
 
 // --- Класс ViewController ---
-class ProfileViewController: UIViewController {
+// Возвращаем соответствие протоколам для ImagePicker
+class ProfileViewController: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate, UIGestureRecognizerDelegate {
 
     // MARK: - Dependencies
     var viewModel: PersonViewModel!
@@ -354,7 +355,7 @@ class ProfileViewController: UIViewController {
 }
 
 // MARK: - UIImagePickerControllerDelegate & UINavigationControllerDelegate
-extension ProfileViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+extension ProfileViewController {
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         guard let selectedImage = info[.originalImage] as? UIImage else {
             picker.dismiss(animated: true, completion: nil)
@@ -419,7 +420,7 @@ extension ProfileViewController: TopMenuViewDelegate {
             // (Или можно обеспечить возврат, если были показаны Stats/Achievements модально)
             break
         case .stats:
-            coordinator?.showStats()
+            print("--- ProfileVC: Stats selected (handled by Container) ---") // Добавим лог для ясности
         // case .achievements: // Удалено
         //    coordinator?.showAchievements()
         //    break

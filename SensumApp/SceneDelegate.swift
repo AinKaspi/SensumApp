@@ -88,13 +88,15 @@ class AppCoordinator: Coordinator { // Делаем AppCoordinator соотве�
         let tabBarController = UITabBarController()
         
         // 2. Создаем КООРДИНАТОРЫ для каждой вкладки
-        // Важно: Убедись, что пути импорта для PersonCoordinator и других будут правильными,
-        // когда ты разнесешь координаторы по папкам. Возможно, понадобится @testable import SensumApp
-        let personCoordinator = PersonCoordinator(navigationController: UINavigationController()) // Даем каждому координатору СВОЙ UINavigationController
+        let personCoordinator = PersonCoordinator(navigationController: UINavigationController()) // Создаем, но не будем добавлять его NC в таббар
         let eventsCoordinator = EventsCoordinator(navigationController: UINavigationController())
         let levelingCoordinator = LevelingCoordinator(navigationController: UINavigationController())
         let rankCoordinator = RankCoordinator(navigationController: UINavigationController())
         let storeCoordinator = StoreCoordinator(navigationController: UINavigationController())
+        
+        // Создаем PersonContainerViewController отдельно
+        let personContainerVC = PersonContainerViewController()
+        personContainerVC.coordinator = personCoordinator // Назначаем координатора
         
         // Сохраняем дочерние координаторы
         addChild(personCoordinator)
@@ -110,16 +112,18 @@ class AppCoordinator: Coordinator { // Делаем AppCoordinator соотве�
         rankCoordinator.start()
         storeCoordinator.start()
 
-        // 4. Настраиваем вкладки TabBarController, используя navigationController'ы координаторов
-        personCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Person", image: UIImage(systemName: "person.fill"), tag: 0)
+        // 4. Настраиваем вкладки TabBarController
+        // Для Person используем напрямую personContainerVC
+        personContainerVC.tabBarItem = UITabBarItem(title: "Person", image: UIImage(systemName: "person.fill"), tag: 0)
+        // Для остальных используем navigationController'ы координаторов
         eventsCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Events", image: UIImage(systemName: "calendar"), tag: 1)
         levelingCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Leveling", image: UIImage(systemName: "figure.walk"), tag: 2)
         rankCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Rank", image: UIImage(systemName: "list.star"), tag: 3)
         storeCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Store", image: UIImage(systemName: "cart.fill"), tag: 4)
 
-        // 5. Добавляем НАВИГАЦИОННЫЕ КОНТРОЛЛЕРЫ координаторов в TabBarController
+        // 5. Добавляем контроллеры в TabBarController
         tabBarController.viewControllers = [
-            personCoordinator.navigationController,
+            personContainerVC, // <-- Добавляем контейнер напрямую
             eventsCoordinator.navigationController,
             levelingCoordinator.navigationController,
             rankCoordinator.navigationController,
