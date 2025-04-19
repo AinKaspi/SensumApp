@@ -11,7 +11,6 @@ class TopMenuView: UIView {
     enum Segment: Int, CaseIterable { // Добавляем CaseIterable
         case profile = 0
         case stats = 1
-        case achievements = 2
     }
 
     weak var delegate: TopMenuViewDelegate?
@@ -29,7 +28,6 @@ class TopMenuView: UIView {
     
     private lazy var profileButton: UIButton = createMenuButton(title: "Profile", segment: .profile)
     private lazy var statsButton: UIButton = createMenuButton(title: "Stats", segment: .stats)
-    private lazy var achievementsButton: UIButton = createMenuButton(title: "Achivements", segment: .achievements)
     
     private lazy var selectionIndicatorView: UIView = {
         let view = UIView()
@@ -48,17 +46,13 @@ class TopMenuView: UIView {
     }()
 
     private lazy var buttonStackView: UIStackView = {
-        let stackView = UIStackView(arrangedSubviews: [profileButton, statsButton, achievementsButton])
+        let stackView = UIStackView(arrangedSubviews: [profileButton, statsButton])
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.axis = .horizontal
         stackView.distribution = .fillEqually
         stackView.spacing = 15 // Увеличим немного расстояние
         return stackView
     }()
-    
-    // Constraints for indicator
-    private var indicatorLeadingConstraint: NSLayoutConstraint?
-    private var indicatorWidthConstraint: NSLayoutConstraint?
     
     private var selectedSegment: Segment = .profile {
         didSet {
@@ -73,9 +67,15 @@ class TopMenuView: UIView {
         setupView()
         setupConstraints()
         updateButtonSelection() // Установить начальное выделение
-        // Задержка для корректного позиционирования индикатора после автолейаута
-        DispatchQueue.main.async {
-             self.moveSelectionIndicator(animated: false)
+    }
+
+    // Переносим обновление индикатора в layoutSubviews
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // Вызываем обновление позиции индикатора без анимации при первой отрисовке/изменении размера
+        // Чтобы избежать вызова до установки начальных констрейнтов, добавим проверку
+        if selectionIndicatorView.transform != .identity {
+             moveSelectionIndicator(animated: false) // Устанавливаем в нужную позицию без анимации
         }
     }
 
@@ -98,40 +98,37 @@ class TopMenuView: UIView {
     private func setupConstraints() {
         let padding: CGFloat = 15
         let buttonHeight: CGFloat = 44 // Стандартная высота для тапа
+        let logoWidth: CGFloat = 40
+        let settingsWidth: CGFloat = 30
+        let horizontalSpacing: CGFloat = 15 // Отступ между элементами
         
         NSLayoutConstraint.activate([
-            // Кнопки занимают всю высоту
+            // Вертикальные констрейнты для всех элементов
+            logoImageView.topAnchor.constraint(equalTo: topAnchor),
+            logoImageView.bottomAnchor.constraint(equalTo: bottomAnchor),
             buttonStackView.topAnchor.constraint(equalTo: topAnchor),
             buttonStackView.bottomAnchor.constraint(equalTo: bottomAnchor),
             settingsButton.topAnchor.constraint(equalTo: topAnchor),
             settingsButton.bottomAnchor.constraint(equalTo: bottomAnchor),
-            logoImageView.topAnchor.constraint(equalTo: topAnchor),
-            logoImageView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            
+
             // Логотип
             logoImageView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: padding),
-            logoImageView.widthAnchor.constraint(equalToConstant: 40),
+            logoImageView.widthAnchor.constraint(equalToConstant: logoWidth),
             
             // Кнопка настроек
             settingsButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -padding),
-            settingsButton.widthAnchor.constraint(equalToConstant: 30),
+            settingsButton.widthAnchor.constraint(equalToConstant: settingsWidth),
             
-            // Стек кнопок меню
-            buttonStackView.leadingAnchor.constraint(equalTo: logoImageView.trailingAnchor, constant: padding * 1.5), // Больше отступ от лого
-            buttonStackView.trailingAnchor.constraint(equalTo: settingsButton.leadingAnchor, constant: -padding * 1.5), // Больше отступ от настроек
+            // Стек кнопок меню (жестко привязан слева и справа)
+            buttonStackView.leadingAnchor.constraint(equalTo: logoImageView.trailingAnchor, constant: horizontalSpacing),
+            buttonStackView.trailingAnchor.constraint(equalTo: settingsButton.leadingAnchor, constant: -horizontalSpacing),
             
-            // Индикатор
+            // Индикатор - статичные констрейнты относительно profileButton
             selectionIndicatorView.heightAnchor.constraint(equalToConstant: 2),
-            selectionIndicatorView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            selectionIndicatorView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            selectionIndicatorView.centerXAnchor.constraint(equalTo: profileButton.centerXAnchor), // Центрируем по X первой кнопки
+            selectionIndicatorView.widthAnchor.constraint(equalTo: profileButton.widthAnchor) // Ширина как у первой кнопки
         ])
-        
-        // Начальные констрейнты индикатора
-        if let firstButton = buttonStackView.arrangedSubviews.first {
-            indicatorLeadingConstraint = selectionIndicatorView.leadingAnchor.constraint(equalTo: firstButton.leadingAnchor)
-            indicatorWidthConstraint = selectionIndicatorView.widthAnchor.constraint(equalTo: firstButton.widthAnchor)
-            indicatorLeadingConstraint?.isActive = true
-            indicatorWidthConstraint?.isActive = true
-        }
     }
     
     // --- Helper Methods ---
@@ -156,23 +153,23 @@ class TopMenuView: UIView {
     
     private func moveSelectionIndicator(animated: Bool = true) {
         guard let buttons = buttonStackView.arrangedSubviews as? [UIButton],
-              let targetButton = buttons.first(where: { $0.tag == selectedSegment.rawValue }) else { return }
+              let currentButton = buttons.first(where: { $0.tag == selectedSegment.rawValue }),
+              let firstButton = buttons.first else { return }
         
-        // Деактивируем старые констрейнты
-        indicatorLeadingConstraint?.isActive = false
-        indicatorWidthConstraint?.isActive = false
+        // Рассчитываем смещение по X от первой кнопки до текущей
+        // Используем frame, убедившись, что layout посчитан
+        self.layoutIfNeeded() // Обновляем layout перед расчетом frame
+        let targetX = currentButton.frame.origin.x
+        let firstX = firstButton.frame.origin.x
+        let translationX = targetX - firstX
         
-        // Создаем и активируем новые
-        indicatorLeadingConstraint = selectionIndicatorView.leadingAnchor.constraint(equalTo: targetButton.leadingAnchor)
-        indicatorWidthConstraint = selectionIndicatorView.widthAnchor.constraint(equalTo: targetButton.widthAnchor)
+        // Создаем transform для смещения
+        let transform = CGAffineTransform(translationX: translationX, y: 0)
         
-        indicatorLeadingConstraint?.isActive = true
-        indicatorWidthConstraint?.isActive = true
-        
-        // Анимируем изменение layout'а
+        // Анимируем изменение transform
         let duration = animated ? 0.3 : 0.0
-        UIView.animate(withDuration: duration, delay: 0, options: .curveEaseInOut, animations: {
-            self.layoutIfNeeded() // Принудительно обновляем layout для анимации
+        UIView.animate(withDuration: duration, delay: 0, options: [.curveEaseInOut, .beginFromCurrentState], animations: {
+            self.selectionIndicatorView.transform = transform
         }, completion: nil)
     }
 
