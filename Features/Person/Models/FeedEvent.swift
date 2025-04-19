@@ -1,8 +1,8 @@
-//
-//  FeedEvent.swift
-//  SensumApp
-//
-//  Created by Ain on 19/04/2025.
-//
-
 import Foundation
+
+struct FeedEvent {
+    let id: String
+    let description: String
+    let timestamp: Date
+    // TODO: Добавить другие свойства (тип события, связанный пользователь/достижение?)
+}

@@ -1,8 +1,8 @@
-//
-//  Achievement.swift
-//  SensumApp
-//
-//  Created by Ain on 19/04/2025.
-//
-
 import Foundation
+
+struct Achievement {
+    let id: String
+    let name: String
+    let iconName: String
+    // TODO: Добавить другие свойства (описание, статус разблокировки и т.д.)
+}

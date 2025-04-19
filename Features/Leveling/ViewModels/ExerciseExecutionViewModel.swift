@@ -3,6 +3,7 @@ import AVFoundation
 import MediaPipeTasksVision
 import UIKit // Для UIImage
 import simd // Для KalmanFilter3D
+import CoreMotion // Для MotionManager
 
 // MARK: - ExerciseExecutionViewModelViewDelegate
 protocol ExerciseExecutionViewModelViewDelegate: AnyObject {
@@ -31,6 +32,7 @@ class ExerciseExecutionViewModel: NSObject {
     private var analyzer: ExerciseAnalyzer?
     private var poseLandmarkerHelper: PoseLandmarkerHelper?
     private let sessionQueue = DispatchQueue(label: "com.sensum.sessionQueue.execVM")
+    private let motionManager = MotionManager.shared
 
     // MARK: - Constants
     private let baseXPPerRep: Double = 10.0
@@ -50,7 +52,7 @@ class ExerciseExecutionViewModel: NSObject {
     private let modelPath = "pose_landmarker_lite.task" 
     private let numPoses = 1
     private let minPoseDetectionConfidence: Float = 0.5
-
+    
     // MARK: - State
     private var sessionStartDate: Date?
     private var sessionTimer: Timer?
@@ -65,6 +67,9 @@ class ExerciseExecutionViewModel: NSObject {
     private var kalmanFilters: [KalmanFilter3D?] = Array(repeating: nil, count: 33)
     private var lastFrameTimestamp: TimeInterval? = nil
     private var lastUpdateTime: [TimeInterval?] = Array(repeating: nil, count: 33)
+    // Таймер и интервал для логгирования углов
+    private var angleLogTimer: Timer?
+    private let angleLogIntervalSecs: TimeInterval = 1.0
 
     // MARK: - Delegate
     weak var viewDelegate: ExerciseExecutionViewModelViewDelegate?
@@ -87,16 +92,18 @@ class ExerciseExecutionViewModel: NSObject {
     func viewDidLoad() {
         updateInitialUI()
     }
-
+    
     func viewDidAppear() {
         startPreparationTimer()
-        // TODO: Рассмотреть запуск AVCaptureSession отсюда, если VC не должен этим управлять
+        // Запускаем отслеживание ориентации
+        motionManager.startUpdates()
     }
-
+    
     func viewWillDisappear() {
         stopTimer()
         stopPreparationTimer()
-        // TODO: Рассмотреть остановку AVCaptureSession
+        // Останавливаем отслеживание ориентации
+        motionManager.stopUpdates()
     }
     
     // MARK: - Initial UI Update
@@ -111,7 +118,7 @@ class ExerciseExecutionViewModel: NSObject {
         viewDelegate?.viewModelDidUpdateDebugAngles(knee: 0, hip: 0)
         viewDelegate?.viewModelDidUpdateDebugVisibility(visibilities: nil)
     }
-
+    
     // MARK: - MediaPipe Handling
     // setupPoseLandmarker убран, т.к. helper передается извне
 
@@ -172,12 +179,16 @@ class ExerciseExecutionViewModel: NSObject {
         sessionStartDate = Date()
         viewDelegate?.viewModelDidUpdateTimer(timeString: "00:00")
         sessionTimer = Timer.scheduledTimer(timeInterval: timerUpdateInterval, target: self, selector: #selector(updateTimer), userInfo: nil, repeats: true)
+        // Запускаем логгеры вместе с основным таймером
+        startVisibilityLogTimer()
+        startAngleLogTimer()
     }
 
     private func stopTimer() {
         sessionTimer?.invalidate()
         sessionTimer = nil
         stopVisibilityLogTimer()
+        stopAngleLogTimer() // Останавливаем и таймер углов
     }
     
     private func startVisibilityLogTimer() {
@@ -194,6 +205,32 @@ class ExerciseExecutionViewModel: NSObject {
         if let status = lastVisibilityStatus {
             let statusText = status.allVisible ? "OK" : "BAD"
             print(String(format: "[VISIBILITY LOG] Status: %@, Average: %.2f", statusText, status.average))
+        }
+    }
+
+    // --- Таймер логгирования Углов --- 
+    private func startAngleLogTimer() {
+        stopAngleLogTimer()
+        angleLogTimer = Timer.scheduledTimer(timeInterval: angleLogIntervalSecs,
+                                             target: self, 
+                                             selector: #selector(logAngles),
+                                             userInfo: nil, 
+                                             repeats: true)
+    }
+    
+    private func stopAngleLogTimer() {
+        angleLogTimer?.invalidate()
+        angleLogTimer = nil
+    }
+    
+    @objc private func logAngles() {
+        // Получаем анализатор и кастуем к типу с углами
+        if let squatAnalyzer = analyzer as? SquatAnalyzer3D {
+            print(String(format: "[ANGLES LOG] Knee: %.1f, Hip: %.1f", 
+                         squatAnalyzer.currentSmoothedKneeAngle, 
+                         squatAnalyzer.currentSmoothedHipAngle))
+        } else {
+            // print("[ANGLES LOG] Analyzer not available or not SquatAnalyzer3D.")
         }
     }
 
@@ -238,45 +275,71 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
         if let error = error {
             print("ExerciseExecutionVM Ошибка детекции поз: \(error.localizedDescription)") 
             lastFrameTimestamp = nil
-            // TODO: Сообщить View об ошибке
             return
         }
         
         guard let resultBundle = resultBundle else {
              viewDelegate?.viewModelDidUpdatePose(landmarks: nil, frameSize: self.currentFrameSize)
              lastFrameTimestamp = nil
-             analyzer?.reset() // Сбрасываем анализатор, если нет результата
+             analyzer?.reset()
             return
         }
                 
+        // Получаем текущую ориентацию устройства
+        guard let deviceAttitude = motionManager.currentAttitude else {
+            print("[ViewModel] Warning: No device attitude data available. Skipping coordinate transformation.")
+            // Можно либо пропустить кадр, либо обработать без преобразования
+            // return 
+            // Пока продолжим без преобразования, если ориентация недоступна
+            // TODO: решить, как обрабатывать отсутствие ориентации
+            processLandmarks(resultBundle: resultBundle, deviceAttitude: nil, currentTimestamp: Date().timeIntervalSince1970)
+            return
+        }
+        
+        processLandmarks(resultBundle: resultBundle, deviceAttitude: deviceAttitude, currentTimestamp: Date().timeIntervalSince1970)
+    }
+    
+    // Выносим логику обработки landmarks в отдельный метод
+    private func processLandmarks(resultBundle: ResultBundle, deviceAttitude: simd_quatd?, currentTimestamp: TimeInterval) {
         var filteredWorldLandmarks: [Landmark]? = nil
-        let currentTimestamp = Date().timeIntervalSince1970 
         let deltaTime = (lastFrameTimestamp != nil) ? currentTimestamp - lastFrameTimestamp! : 0.0
-        
-        // Переменные для сбора информации о видимости ключевых точек
-        var allKeyPointsVisible = true
-        var visibleKeyPointsCount = 0
-        var totalVisibility: Float = 0.0
-        // Определяем ключевые индексы как массив Enum
-        let keyIndices: [PoseConnections.LandmarkIndex] = [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle, .leftShoulder, .rightShoulder]
-        // Создаем Set из rawValue для быстрой проверки contains
-        let keyIndicesRawValues = Set(keyIndices.map { $0.rawValue })
-        
-        // Массив для отфильтрованных 3D точек
-        var poseFiltered: [Landmark] = []
         
         if let worldLandmarks = resultBundle.poseWorldLandmarks,
            let firstPoseWorldLandmarks = worldLandmarks.first,
            !firstPoseWorldLandmarks.isEmpty {
             
-            // Итерируем по всем точкам для фильтрации Калмана
+            var poseFiltered: [Landmark] = []
+            var allKeyPointsVisible = true 
+            var visibleKeyPointsCount = 0
+            var totalKeyPointsVisibility: Float = 0.0
+            let keyIndices: [PoseConnections.LandmarkIndex] = [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle, .leftShoulder, .rightShoulder]
+            let keyIndicesRawValues = Set(keyIndices.map { $0.rawValue })
+            
+            // --- Преобразование координат с учетом ориентации устройства --- 
+            // ВРЕМЕННО ОТКЛЮЧАЕМ ПРЕОБРАЗОВАНИЕ ДЛЯ ОТЛАДКИ
+            /*
+            // Получаем обратный кватернион ориентации
+            let inverseDeviceAttitude = deviceAttitude?.inverse
+            */
+            
             for i in 0..<firstPoseWorldLandmarks.count {
                 let measurement = firstPoseWorldLandmarks[i]
-                let measurementVec = simd_float3(measurement.x, measurement.y, measurement.z)
+                var measurementVec = simd_float3(measurement.x, measurement.y, measurement.z)
+                
+                // --- Преобразуем координаты в мировую систему --- 
+                // ОТКЛЮЧЕНО
+                /*
+                if let invAttitude = inverseDeviceAttitude {
+                    let rotatedVec = invAttitude.act(simd_double3(measurementVec))
+                    measurementVec = simd_float3(rotatedVec) 
+                } 
+                */
+                // -------------------------------------------------
+                
                 let visibilityValue = measurement.visibility?.floatValue ?? 0.0 
                 let isVisible = visibilityValue > PoseConnections.visibilityThreshold
                 
-                // --- Логика Калмана (Инициализация/Предсказание/Обновление) --- 
+                // --- Логика Калмана --- 
                 var needsReset = false
                 if let lastUpdate = lastUpdateTime[i], !isVisible {
                     if currentTimestamp - lastUpdate > maxOcclusionTime {
@@ -287,7 +350,7 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
                 }
                 
                 if kalmanFilters[i] == nil && isVisible && !needsReset {
-                    kalmanFilters[i] = KalmanFilter3D(initialMeasurement: measurementVec, 
+                    kalmanFilters[i] = KalmanFilter3D(initialMeasurement: measurementVec,
                                                       initialUncertainty: kalmanInitialUncertainty,
                                                       processNoise: kalmanProcessNoise, 
                                                       measurementNoise: kalmanMeasurementNoise)
@@ -300,33 +363,31 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
                     kalmanFilters[i]!.update(measurement: measurementVec, measurementVisibility: visibilityValue)
                     lastUpdateTime[i] = currentTimestamp
                 }
-                // ----------------------------------------------------------
+                // ----------------------
 
-                // --- Сбор информации о видимости КЛЮЧЕВЫХ точек --- 
-                // Проверяем, является ли текущий Int индекс `i` одним из ключевых
-                if keyIndicesRawValues.contains(i) { 
+                // --- Сбор видимости ключевых точек --- 
+                if keyIndicesRawValues.contains(i) {
                    if isVisible {
                        visibleKeyPointsCount += 1
-                       totalVisibility += visibilityValue
+                       totalKeyPointsVisibility += visibilityValue
                    } else {
                        allKeyPointsVisible = false
                    }
                 }
-                // -------------------------------------------------
+                // -----------------------------------
 
                 // --- Формирование отфильтрованной позы --- 
                 if let filter = kalmanFilters[i] {
                     let filteredPosition = filter.filteredPosition
-                    // Создаем отфильтрованный Landmark
+                    // Создаем Landmark с отфильтрованной мировой позицией
                     let filteredLandmark = Landmark(x: filteredPosition.x,
                                                     y: filteredPosition.y,
                                                     z: filteredPosition.z,
-                                                    visibility: measurement.visibility, // Важно: видимость берем из исходного измерения
+                                                    visibility: measurement.visibility, 
                                                     presence: measurement.presence)
                     poseFiltered.append(filteredLandmark)
                     
-                    // Передаем отладочные данные StdDev для носа
-                    // Сравниваем Int `i` с Int `rawValue` из enum
+                    // Отладка StdDev для носа
                     if i == PoseConnections.LandmarkIndex.nose.rawValue { 
                          let stdDev = filter.positionStandardDeviation
                          viewDelegate?.viewModelDidUpdateDebugStdDev(positionStdDev: stdDev)
@@ -334,18 +395,16 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
                 } 
                 // -----------------------------------------
             }
-            filteredWorldLandmarks = poseFiltered // Сохраняем отфильтрованную позу
+            filteredWorldLandmarks = poseFiltered 
             
-            // Сохраняем общий статус видимости ключевых точек
-            let averageVisibility = (visibleKeyPointsCount > 0) ? totalVisibility / Float(visibleKeyPointsCount) : 0.0
+            let averageVisibility = (visibleKeyPointsCount > 0) ? totalKeyPointsVisibility / Float(visibleKeyPointsCount) : 0.0
             self.lastVisibilityStatus = (allVisible: allKeyPointsVisible, average: averageVisibility)
             
-            // Передаем ОТФИЛЬТРОВАННЫЕ 3D точки в анализатор
-            if !isPreparing, let validFilteredPose = filteredWorldLandmarks { // Передаем только если они есть
+            // Передаем отфильтрованные и ПРЕОБРАЗОВАННЫЕ 3D точки в анализатор
+            if !isPreparing, let validFilteredPose = filteredWorldLandmarks {
                  analyzer?.analyze(worldLandmarks: validFilteredPose)
             }
         } else {
-             // Если нет world landmarks
              if !isPreparing { analyzer?.reset() }
              resetKalmanFilters()
              self.lastVisibilityStatus = nil
@@ -353,7 +412,7 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
         
         lastFrameTimestamp = currentTimestamp
         
-        // Передаем ИСХОДНЫЕ 2D-данные для отрисовки и массив ВИДИМОСТЕЙ (всех точек)
+        // Передаем ИСХОДНЫЕ 2D-данные и ВИДИМОСТИ для отрисовки
         let allVisibilities = resultBundle.poseLandmarks?.first?.map { $0.visibility?.floatValue ?? 0.0 }
         viewDelegate?.viewModelDidUpdatePose(landmarks: resultBundle.poseLandmarks, frameSize: self.currentFrameSize)
         viewDelegate?.viewModelDidUpdateDebugVisibility(visibilities: allVisibilities)
@@ -404,8 +463,11 @@ extension ExerciseExecutionViewModel: ExerciseAnalyzerDelegate {
     
     func exerciseAnalyzer(_ analyzer: ExerciseAnalyzer, didChangeState newState: String) {
         viewDelegate?.viewModelDidUpdateDebugState(newState)
+        // Убираем передачу углов в View отсюда
+        /*
         if let squatAnalyzer = analyzer as? SquatAnalyzer3D {
            viewDelegate?.viewModelDidUpdateDebugAngles(knee: squatAnalyzer.currentSmoothedKneeAngle, hip: squatAnalyzer.currentSmoothedHipAngle)
         } 
+        */
     }
 }

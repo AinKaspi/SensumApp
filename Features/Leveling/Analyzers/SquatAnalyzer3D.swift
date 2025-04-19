@@ -83,16 +83,18 @@ class SquatAnalyzer3D: ExerciseAnalyzer {
         static let rightWrist = 16
     }
 
-    // Пороговые значения углов (в градусах) - НУЖНО БУДЕТ ПОДБИРАТЬ ЭКСПЕРИМЕНТАЛЬНО!
+    // Пороговые значения углов (в градусах) - НАСТРОЕНО ДЛЯ 3D
     private enum Thresholds {
-        static let kneeUp: Float = 160.0
-        static let kneeDown: Float = 125.0 // Порог для перехода UP -> DOWN
-        static let kneeUpTransition: Float = 140.0 // Порог для перехода DOWN -> UP
-        static let hipUp: Float = 165.0
-        static let hipDown: Float = 125.0 // Порог для перехода UP -> DOWN
-        static let hipUpTransition: Float = 145.0 // Порог для перехода DOWN -> UP
-        // Значительно понижаем порог видимости для теста
-        static let visibility: Float = 0.1
+        static let kneeUp: Float = 160.0         // Состояние UP: Колено почти прямое
+        static let hipUp: Float = 165.0          // Состояние UP: Бедро почти прямое
+        
+        static let kneeDown: Float = 110.0         // Состояние DOWN: Колено достаточно согнуто
+        static let hipDown: Float = 105.0          // Состояние DOWN: Бедро достаточно согнуто
+        
+        static let kneeUpTransition: Float = 130.0 // Порог ВЫХОДА из DOWN (колено)
+        static let hipUpTransition: Float = 135.0  // Порог ВЫХОДА из DOWN (бедро)
+        
+        static let visibility: Float = 0.1         // Порог видимости точки
     }
 
     // MARK: - Initialization

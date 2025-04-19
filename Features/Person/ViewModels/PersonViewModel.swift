@@ -1,8 +1,11 @@
-//
-//  PersonViewModel.swift
-//  SensumApp
-//
-//  Created by Ain on 19/04/2025.
-//
-
 import Foundation
+
+class PersonViewModel {
+    // TODO: Добавить логику для экрана Person
+    
+    init() {
+        // Загрузка данных пользователя?
+    }
+    
+    // TODO: Добавить методы для предоставления данных View Controller'у
+}
