@@ -1,6 +1,7 @@
 import Foundation
 import FirebaseAuth
 import GoogleSignIn // Понадобится позже для Google Sign-In
+import FirebaseCore // <-- Добавляем этот импорт
 import Combine // Для публикации статуса аутентификации
 
 // Протокол для AuthService, если захотим использовать Dependency Injection

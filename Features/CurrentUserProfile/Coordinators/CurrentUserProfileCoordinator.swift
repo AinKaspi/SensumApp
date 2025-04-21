@@ -1,6 +1,7 @@
 import UIKit
 
-class CurrentUserProfileCoordinator: Coordinator {
+// Добавляем соответствие UserProfileFeedViewControllerDelegate
+class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerDelegate {
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
     
@@ -48,8 +49,8 @@ class CurrentUserProfileCoordinator: Coordinator {
         )
         
         let vc = UserProfileFeedViewController()
-        // Передаем viewModel в vc
         vc.viewModel = viewModel
+        vc.delegate = self // Устанавливаем себя делегатом VC
         
         // Скрываем Navigation Bar для этого экрана (т.к. есть кастомная шапка в макете)
         // Но можно оставить для заголовка "Profile"?
@@ -57,6 +58,37 @@ class CurrentUserProfileCoordinator: Coordinator {
         // vc.title = "Profile" // Если бар видимый
         
         navigationController.setViewControllers([vc], animated: false)
+    }
+    
+    // MARK: - UserProfileFeedViewControllerDelegate
+    
+    func didTapEditProfileButton() {
+        print("CurrentUserProfileCoordinator: Edit profile requested")
+        // TODO: Реализовать навигацию на экран редактирования
+    }
+    
+    func didTapFollowButton() {
+        // Не должно вызываться для CurrentUserProfile
+        print("CurrentUserProfileCoordinator Warning: didTapFollowButton called unexpectedly")
+    }
+    
+    func didTapMessageButton() {
+        // Не должно вызываться для CurrentUserProfile
+        print("CurrentUserProfileCoordinator Warning: didTapMessageButton called unexpectedly")
+    }
+    
+    func didRequestSignOut() {
+        print("CurrentUserProfileCoordinator: Sign out requested. Calling AuthService...")
+        authService.signOut { [weak self] error in
+            if let error = error {
+                print("CurrentUserProfileCoordinator Error: Sign out failed: \(error.localizedDescription)")
+                // TODO: Показать ошибку пользователю?
+            } else {
+                print("CurrentUserProfileCoordinator: Sign out successful. AppCoordinator should handle state change.")
+                // AppCoordinator должен автоматически переключиться на AuthFlow 
+                // из-за изменения authenticationState в AuthService
+            }
+        }
     }
     
     // TODO: Добавить методы для навигации (например, на экран редактирования профиля)

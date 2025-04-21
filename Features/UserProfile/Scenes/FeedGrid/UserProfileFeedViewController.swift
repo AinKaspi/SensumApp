@@ -2,12 +2,22 @@ import UIKit
 import Combine // Добавляем для биндингов
 // TODO: Импортировать библиотеку для загрузки изображений (Kingfisher, SDWebImage, Nuke)?
 
+// Добавляем делегат для кнопки Выхода
+protocol UserProfileFeedViewControllerDelegate: AnyObject {
+    func didTapEditProfileButton()
+    func didTapFollowButton() // (Будет использоваться, когда isCurrentUser=false)
+    func didTapMessageButton() // (Будет использоваться, когда isCurrentUser=false)
+    func didRequestSignOut() // Новый метод
+}
+
 // Этот VC будет отображать Макет 3 (Шапка с подписчиками, сетка постов)
 // Он будет переиспользоваться для CurrentUserProfile и UserProfile (другого пользователя)
 class UserProfileFeedViewController: UIViewController {
 
     // Добавляем ViewModel
     var viewModel: UserProfileFeedViewModel! // Используем !, т.к. он будет инжектирован координатором
+    // Добавляем слабого делегата
+    weak var delegate: UserProfileFeedViewControllerDelegate?
     private var cancellables = Set<AnyCancellable>() // Для хранения подписок Combine
 
     // TODO: Добавить ViewModel для загрузки данных профиля и постов
@@ -88,7 +98,17 @@ class UserProfileFeedViewController: UIViewController {
         return label
     }()
 
-    // Кнопки
+    // --- Кнопки под статусом ---
+    // Стек для кнопок Edit/Follow/Message
+    private lazy var actionButtonsStackView: UIStackView = {
+        let stack = UIStackView()
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.axis = .horizontal
+        stack.spacing = 10
+        stack.distribution = .fillEqually
+        return stack
+    }()
+    
     private lazy var editProfileButton: UIButton = {
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -103,7 +123,17 @@ class UserProfileFeedViewController: UIViewController {
         return button
     }()
     
-    // TODO: Добавить кнопки Follow/Message (показывать если !isCurrentUser)
+    // Добавляем кнопку Выхода (будет ниже)
+    private lazy var signOutButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setTitle("Sign Out", for: .normal)
+        button.setTitleColor(.systemRed, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 15, weight: .medium)
+        button.addTarget(self, action: #selector(signOutTapped), for: .touchUpInside)
+        // TODO: Скрывать, если !isCurrentUser?
+        return button
+    }()
     
     // --- Разделитель и Переключатель ---
     // TODO: Добавить разделитель
@@ -138,12 +168,19 @@ class UserProfileFeedViewController: UIViewController {
         view.addSubview(profileHeaderView)
         view.addSubview(usernameLabel)
         view.addSubview(statusLabel)
-        view.addSubview(editProfileButton)
+        // Добавляем стек с кнопками действия
+        view.addSubview(actionButtonsStackView)
+        // Добавляем кнопку выхода
+        view.addSubview(signOutButton)
         view.addSubview(postsCollectionView) // Добавляем CollectionView
         
         // Добавляем элементы в шапку
         profileHeaderView.addSubview(avatarImageView)
         profileHeaderView.addSubview(statsStackView)
+        
+        // Добавляем кнопки в стек действий
+        // TODO: Логика добавления Edit или Follow/Message
+        actionButtonsStackView.addArrangedSubview(editProfileButton) 
     }
 
     private func setupConstraints() {
@@ -177,17 +214,23 @@ class UserProfileFeedViewController: UIViewController {
             statusLabel.leadingAnchor.constraint(equalTo: usernameLabel.leadingAnchor),
             statusLabel.trailingAnchor.constraint(equalTo: usernameLabel.trailingAnchor),
             
-            // Кнопка Edit (под статусом)
-            editProfileButton.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 10),
-            editProfileButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
-            editProfileButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
-            editProfileButton.heightAnchor.constraint(equalToConstant: 30),
+            // Стек кнопок Edit/Follow/Message (под статусом)
+            actionButtonsStackView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 10),
+            actionButtonsStackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
+            actionButtonsStackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
+            actionButtonsStackView.heightAnchor.constraint(equalToConstant: 30),
             
-            // Сетка постов (занимает оставшееся место)
-            postsCollectionView.topAnchor.constraint(equalTo: editProfileButton.bottomAnchor, constant: padding), // Или к разделителю/переключателю
+            // Сетка постов (под кнопками действия)
+            postsCollectionView.topAnchor.constraint(equalTo: actionButtonsStackView.bottomAnchor, constant: padding),
             postsCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             postsCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            postsCollectionView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+            postsCollectionView.bottomAnchor.constraint(equalTo: signOutButton.topAnchor, constant: -padding), // Перед кнопкой Выхода
+
+            // Кнопка Выхода (внизу)
+            signOutButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
+            signOutButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
+            signOutButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -10),
+            signOutButton.heightAnchor.constraint(equalToConstant: 44)
         ])
     }
     
@@ -248,10 +291,12 @@ class UserProfileFeedViewController: UIViewController {
         // - viewModel.$isFollowing -> обновить вид кнопки Follow/Edit
         // - viewModel.$isCurrentUser -> обновить вид кнопки Follow/Edit
         
-        // Скрываем/показываем кнопку Edit в зависимости от isCurrentUser
+        // Скрываем/показываем кнопки Edit/Follow/Message
+        // Пока просто управляем editProfileButton
         editProfileButton.isHidden = !viewModel.isCurrentUser
-        // TODO: Добавить кнопки Follow/Message и скрывать/показывать их
-
+        actionButtonsStackView.isHidden = !viewModel.isCurrentUser // Скрываем весь стек, если не текущий юзер? Или добавить Follow/Message?
+        // TODO: Добавить кнопки Follow/Message и управлять их видимостью
+        signOutButton.isHidden = !viewModel.isCurrentUser // Кнопка Выхода видна только для текущего пользователя
     }
     
     // Вспомогательный метод для обновления стека статов
@@ -265,7 +310,14 @@ class UserProfileFeedViewController: UIViewController {
 
     // MARK: - Actions
     @objc private func editProfileTapped() {
-        viewModel.editProfileButtonTapped()
+        // Вызываем делегата
+        delegate?.didTapEditProfileButton()
+        // viewModel.editProfileButtonTapped() // Логику VM убираем отсюда, делегат решает
+    }
+    
+    @objc private func signOutTapped() {
+        // Вызываем делегата
+        delegate?.didRequestSignOut()
     }
     
     // TODO: Actions для Follow/Message

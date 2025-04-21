@@ -353,7 +353,8 @@
 				DEVELOPMENT_TEAM = U6WP7S3365;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SensumApp/Info.plist;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Разрешить камере отслеживать упражднения.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Разрешить камере отслеживать упражнения.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Разрешить доступ к галлерее для выбора аватара.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -382,7 +383,8 @@
 				DEVELOPMENT_TEAM = U6WP7S3365;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SensumApp/Info.plist;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Разрешить камере отслеживать упражднения.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Разрешить камере отслеживать упражнения.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Разрешить доступ к галлерее для выбора аватара.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
