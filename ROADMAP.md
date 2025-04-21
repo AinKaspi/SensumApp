@@ -64,7 +64,7 @@ SensumApp/
 |       +-- Scenes/          (ChatListViewController.swift, ChatViewController.swift)
 ```
 
-## Phase 1: Refactoring & Setup (Завершено!)
+## Phase 1: Refactoring & Setup (ЗАВЕРШЕНО!)
 
 *Цель: Перестроить структуру проекта под новую концепцию, переименовать компоненты, настроить базовые координаторы для всех вкладок.*
 
@@ -100,8 +100,8 @@ SensumApp/
 -   [x] **Update AppCoordinator (`SceneDelegate.swift`):**
     *   [x] Configure `UITabBarController` with: `FeedCoordinator`, `CurrentUserProfileCoordinator`, `LevelingCoordinator`, `ProgressCoordinator`, `StoreCoordinator`. (Выполнено)
     *   [x] Ensure all coordinators are initialized and started correctly. (Выполнено)
--   [x] **Update Imports & References:** Systematically fix all broken imports and class/file references project-wide after renames. (Выполнено в процессе)
--   [x] **Delete Unused Files/Folders:** Delete `SensumApp/ViewController.swift`, `Features/Person`, `Features/Rank`, `Features/Events`. (Выполнено / Задача пользователю)
+-   [x] **Update Imports & References:** Systematically fix all broken imports and class/file references project-wide after renames. (Выполнено)
+-   [x] **Delete Unused Files/Folders:** Delete `SensumApp/ViewController.swift`, `Features/Person`, `Features/Rank`, `Features/Events`. (Выполнено пользователем)
 -   [x] **Build & Test:** Ensure the app compiles and runs with the new structure (mostly placeholders). (Выполнено - Компилируется!)
 
 ## Phase 2: Backend & Authentication

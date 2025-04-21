@@ -69,62 +69,83 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 }
 
 // ----- Главный Координатор Приложения -----
-class AppCoordinator: Coordinator {
+// Добавляем соответствие AuthCoordinatorDelegate
+class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
     
     var window: UIWindow
     var navigationController: UINavigationController // Не используется для TabBar
     var childCoordinators: [Coordinator] = []
+    
+    // Добавляем AuthService
+    private lazy var authService: AuthServiceProtocol = AuthService()
+    
+    // Храним ссылку на AuthCoordinator, если он активен
+    private var authCoordinator: AuthCoordinator?
 
     init(window: UIWindow) {
         self.window = window
         self.navigationController = UINavigationController() // Заглушка для протокола
-        // TODO: Добавить проверку статуса аутентификации. Если не вошел - запускать AuthCoordinator.
     }
 
     func start() {
-        // Создаем TabBarController
+        // Проверяем начальное состояние аутентификации
+        authService.checkAuthenticationState()
+        
+        if authService.authenticationState.value == .signedIn {
+            print("AppCoordinator: User already signed in. Starting main flow.")
+            showMainAppFlow()
+        } else {
+            print("AppCoordinator: User not signed in. Starting auth flow.")
+            showAuthenticationFlow()
+        }
+    }
+    
+    // Показывает основной TabBar интерфейс
+    private func showMainAppFlow() {
+        // Убираем AuthCoordinator, если он был
+        if let authCoordinator = authCoordinator {
+            removeChild(authCoordinator)
+            self.authCoordinator = nil
+        }
+        
+        // --- Код создания TabBarController (переносим сюда из start()) ---
         let tabBarController = UITabBarController()
         
-        // --- Создаем и настраиваем координаторы для каждой вкладки ---
-        
-        // 1. Feed Coordinator (Tab 1)
+        // 1. Feed Coordinator
         let feedNavController = UINavigationController()
         let feedCoordinator = FeedCoordinator(navigationController: feedNavController)
         addChild(feedCoordinator)
         feedCoordinator.start()
-        feedNavController.tabBarItem = UITabBarItem(title: "Feed", image: UIImage(systemName: "flame.fill"), tag: 0) // Иконка Огонь
+        feedNavController.tabBarItem = UITabBarItem(title: "Feed", image: UIImage(systemName: "flame.fill"), tag: 0)
 
-        // 2. Current User Profile Coordinator (Tab 2)
+        // 2. Current User Profile Coordinator
         let profileNavController = UINavigationController()
         let currentUserProfileCoordinator = CurrentUserProfileCoordinator(navigationController: profileNavController)
         addChild(currentUserProfileCoordinator)
         currentUserProfileCoordinator.start()
-        profileNavController.tabBarItem = UITabBarItem(title: "Person", image: UIImage(systemName: "person.fill"), tag: 1) // Иконка Человек
+        profileNavController.tabBarItem = UITabBarItem(title: "Person", image: UIImage(systemName: "person.fill"), tag: 1)
         
-        // 3. Leveling Coordinator (Tab 3)
+        // 3. Leveling Coordinator
         let levelingNavController = UINavigationController()
         let levelingCoordinator = LevelingCoordinator(navigationController: levelingNavController)
         addChild(levelingCoordinator)
         levelingCoordinator.start()
-        // Используем кастомную иконку? Пока оставим системную.
-        levelingNavController.tabBarItem = UITabBarItem(title: "Leveling", image: UIImage(systemName: "figure.walk"), tag: 2) // Нужна иконка Круг?
-        // TODO: Настроить внешний вид центральной кнопки таббара?
+        levelingNavController.tabBarItem = UITabBarItem(title: "Leveling", image: UIImage(systemName: "figure.walk"), tag: 2)
 
-        // 4. Progress Coordinator (Tab 4)
+        // 4. Progress Coordinator
         let progressNavController = UINavigationController()
         let progressCoordinator = ProgressCoordinator(navigationController: progressNavController)
         addChild(progressCoordinator)
         progressCoordinator.start()
-        progressNavController.tabBarItem = UITabBarItem(title: "Progress", image: UIImage(systemName: "chart.bar.fill"), tag: 3) // Иконка Столбцы
+        progressNavController.tabBarItem = UITabBarItem(title: "Progress", image: UIImage(systemName: "chart.bar.fill"), tag: 3)
         
-        // 5. Store Coordinator (Tab 5)
+        // 5. Store Coordinator
         let storeNavController = UINavigationController()
         let storeCoordinator = StoreCoordinator(navigationController: storeNavController)
         addChild(storeCoordinator)
         storeCoordinator.start()
-        storeNavController.tabBarItem = UITabBarItem(title: "Store", image: UIImage(systemName: "cart.fill"), tag: 4) // Иконка Корзина
+        storeNavController.tabBarItem = UITabBarItem(title: "Store", image: UIImage(systemName: "cart.fill"), tag: 4)
         
-        // --- Собираем TabBarController ---
         tabBarController.viewControllers = [
             feedNavController,
             profileNavController,
@@ -133,7 +154,7 @@ class AppCoordinator: Coordinator {
             storeNavController
         ]
         
-        // Настраиваем внешний вид TabBar (оставляем как было)
+        // Настройка внешнего вида TabBar (оставляем)
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = .black
@@ -149,11 +170,38 @@ class AppCoordinator: Coordinator {
         if #available(iOS 15.0, *) {
             tabBarController.tabBar.scrollEdgeAppearance = appearance
         }
+        // --- Конец кода создания TabBarController ---
 
         // Устанавливаем TabBarController как корневой
         window.rootViewController = tabBarController
-        // Убираем желтый фон окна
-        window.backgroundColor = .black 
+        window.makeKeyAndVisible() // Делаем видимым
+        window.backgroundColor = .black
+    }
+    
+    // Показывает флоу аутентификации
+    private func showAuthenticationFlow() {
+        // Убираем старые дочерние координаторы, если были
+        childCoordinators.removeAll()
+        
+        // Создаем отдельный Navigation Controller для флоу аутентификации
+        let authNavController = UINavigationController()
+        authCoordinator = AuthCoordinator(navigationController: authNavController, authService: authService)
+        authCoordinator?.delegate = self // Устанавливаем себя делегатом
+        addChild(authCoordinator!)
+        authCoordinator?.start()
+        
+        // Устанавливаем authNavController как корневой (он покажет Login/Register)
+        window.rootViewController = authNavController
+        window.makeKeyAndVisible()
+        window.backgroundColor = .black // Или другой фон для этого флоу
+    }
+    
+    // MARK: - AuthCoordinatorDelegate
+    
+    // Вызывается, когда AuthCoordinator завершает работу (пользователь вошел)
+    func didFinishAuthentication(coordinator: AuthCoordinator) {
+        print("AppCoordinator: Auth flow finished. Switching to main flow.")
+        showMainAppFlow()
     }
 }
 
