@@ -39,6 +39,8 @@
 		B1A4838A2DB6CD0000755E25 /* FirebaseVertexAI in Frameworks */ = {isa = PBXBuildFile; productRef = B1A483892DB6CD0000755E25 /* FirebaseVertexAI */; };
 		B1A6E6E62DA74B4500E9E9EB /* DGCharts in Frameworks */ = {isa = PBXBuildFile; productRef = B1A6E6E52DA74B4500E9E9EB /* DGCharts */; };
 		B1A6E6EA2DA7F0F500E9E9EB /* ROADMAP.md in Resources */ = {isa = PBXBuildFile; fileRef = B1A6E6E92DA7F0F500E9E9EB /* ROADMAP.md */; };
+		B1AE8A4B2DB6EEF20089728F /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B1AE8A4A2DB6EEF20089728F /* GoogleSignIn */; };
+		B1AE8A4D2DB6EEF20089728F /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B1AE8A4C2DB6EEF20089728F /* GoogleSignInSwift */; };
 		B1BE36972DA6A6ED00BF1C55 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BE36962DA6A6ED00BF1C55 /* UserProfile.swift */; };
 		B1BE369A2DA6A75400BF1C55 /* DataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BE36992DA6A75400BF1C55 /* DataManager.swift */; };
 /* End PBXBuildFile section */
@@ -97,6 +99,7 @@
 				B1A6E6E62DA74B4500E9E9EB /* DGCharts in Frameworks */,
 				B1A483862DB6CD0000755E25 /* FirebaseStorage in Frameworks */,
 				B1A483602DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */,
+				B1AE8A4D2DB6EEF20089728F /* GoogleSignInSwift in Frameworks */,
 				B1A4836A2DB6CD0000755E25 /* FirebaseCore in Frameworks */,
 				0BEC571AAD9BAB36845AF4F7 /* Pods_SensumApp.framework in Frameworks */,
 				B1A4837E2DB6CD0000755E25 /* FirebaseMLModelDownloader in Frameworks */,
@@ -107,6 +110,7 @@
 				B1A483742DB6CD0000755E25 /* FirebaseFirestoreCombine-Community in Frameworks */,
 				B1A4838A2DB6CD0000755E25 /* FirebaseVertexAI in Frameworks */,
 				B1A483782DB6CD0000755E25 /* FirebaseFunctionsCombine-Community in Frameworks */,
+				B1AE8A4B2DB6EEF20089728F /* GoogleSignIn in Frameworks */,
 				B1A483882DB6CD0000755E25 /* FirebaseStorageCombine-Community in Frameworks */,
 				B1A483842DB6CD0000755E25 /* FirebaseRemoteConfig in Frameworks */,
 				B10F642B2DA992B80002F8FD /* Surge in Frameworks */,
@@ -270,6 +274,7 @@
 				B11327152DA7476A009315D3 /* XCRemoteSwiftPackageReference "Charts" */,
 				B10F64292DA992B80002F8FD /* XCRemoteSwiftPackageReference "Surge" */,
 				B1A4835A2DB6CD0000755E25 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				B1AE8A492DB6EEF20089728F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B148666A2DA4351800C4A753 /* Products */;
@@ -562,6 +567,14 @@
 				minimumVersion = 11.12.0;
 			};
 		};
+		B1AE8A492DB6EEF20089728F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -679,6 +692,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B11327152DA7476A009315D3 /* XCRemoteSwiftPackageReference "Charts" */;
 			productName = DGCharts;
+		};
+		B1AE8A4A2DB6EEF20089728F /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B1AE8A492DB6EEF20089728F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		B1AE8A4C2DB6EEF20089728F /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B1AE8A492DB6EEF20089728F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
