@@ -32,3 +32,6 @@ Pods/
 
 # Локальные настройки (если есть)
 # .env
+
+# Firebase / Конфигурация
+GoogleService-Info.plist
