@@ -56,20 +56,17 @@ class AuthCoordinator: Coordinator, LoginViewControllerDelegate, LoginViewModelC
         vm.coordinatorDelegate = self
         let vc = LoginViewController()
         vc.delegate = self
-        // TODO: Pass vm to vc and set up bindings
-        navigationController.setViewControllers([vc], animated: false) // Не анимируем первый экран
+        vc.viewModel = vm
+        navigationController.setViewControllers([vc], animated: false)
     }
     
     // Показывает экран регистрации
     func showRegisterScreen() {
-        // Создаем реальные VC и ViewModel
         let vm = RegisterViewModel(authService: authService)
-        // vm.coordinatorDelegate не нужен для RegisterViewModel
-        
+        // Делегат координатора для VM не нужен
         let vc = RegisterViewController()
-        vc.delegate = self // Мы делегат для ViewController
-        // TODO: Pass vm to vc and set up bindings
-        
+        vc.delegate = self
+        vc.viewModel = vm // <-- Передаем ViewModel
         navigationController.pushViewController(vc, animated: true)
     }
     
@@ -80,14 +77,29 @@ class AuthCoordinator: Coordinator, LoginViewControllerDelegate, LoginViewModelC
     }
     
     func didTapLoginButton(email: String?, password: String?) {
-        // Передаем данные в ViewModel для попытки входа
-        // TODO: Связать текстовые поля с @Published свойствами ViewModel напрямую,
-        // чтобы не передавать email/password здесь.
-        // vm.email = email ?? ""
-        // vm.password = password ?? ""
-        // vm.attemptLogin()
-        print("AuthCoordinator: Login button tapped (should be handled by ViewModel binding)")
-        // Пока оставим так, нужно реализовать биндинг VC <-> VM
+        // Логика теперь в ViewModel
+        print("AuthCoordinator: didTapLoginButton called (DEPRECATED - use ViewModel binding)")
+    }
+    
+    // Обработка нажатия кнопки Google
+    func didTapGoogleSignInButton() {
+        print("AuthCoordinator: Google Sign In button tapped.")
+        // Нужен view controller для представления окна входа Google
+        guard let presentingVC = navigationController.topViewController else {
+            print("AuthCoordinator Error: Cannot get presenting view controller for Google Sign In.")
+            return
+        }
+        
+        authService.signInWithGoogle(presentingViewController: presentingVC) { [weak self] error in
+            // Ошибки обрабатываются внутри AuthService и LoginViewModel (через errorMessage)
+            // Успешный вход обработается через подписку на authenticationState
+            if let error = error {
+                print("AuthCoordinator: Google Sign In completed with error: \(error.localizedDescription)")
+                // Можно показать Alert здесь, если нужно общее сообщение об ошибке
+            } else {
+                print("AuthCoordinator: Google Sign In process initiated successfully (waiting for state change)...")
+            }
+        }
     }
     
     // MARK: - LoginViewModelCoordinatorDelegate
@@ -99,14 +111,8 @@ class AuthCoordinator: Coordinator, LoginViewControllerDelegate, LoginViewModelC
     // MARK: - RegisterViewControllerDelegate
     
     func didTapRegisterButton(email: String?, username: String?, password: String?) {
-        // Передаем данные в ViewModel для попытки регистрации
-        // TODO: Связать текстовые поля с @Published свойствами ViewModel напрямую.
-        // vm.email = email ?? ""
-        // vm.username = username ?? ""
-        // vm.password = password ?? ""
-        // vm.attemptRegistration()
-        print("AuthCoordinator: Register button tapped (should be handled by ViewModel binding)")
-        // Пока оставим так, нужно реализовать биндинг VC <-> VM
+        // Этот метод больше не нужен, используем биндинги и viewModel.attemptRegistration()
+        print("AuthCoordinator: didTapRegisterButton called (DEPRECATED - use ViewModel binding)")
     }
     
     // TODO: Добавить методы-делегаты для ViewModel (например, didTapRegister, didTapLogin)

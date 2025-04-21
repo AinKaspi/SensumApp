@@ -9,6 +9,12 @@
 /* Begin PBXBuildFile section */
 		0BEC571AAD9BAB36845AF4F7 /* Pods_SensumApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F08A7153A835D56D39470A7D /* Pods_SensumApp.framework */; };
 		B10F642B2DA992B80002F8FD /* Surge in Frameworks */ = {isa = PBXBuildFile; productRef = B10F642A2DA992B80002F8FD /* Surge */; };
+		B117CBCF2DB6DFA100A696B9 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBCD2DB6DFA100A696B9 /* User.swift */; };
+		B117CBD02DB6DFA100A696B9 /* Post.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBCC2DB6DFA100A696B9 /* Post.swift */; };
+		B117CBD72DB6DFD200A696B9 /* FollowService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBD22DB6DFD200A696B9 /* FollowService.swift */; };
+		B117CBD82DB6DFD200A696B9 /* PostService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBD32DB6DFD200A696B9 /* PostService.swift */; };
+		B117CBD92DB6DFD200A696B9 /* UserProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBD52DB6DFD200A696B9 /* UserProfileService.swift */; };
+		B117CBDA2DB6DFD200A696B9 /* StorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBD42DB6DFD200A696B9 /* StorageService.swift */; };
 		B190B3032DB6CF86007376B9 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B190B3002DB6CF86007376B9 /* AuthService.swift */; };
 		B1A4835E2DB6CD0000755E25 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = B1A4835D2DB6CD0000755E25 /* FirebaseAnalyticsOnDeviceConversion */; };
 		B1A483602DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */ = {isa = PBXBuildFile; productRef = B1A4835F2DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport */; };
@@ -39,6 +45,13 @@
 
 /* Begin PBXFileReference section */
 		4B4200EB984C0FC9B3FF8535 /* Pods-SensumApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SensumApp.release.xcconfig"; path = "Target Support Files/Pods-SensumApp/Pods-SensumApp.release.xcconfig"; sourceTree = "<group>"; };
+		B117CBCC2DB6DFA100A696B9 /* Post.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Post.swift; sourceTree = "<group>"; };
+		B117CBCD2DB6DFA100A696B9 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
+		B117CBD12DB6DFD200A696B9 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		B117CBD22DB6DFD200A696B9 /* FollowService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FollowService.swift; sourceTree = "<group>"; };
+		B117CBD32DB6DFD200A696B9 /* PostService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostService.swift; sourceTree = "<group>"; };
+		B117CBD42DB6DFD200A696B9 /* StorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageService.swift; sourceTree = "<group>"; };
+		B117CBD52DB6DFD200A696B9 /* UserProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileService.swift; sourceTree = "<group>"; };
 		B14866692DA4351800C4A753 /* SensumApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SensumApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B190B3002DB6CF86007376B9 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		B1A6E6E92DA7F0F500E9E9EB /* ROADMAP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ROADMAP.md; sourceTree = "<group>"; };
@@ -126,6 +139,27 @@
 			path = Pods;
 			sourceTree = "<group>";
 		};
+		B117CBCE2DB6DFA100A696B9 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				B117CBCC2DB6DFA100A696B9 /* Post.swift */,
+				B117CBCD2DB6DFA100A696B9 /* User.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		B117CBD62DB6DFD200A696B9 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B117CBD12DB6DFD200A696B9 /* AuthService.swift */,
+				B117CBD22DB6DFD200A696B9 /* FollowService.swift */,
+				B117CBD32DB6DFD200A696B9 /* PostService.swift */,
+				B117CBD42DB6DFD200A696B9 /* StorageService.swift */,
+				B117CBD52DB6DFD200A696B9 /* UserProfileService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
 		B14866602DA4351800C4A753 = {
 			isa = PBXGroup;
 			children = (
@@ -160,6 +194,8 @@
 		B190B3022DB6CF86007376B9 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				B117CBD62DB6DFD200A696B9 /* Services */,
+				B117CBCE2DB6DFA100A696B9 /* Models */,
 				B190B3012DB6CF86007376B9 /* Services */,
 			);
 			path = Core;
@@ -286,6 +322,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B117CBCF2DB6DFA100A696B9 /* User.swift in Sources */,
+				B117CBD02DB6DFA100A696B9 /* Post.swift in Sources */,
+				B117CBD72DB6DFD200A696B9 /* FollowService.swift in Sources */,
+				B117CBD82DB6DFD200A696B9 /* PostService.swift in Sources */,
+				B117CBD92DB6DFD200A696B9 /* UserProfileService.swift in Sources */,
+				B117CBDA2DB6DFD200A696B9 /* StorageService.swift in Sources */,
 				B1BE369A2DA6A75400BF1C55 /* DataManager.swift in Sources */,
 				B1BE36972DA6A6ED00BF1C55 /* UserProfile.swift in Sources */,
 				B190B3032DB6CF86007376B9 /* AuthService.swift in Sources */,

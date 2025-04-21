@@ -1,6 +1,6 @@
 import Foundation
 import FirebaseAuth
-// import GoogleSignIn // Понадобится позже для Google Sign-In
+import GoogleSignIn // Понадобится позже для Google Sign-In
 import Combine // Для публикации статуса аутентификации
 
 // Протокол для AuthService, если захотим использовать Dependency Injection
@@ -11,7 +11,7 @@ protocol AuthServiceProtocol {
     func checkAuthenticationState()
     func registerUser(email: String, password: String, completion: @escaping (Error?) -> Void)
     func signInUser(email: String, password: String, completion: @escaping (Error?) -> Void)
-    // func signInWithGoogle(presentingViewController: UIViewController, completion: @escaping (Error?) -> Void) // Добавим позже
+    func signInWithGoogle(presentingViewController: UIViewController, completion: @escaping (Error?) -> Void)
     func signOut(completion: @escaping (Error?) -> Void)
 }
 
@@ -94,12 +94,49 @@ class AuthService: AuthServiceProtocol {
         }
     }
     
-    // TODO: Реализовать Google Sign-In
-    /*
+    // Реализуем Google Sign-In
     func signInWithGoogle(presentingViewController: UIViewController, completion: @escaping (Error?) -> Void) {
-        // ... Логика Google Sign-In с использованием GIDSignIn ...
+        // 1. Получаем Client ID из GoogleService-Info.plist
+        guard let clientID = FirebaseApp.app()?.options.clientID else {
+            completion(NSError(domain: "AuthService", code: -10, userInfo: [NSLocalizedDescriptionKey: "Firebase client ID not found in GoogleService-Info.plist"])) 
+            return
+        }
+
+        // 2. Конфигурируем Google Sign-In
+        let config = GIDConfiguration(clientID: clientID)
+        GIDSignIn.sharedInstance.configuration = config
+
+        // 3. Запускаем процесс входа Google
+        GIDSignIn.sharedInstance.signIn(withPresenting: presentingViewController) { [weak self] result, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("AuthService Error (Google Sign In): \(error.localizedDescription)")
+                completion(error)
+                return
+            }
+
+            guard let user = result?.user,
+                  let idToken = user.idToken?.tokenString
+            else {
+                completion(NSError(domain: "AuthService", code: -11, userInfo: [NSLocalizedDescriptionKey: "Google Sign In failed to return user or ID token"])) 
+                return
+            }
+
+            // 4. Создаем Firebase Credential с помощью Google ID token
+            let credential = GoogleAuthProvider.credential(withIDToken: idToken,
+                                                         accessToken: user.accessToken.tokenString)
+                                                         
+            // 5. Входим в Firebase с этими учетными данными
+            self.auth.signIn(with: credential) { authResult, error in
+                if let error = error {
+                     print("AuthService Error (Firebase Sign In with Google Credential): \(error.localizedDescription)")
+                 }
+                 // TODO: После первого входа через Google, возможно, нужно создать профиль в Firestore, если его еще нет.
+                 completion(error)
+            }
+        }
     }
-    */
     
     func signOut(completion: @escaping (Error?) -> Void) {
         do {

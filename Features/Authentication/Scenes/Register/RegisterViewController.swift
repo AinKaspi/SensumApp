@@ -1,4 +1,5 @@
 import UIKit
+import Combine
 
 // Делегат для RegisterViewController
 protocol RegisterViewControllerDelegate: AnyObject {
@@ -10,7 +11,9 @@ protocol RegisterViewControllerDelegate: AnyObject {
 class RegisterViewController: UIViewController {
     
     weak var delegate: RegisterViewControllerDelegate?
-    // TODO: Добавить ссылку на RegisterViewModel
+    // Добавляем ViewModel
+    var viewModel: RegisterViewModel!
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - UI Elements (Аналогично Login, но добавляем Username)
     
@@ -70,14 +73,36 @@ class RegisterViewController: UIViewController {
         return button
     }()
     
-    // TODO: Добавить кнопку Google Sign In?
+    // Добавляем индикатор и лейбл ошибок (аналогично Login)
+    private lazy var activityIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .large)
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.color = .white
+        indicator.hidesWhenStopped = true
+        return indicator
+    }()
     
+    private lazy var errorLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.textColor = .systemRed
+        label.font = .systemFont(ofSize: 14)
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.isHidden = true
+        return label
+    }()
+
     private lazy var stackView: UIStackView = {
-        let stack = UIStackView(arrangedSubviews: [emailTextField, usernameTextField, passwordTextField, registerButton])
+        // Обновляем subviews
+        let stack = UIStackView(arrangedSubviews: [emailTextField, usernameTextField, passwordTextField, errorLabel, registerButton])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.axis = .vertical
         stack.spacing = 15
         stack.distribution = .fill
+        // Добавляем кастомные отступы
+        stack.setCustomSpacing(8, after: passwordTextField)
+        stack.setCustomSpacing(20, after: errorLabel)
         return stack
     }()
 
@@ -85,6 +110,7 @@ class RegisterViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        assert(viewModel != nil, "ViewModel not injected into RegisterViewController")
         view.backgroundColor = .black
         // Показываем Navigation Bar со стандартной кнопкой "Назад"
         navigationController?.isNavigationBarHidden = false
@@ -92,6 +118,8 @@ class RegisterViewController: UIViewController {
         // navigationController?.navigationBar.tintColor = .white
         setupViews()
         setupConstraints()
+        setupBindings()
+        setupTextFieldTargets()
     }
 
     // MARK: - Setup
@@ -99,6 +127,7 @@ class RegisterViewController: UIViewController {
     private func setupViews() {
         view.addSubview(titleLabel)
         view.addSubview(stackView)
+        view.addSubview(activityIndicator) // Добавляем индикатор
     }
     
     private func setupConstraints() {
@@ -114,15 +143,67 @@ class RegisterViewController: UIViewController {
             emailTextField.heightAnchor.constraint(equalToConstant: 44),
             usernameTextField.heightAnchor.constraint(equalToConstant: 44),
             passwordTextField.heightAnchor.constraint(equalToConstant: 44),
-            registerButton.heightAnchor.constraint(equalToConstant: 50)
+            registerButton.heightAnchor.constraint(equalToConstant: 50),
+            
+            // Констрейнты для индикатора
+            activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
     }
-
-    // MARK: - Actions
     
+    // Настраиваем таргеты
+    private func setupTextFieldTargets() {
+        emailTextField.addTarget(self, action: #selector(emailDidChange), for: .editingChanged)
+        usernameTextField.addTarget(self, action: #selector(usernameDidChange), for: .editingChanged)
+        passwordTextField.addTarget(self, action: #selector(passwordDidChange), for: .editingChanged)
+    }
+    
+    // MARK: - Bindings
+    private func setupBindings() {
+        // Кнопка Register
+        viewModel.isRegisterButtonEnabled
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.isEnabled, on: registerButton)
+            .store(in: &cancellables)
+            
+        // Загрузка
+        viewModel.$isLoading
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isLoading in
+                if isLoading {
+                    self?.activityIndicator.startAnimating()
+                    self?.registerButton.isEnabled = false
+                } else {
+                    self?.activityIndicator.stopAnimating()
+                }
+            }
+            .store(in: &cancellables)
+            
+        // Ошибка
+        viewModel.$errorMessage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] message in
+                self?.errorLabel.text = message
+                self?.errorLabel.isHidden = (message == nil || message!.isEmpty)
+            }
+            .store(in: &cancellables)
+    }
+
+    // MARK: - Actions & Targets
     @objc private func registerButtonTapped() {
-        delegate?.didTapRegisterButton(email: emailTextField.text, 
-                                     username: usernameTextField.text, 
-                                     password: passwordTextField.text)
+        // Вызываем ViewModel напрямую
+        viewModel.attemptRegistration()
+    }
+    
+    @objc private func emailDidChange() {
+        viewModel.email = emailTextField.text ?? ""
+    }
+    
+    @objc private func usernameDidChange() {
+        viewModel.username = usernameTextField.text ?? ""
+    }
+    
+    @objc private func passwordDidChange() {
+        viewModel.password = passwordTextField.text ?? ""
     }
 } 
