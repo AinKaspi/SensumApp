@@ -1,78 +1,160 @@
-# Дорожная карта улучшения Pose Estimation в SensumApp
+# Дорожная карта SensumApp - Социальная Платформа
 
-## Фаза 0: Рефакторинг архитектуры (MVVM-C)
+## Концептуальное Дерево Архитектуры (Планируемое)
 
--   [ ] **Базовая структура:**
-    -   [ ] Переименовать `LevelingViewController` в `ExerciseExecutionViewController`.
-    -   [ ] Создать пустые файлы для `ExerciseSelectionViewController` и `ExerciseSelectionViewModel`.
-    -   [ ] Создать модель `Exercise` (структура с `id`, `name`, `description`, `iconName`).
-    -   [ ] Обновить `LevelingCoordinator` для старта с `ExerciseSelectionViewController`.
--   [ ] **Экран выбора упражнений (`ExerciseSelection`):**
-    -   [ ] Реализовать UI (`UITableView` или `UICollectionView`) в `ExerciseSelectionViewController`.
-    -   [ ] Реализовать `ExerciseSelectionViewModel` (загрузка моковых данных упражнений, предоставление данных для View).
-    -   [ ] Настроить навигацию: ViewModel сообщает координатору о выборе, координатор показывает `ExerciseExecutionViewController`.
--   [ ] **Экран выполнения упражнений (`ExerciseExecution`):**
-    -   [ ] Создать `ExerciseExecutionViewModel`.
-    -   [ ] Перенести логику управления `PoseLandmarkerHelper` и `ExerciseAnalyzer` из View во ViewModel.
-    -   [ ] Перенести логику состояния тренировки (таймер, счетчики) во ViewModel.
-    -   [ ] Перенести логику расчета XP и атрибутов во ViewModel.
-    -   [ ] Перенести взаимодействие с `DataManager` во ViewModel.
-    -   [ ] Настроить связь ViewModel -> View для обновления UI (делегат/замыкания/Combine).
-    -   [ ] `ExerciseExecutionViewController` становится тоньше, отвечает за UI и передачу событий.
--   [ ] **Анализаторы упражнений:**
-    -   [ ] Создать протокол/базовый класс `ExerciseAnalyzer`.
-    -   [ ] Переименовать `SquatAnalyzer` в `SquatAnalyzer3D` и адаптировать под `ExerciseAnalyzer`.
-    -   [ ] `ExerciseExecutionViewModel` создает нужный анализатор в зависимости от выбранного упражнения.
--   [ ] **Отрисовка позы:**
-    -   [ ] Переименовать `PoseOverlayView` в `PoseOverlayView2D` (если хотим сохранить старую реализацию).
-    -   [ ] Создать `PoseOverlayView3D` для отрисовки 3D-точек (проецируя их).
-    -   [ ] `ExerciseExecutionViewController` использует `PoseOverlayView3D`.
--   [ ] **Базовая Верстка:**
-    -   [ ] Обновить `setupViews` и `setupConstraints` для размещения новых элементов.
--   [ ] **Реализация Верхнего Меню:**
-    -   [x] Создать кастомный `UIView` для верхнего меню (`TopMenuView`).
-    -   [x] Добавить элементы "Profile", "Stats", "Settings".
-    -   [x] Добавить обработку переключения (пока `print`).
-    -   [x] Исправить верстку меню (убрать схлопывание).
-    -   [ ] Убрать пункт "Achievements". (Делаем сейчас)
--   [ ] **Реализация Фонового Аватара:**
-    -   [x] Настроить `UIImageView` для фона.
+```
+SensumApp/
+|-- App/
+|   |-- AppDelegate.swift
+|   |-- SceneDelegate.swift  (Содержит AppCoordinator)
+|   +-- Coordinator.swift    (Базовый протокол)
+|
+|-- Core/
+|   |-- Models/              (User.swift, Post.swift, Follow.swift, Stats.swift, etc.)
+|   |-- Networking/          (APIService.swift, FirebaseService.swift, etc.)
+|   |-- Services/            (AuthService.swift, StorageService.swift, FeedService.swift, etc.)
+|   +-- Utils/               (Extensions, Helpers, etc.)
+|
+|-- Features/
+|   |-- Authentication/      (Флоу входа/регистрации)
+|   |   |-- Coordinators/    (AuthCoordinator.swift)
+|   |   |-- Scenes/
+|   |   |   |-- Login/       (LoginViewController.swift, LoginViewModel.swift)
+|   |   |   +-- Register/    (RegisterViewController.swift, RegisterViewModel.swift)
+|   |
+|   |-- Feed/                (Таб 1: Лента)
+|   |   |-- Coordinators/    (FeedCoordinator.swift)
+|   |   |-- Scenes/
+|   |   |   +-- FeedList/    (FeedViewController.swift, FeedViewModel.swift)
+|   |   +-- Views/           (StoryCircleCell.swift, PostCell.swift, etc.)
+|   |
+|   |-- UserProfile/         (Экраны для профиля *ДРУГОГО* пользователя - НЕ в таббаре)
+|   |   |-- Coordinators/    (UserProfileCoordinator.swift - запускается из Feed)
+|   |   |-- Scenes/
+|   |   |   |-- Container/   (UserProfileContainerViewController.swift - управляет Card/Person/Stats)
+|   |   |   |-- Card/        (UserProfileCardViewController.swift - старый ProfileVC, макет 2)
+|   |   |   |-- FeedGrid/    (UserProfileFeedViewController.swift - макет 3, ПЕРЕИСПОЛЬЗУЕТСЯ!)
+|   |   |   +-- Stats/       (UserProfileStatsViewController.swift - макет 4)
+|   |   +-- Views/           (TopMenuView.swift - используется в Container)
+|   |
+|   |-- CurrentUserProfile/  (Таб 2: Профиль Текущего Пользователя)
+|   |   |-- Coordinators/    (CurrentUserProfileCoordinator.swift)
+|   |   |-- Scenes/          (Использует UserProfileFeedViewController, UserProfileStatsViewController)
+|   |   |   +-- Container?/  (Возможно, нужен свой контейнер или доп. логика)
+|   |
+|   |-- Create/              (Таб 3: Создать - Пока заменен на Leveling)
+|   |   |-- ... (Заглушка)
+|   |
+|   |-- Leveling/            (Таб 3: Тренировки)
+|   |   |-- Coordinators/    (LevelingCoordinator.swift)
+|   |   |-- Scenes/          (ExerciseSelectionViewController.swift, ExerciseExecutionViewController.swift)
+|   |   +-- ... (ViewModels, Helpers, Views)
+|   |
+|   |-- Progress/            (Таб 4: Прогресс - Заглушка)
+|   |   |-- Coordinators/    (ProgressCoordinator.swift)
+|   |   +-- Scenes/          (ProgressViewController.swift)
+|   |
+|   |-- Store/               (Таб 5: Магазин - Заглушка)
+|   |   |-- Coordinators/    (StoreCoordinator.swift)
+|   |   +-- Scenes/          (StoreViewController.swift)
+|   |
+|   +-- Messaging/           (Позже: Чаты)
+|       |-- Coordinators/    (MessagingCoordinator.swift)
+|       +-- Scenes/          (ChatListViewController.swift, ChatViewController.swift)
+```
 
-## Фаза 1: Фундамент (3D и Оптимизация)
+## Phase 1: Refactoring & Setup (Приоритет!)
 
--   [ ] **Переход на 3D (`poseWorldLandmarks`):**
-    -   [ ] Обновить `PoseLandmarkerHelper` для извлечения `poseWorldLandmarks`.
-    -   [ ] Переписать `SquatAnalyzer` для работы с 3D-координатами и расчета углов в 3D.
-    -   [ ] (В будущем) Адаптировать анализ для других упражнений под 3D.
--   [ ] **Оптимизация под iOS:**
-    -   [ ] Убедиться, что используется GPU-делегат MediaPipe (`computeDelegate: .GPU`).
-    -   [ ] Исследовать возможность и сложность конвертации модели MediaPipe Pose в Core ML для использования Neural Engine (ANE).
-    -   [ ] (Позже) Оптимизировать код пост-обработки (анализаторы упражнений).
--   [ ] **Специализация анализа:**
-    -   [ ] Определить наборы ключевых 3D-точек и углов для приседаний.
-    -   [ ] (В будущем) Определить наборы для других упражнений.
+*Цель: Перестроить структуру проекта под новую концепцию, переименовать компоненты, настроить базовые координаторы для всех вкладок.*
 
-## Фаза 2: Устойчивость и Точность
+-   [ ] **Rename Feature:** Rename folder `Features/Person` -> `Features/UserProfile`. (Выполнено пользователем)
+-   [ ] **Rename/Create UserProfile Components (Модальный профиль другого пользователя):**
+    -   [x] Rename `PersonCoordinator` -> `UserProfileCoordinator` (file & class). (Выполнено)
+    -   [x] Rename `PersonContainerViewController` -> `UserProfileContainerViewController` (file & class). (Выполнено)
+    -   [x] Rename `ProfileViewController` -> `UserProfileCardViewController` (file & class, Макет 2). (Выполнено)
+    -   [ ] Rename `StatsViewController` -> `UserProfileStatsViewController` (file & class, Макет 4).
+    -   [ ] Create placeholder `UserProfileFeedViewController.swift` (file & class, Макет 3).
+    -   [ ] Update `UserProfileContainerViewController` to manage Card/Person/Stats VCs.
+    -   [ ] Update `TopMenuView.swift` segments: "Card", "Person", "Stats". Add back arrow delegate?.
+-   [ ] **Create Feed Components (Tab 1 - Placeholders):**
+    -   [ ] Create folder `Features/Feed`.
+    -   [ ] Create `FeedCoordinator.swift` (file & class).
+    -   [ ] Create `FeedViewController.swift` (file & class).
+-   [ ] **Create CurrentUserProfile Components (Tab 2 - Placeholders):**
+    -   [ ] Create folder `Features/CurrentUserProfile`.
+    -   [ ] Create `CurrentUserProfileCoordinator.swift` (file & class).
+    -   [ ] Create placeholder `CurrentUserProfileContainerViewController.swift`? (Or use `UserProfileFeedVC` directly).
+-   [ ] **Verify/Update Leveling Components (Tab 3):**
+    -   [ ] Verify `Features/Leveling` exists.
+    *   [ ] Verify `LevelingCoordinator.swift` exists (update if needed).
+    *   [ ] Verify `ExerciseSelectionViewController.swift` & `ExerciseExecutionViewController.swift` exist.
+-   [ ] **Create Progress Components (Tab 4 - Placeholders):**
+    *   [ ] Create folder `Features/Progress`.
+    *   [ ] Create `ProgressCoordinator.swift` (file & class).
+    *   [ ] Create `ProgressViewController.swift` (file & class).
+-   [ ] **Verify/Update Store Components (Tab 5 - Placeholders):**
+    *   [ ] Verify `Features/Store` exists.
+    *   [ ] Verify `StoreCoordinator.swift` exists (update if needed).
+    *   [ ] Verify `StoreViewController.swift` exists.
+-   [ ] **Update AppCoordinator (`SceneDelegate.swift`):**
+    *   [ ] Configure `UITabBarController` with: `FeedCoordinator`, `CurrentUserProfileCoordinator`, `LevelingCoordinator`, `ProgressCoordinator`, `StoreCoordinator`.
+    *   [ ] Ensure all coordinators are initialized and started correctly.
+-   [ ] **Update Imports & References:** Systematically fix all broken imports and class/file references project-wide after renames.
+-   [ ] **Delete Unused Files:** Delete `SensumApp/ViewController.swift`.
+-   [ ] **Build & Test:** Ensure the app compiles and runs with the new structure (mostly placeholders).
 
--   [ ] **Плохая освещенность/Шум:**
-    -   [ ] Оценить работу текущей модели в сложных условиях.
-    -   [ ] (Если необходимо) Исследовать/реализовать базовые техники улучшения изображения (яркость/контраст, простые фильтры шума).
-    -   [ ] (Продвинуто) Исследовать нейросетевые подходы к Low-Light Enhancement / Denoising.
--   [ ] **Окклюзии (Базово):**
-    -   [ ] Оценить устойчивость текущего трекинга MediaPipe.
-    *   [ ] (Если необходимо) Исследовать/реализовать Фильтр Калмана для сглаживания и краткосрочного предсказания `poseWorldLandmarks`.
+## Phase 2: Backend & Authentication
 
-## Фаза 3: Революционные возможности
+*Цель: Настроить Firebase, реализовать вход и регистрацию.*
 
--   [ ] **Точная 3D-реконструкция (Mesh Recovery):**
-    -   [ ] Исследовать существующие модели (SPIN, PARE, CLIFF и т.д.) и возможность их интеграции/запуска на iOS.
-    -   [ ] (Опционально) Оценить использование данных с LiDAR/TrueDepth через ARKit.
--   [ ] **Предсказание и анализ динамики (Временные модели):**
-    -   [ ] Исследовать применение LSTM/Трансформеров к последовательностям 3D-поз.
-    -   [ ] Собрать или найти датасеты с 3D-позами во времени.
--   [ ] **Биомеханический анализ:**
-    -   [ ] Исследовать создание упрощенной физической модели скелета.
-    -   [ ] Разработать методы оценки качества движения и нагрузок на основе 3D-позы и модели.
--   [ ] **Собственные модели (При необходимости):**
-    -   [ ] Оценить необходимость разработки собственных моделей (Pose, Mesh, Temporal).
-    -   [ ] Исследовать техники обучения (GAN, Self-Supervised, NAS, Knowledge Distillation).
+-   [ ] Настроить Firebase Project (Auth, Firestore, Storage).
+-   [ ] Реализовать `AuthService`.
+-   [ ] Создать `AuthCoordinator`.
+-   [ ] Реализовать `AppCoordinator` для запуска `AuthCoordinator`.
+-   [ ] Создать UI и ViewModel для Login/Register (Email/Password, Google Sign-In).
+
+## Phase 3: Core Models & Services
+
+*Цель: Определить структуру данных и сервисы для взаимодействия с бэкендом.*
+
+-   [ ] Определить Firestore Модели (`User`, `Post` - фото+текст, `Follow`, `Stats`).
+-   [ ] Создать `StorageService`.
+-   [ ] Создать `UserProfileService`.
+-   [ ] Создать `PostService`.
+-   [ ] Создать `FollowService`.
+-   [ ] Создать `FeedService`.
+
+## Phase 4: Feature Implementation - Feed & CurrentUserProfile
+
+*Цель: Реализовать основные экраны - ленту и профиль текущего пользователя.*
+
+-   [ ] **Feed (Tab 1):** UI ленты, "сторис", ViewModel, загрузка данных, навигация на `UserProfileCoordinator`.
+-   [ ] **CurrentUserProfile (Tab 2):** Координатор, переиспользование `UserProfileFeedViewController`, отображение данных текущего юзера, настройка UI (Edit).
+
+## Phase 5: Feature Implementation - UserProfile (Modal)
+
+*Цель: Реализовать показ профиля другого пользователя.*
+
+-   [ ] Реализация `UserProfileContainerViewController` (слайдер Card/Person/Stats).
+-   [ ] Реализация `UserProfileCardViewController` (Макет 2).
+-   [ ] Реализация `UserProfileFeedViewController` (Макет 3) - переиспользование.
+-   [ ] Реализация `UserProfileStatsViewController` (Макет 4).
+-   [ ] Настроить представление/переход из `FeedCoordinator`.
+
+## Phase 6: Other Tabs & Features
+
+*Цель: Реализовать заглушки/базовый функционал остальных вкладок и фич.*
+
+-   [ ] Leveling (Tab 3) - Интеграция существующей логики.
+-   [ ] Progress (Tab 4) - Базовый UI.
+-   [ ] Store (Tab 5) - Базовый UI.
+-   [ ] Create (Центральная кнопка) - Базовый UI/флоу (Заменен на Leveling).
+-   [ ] Сообщения (иконка в Feed) - Базовый UI.
+-   [ ] Подписки (логика и UI).
+-   [ ] Статы/Достижения (логика и UI).
+
+## Ongoing / TODOs
+
+-   [ ] Исследовать и исправить баги компиляции Xcode 16 beta (`contentInsetAdjustmentBehavior`, `isTranslucent`).
+-   [ ] Добавить проверку прав доступа к галерее.
+-   [ ] Решить, как будет работать навигация на Настройки (из `UserProfile` или `CurrentUserProfile`).

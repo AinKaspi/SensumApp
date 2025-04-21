@@ -69,225 +69,97 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 }
 
 // ----- Главный Координатор Приложения -----
-class AppCoordinator: Coordinator { // Делаем AppCoordinator соответствующим нашему протоколу
+class AppCoordinator: Coordinator {
     
-    // AppCoordinator владеет главным окном, а не UINavigationController напрямую
     var window: UIWindow
-    
-    // Реализация требований протокола Coordinator
-    var navigationController: UINavigationController // Этот navController будет общим или не использоваться напрямую AppCoordinator'ом
+    var navigationController: UINavigationController // Не используется для TabBar
     var childCoordinators: [Coordinator] = []
 
     init(window: UIWindow) {
         self.window = window
-        self.navigationController = UINavigationController() // Создаем "пустой" navController для соответствия протоколу, но можем не использовать его
+        self.navigationController = UINavigationController() // Заглушка для протокола
+        // TODO: Добавить проверку статуса аутентификации. Если не вошел - запускать AuthCoordinator.
     }
 
     func start() {
-        // 1. Создаем TabBarController
+        // Создаем TabBarController
         let tabBarController = UITabBarController()
         
-        // 2. Создаем КООРДИНАТОРЫ для каждой вкладки
-        let personCoordinator = PersonCoordinator(navigationController: UINavigationController()) // Создаем, но не будем добавлять его NC в таббар
-        let eventsCoordinator = EventsCoordinator(navigationController: UINavigationController())
-        let levelingCoordinator = LevelingCoordinator(navigationController: UINavigationController())
-        let rankCoordinator = RankCoordinator(navigationController: UINavigationController())
-        let storeCoordinator = StoreCoordinator(navigationController: UINavigationController())
+        // --- Создаем и настраиваем координаторы для каждой вкладки ---
         
-        // Создаем PersonContainerViewController отдельно
-        let personContainerVC = PersonContainerViewController()
-        personContainerVC.coordinator = personCoordinator // Назначаем координатора
+        // 1. Feed Coordinator (Tab 1)
+        let feedNavController = UINavigationController()
+        let feedCoordinator = FeedCoordinator(navigationController: feedNavController)
+        addChild(feedCoordinator)
+        feedCoordinator.start()
+        feedNavController.tabBarItem = UITabBarItem(title: "Feed", image: UIImage(systemName: "flame.fill"), tag: 0) // Иконка Огонь
+
+        // 2. Current User Profile Coordinator (Tab 2)
+        let profileNavController = UINavigationController()
+        let currentUserProfileCoordinator = CurrentUserProfileCoordinator(navigationController: profileNavController)
+        addChild(currentUserProfileCoordinator)
+        currentUserProfileCoordinator.start()
+        profileNavController.tabBarItem = UITabBarItem(title: "Person", image: UIImage(systemName: "person.fill"), tag: 1) // Иконка Человек
         
-        // Сохраняем дочерние координаторы
-        addChild(personCoordinator)
-        addChild(eventsCoordinator)
+        // 3. Leveling Coordinator (Tab 3)
+        let levelingNavController = UINavigationController()
+        let levelingCoordinator = LevelingCoordinator(navigationController: levelingNavController)
         addChild(levelingCoordinator)
-        addChild(rankCoordinator)
-        addChild(storeCoordinator)
-        
-        // 3. ЗАПУСКАЕМ каждый дочерний координатор
-        personCoordinator.start()
-        eventsCoordinator.start()
         levelingCoordinator.start()
-        rankCoordinator.start()
+        // Используем кастомную иконку? Пока оставим системную.
+        levelingNavController.tabBarItem = UITabBarItem(title: "Leveling", image: UIImage(systemName: "figure.walk"), tag: 2) // Нужна иконка Круг?
+        // TODO: Настроить внешний вид центральной кнопки таббара?
+
+        // 4. Progress Coordinator (Tab 4)
+        let progressNavController = UINavigationController()
+        let progressCoordinator = ProgressCoordinator(navigationController: progressNavController)
+        addChild(progressCoordinator)
+        progressCoordinator.start()
+        progressNavController.tabBarItem = UITabBarItem(title: "Progress", image: UIImage(systemName: "chart.bar.fill"), tag: 3) // Иконка Столбцы
+        
+        // 5. Store Coordinator (Tab 5)
+        let storeNavController = UINavigationController()
+        let storeCoordinator = StoreCoordinator(navigationController: storeNavController)
+        addChild(storeCoordinator)
         storeCoordinator.start()
-
-        // 4. Настраиваем вкладки TabBarController
-        // Для Person используем напрямую personContainerVC
-        personContainerVC.tabBarItem = UITabBarItem(title: "Person", image: UIImage(systemName: "person.fill"), tag: 0)
-        // Для остальных используем navigationController'ы координаторов
-        eventsCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Events", image: UIImage(systemName: "calendar"), tag: 1)
-        levelingCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Leveling", image: UIImage(systemName: "figure.walk"), tag: 2)
-        rankCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Rank", image: UIImage(systemName: "list.star"), tag: 3)
-        storeCoordinator.navigationController.tabBarItem = UITabBarItem(title: "Store", image: UIImage(systemName: "cart.fill"), tag: 4)
-
-        // 5. Добавляем контроллеры в TabBarController
+        storeNavController.tabBarItem = UITabBarItem(title: "Store", image: UIImage(systemName: "cart.fill"), tag: 4) // Иконка Корзина
+        
+        // --- Собираем TabBarController ---
         tabBarController.viewControllers = [
-            personContainerVC, // <-- Добавляем контейнер напрямую
-            eventsCoordinator.navigationController,
-            levelingCoordinator.navigationController,
-            rankCoordinator.navigationController,
-            storeCoordinator.navigationController
+            feedNavController,
+            profileNavController,
+            levelingNavController,
+            progressNavController,
+            storeNavController
         ]
         
-        
-        // 6. Настраиваем внешний вид TabBar с помощью Appearance API
+        // Настраиваем внешний вид TabBar (оставляем как было)
         let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground() 
-        // Устанавливаем черный цвет фона
-        appearance.backgroundColor = .black 
-
-        // Настройка цвета иконок и текста
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = .black
         let itemAppearance = UITabBarItemAppearance()
         itemAppearance.normal.iconColor = .lightGray
         itemAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.lightGray]
         itemAppearance.selected.iconColor = .white
         itemAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor.white]
-
         appearance.stackedLayoutAppearance = itemAppearance
         appearance.inlineLayoutAppearance = itemAppearance
         appearance.compactInlineLayoutAppearance = itemAppearance
-
         tabBarController.tabBar.standardAppearance = appearance
-        // Добавляем 적용 для iOS 15+ скролл-эдж
         if #available(iOS 15.0, *) {
             tabBarController.tabBar.scrollEdgeAppearance = appearance
         }
 
-        // Старые свойства можно закомментировать или удалить
-        // tabBarController.tabBar.backgroundColor = .darkGray
-        // tabBarController.tabBar.tintColor = .white
-        // tabBarController.tabBar.unselectedItemTintColor = .lightGray
-        
-        // 7. Устанавливаем TabBarController как корневой для окна
+        // Устанавливаем TabBarController как корневой
         window.rootViewController = tabBarController
+        // Убираем желтый фон окна
+        window.backgroundColor = .black 
     }
 }
 
-// ----- Координаторы-заглушки для других вкладок -----
-// TODO: Перенести эти классы в соответствующие папки Features/.../Coordinators/
+// ----- Координаторы-заглушки (Events/Rank удалены, остальные используются) -----
+// class EventsCoordinator: Coordinator { ... }
+// class RankCoordinator: Coordinator { ... }
 
-class EventsCoordinator: Coordinator {
-    var navigationController: UINavigationController
-    var childCoordinators: [Coordinator] = []
-    init(navigationController: UINavigationController) { self.navigationController = navigationController }
-    func start() {
-        let vc = EventsViewController() // Используем твой ViewController или заглушку
-        vc.view.backgroundColor = .darkGray // Пример фона
-        vc.title = "Events (stub)" // Пример заголовка
-        navigationController.setViewControllers([vc], animated: false)
-    }
-}
-
-class LevelingCoordinator: Coordinator, ExerciseSelectionViewModelCoordinatorDelegate {
-    var navigationController: UINavigationController
-    var childCoordinators: [Coordinator] = []
-    
-    // Создаем и храним PoseLandmarkerHelper на уровне координатора
-    private var poseLandmarkerHelper: PoseLandmarkerHelper?
-    private let sessionQueue = DispatchQueue(label: "com.sensum.poseHelperQueue") // Очередь для хелпера
-    
-    init(navigationController: UINavigationController) { 
-        self.navigationController = navigationController
-        // Запускаем инициализацию хелпера в фоне при создании координатора
-        setupPoseLandmarkerHelperInBackground()
-    }
-    
-    func start() {
-        // Стартуем с экрана выбора упражнений
-        let selectionVC = ExerciseSelectionViewController()
-        // Создаем ViewModel и передаем себя как делегата
-        let viewModel = ExerciseSelectionViewModel(coordinatorDelegate: self) 
-        selectionVC.viewModel = viewModel // Передаем ViewModel во ViewController
-        selectionVC.title = "Упражнения"
-        navigationController.setViewControllers([selectionVC], animated: false)
-    }
-    
-    // Реализуем метод делегата
-    func exerciseSelectionViewModelDidSelect(exercise: Exercise) {
-        // Создаем и показываем экран выполнения
-        let executionVC = ExerciseExecutionViewController()
-        // Создаем ViewModel, передавая упражнение, ГОТОВЫЙ хелпер и делегата VC
-        let executionViewModel = ExerciseExecutionViewModel(exercise: exercise, 
-                                                          poseLandmarkerHelper: self.poseLandmarkerHelper,
-                                                          viewDelegate: executionVC)
-        executionVC.viewModel = executionViewModel 
-        executionVC.title = exercise.name
-        navigationController.pushViewController(executionVC, animated: true)
-    }
-    
-    // Метод для инициализации PoseLandmarkerHelper в фоне
-    private func setupPoseLandmarkerHelperInBackground() {
-        sessionQueue.async { [weak self] in
-            guard let self = self else { return }
-            
-            // Параметры инициализации (можно вынести в константы)
-            let modelPathString = "pose_landmarker_full.task"
-            let numPoses = 1
-            let minPoseDetectionConfidence: Float = 0.5
-            let minPosePresenceConfidence: Float = 0.5
-            let minTrackingConfidence: Float = 0.5
-            let computeDelegate: Delegate = .GPU
-            
-            guard let modelPath = Bundle.main.path(forResource: modelPathString, ofType: nil) else {
-                print("LevelingCoordinator Ошибка: Файл модели MediaPipe не найден ('\(modelPathString)').")
-                return
-            }
-            
-            // Используем тот же статический инициализатор, но liveStreamDelegate будет nil
-            // Делегат будет назначен позже во ViewModel
-            self.poseLandmarkerHelper = PoseLandmarkerHelper.liveStreamPoseLandmarkerHelper(
-                modelPath: modelPath, 
-                numPoses: numPoses,
-                minPoseDetectionConfidence: minPoseDetectionConfidence, 
-                minPosePresenceConfidence: minPosePresenceConfidence, 
-                minTrackingConfidence: minTrackingConfidence, 
-                liveStreamDelegate: nil, // Делегат будет назначен во ViewModel
-                computeDelegate: computeDelegate
-            )
-            
-            if self.poseLandmarkerHelper == nil {
-                 print("LevelingCoordinator Ошибка: Ошибка инициализации PoseLandmarkerHelper.")
-            } else {
-                 print("--- LevelingCoordinator: PoseLandmarkerHelper инициализирован в фоне. ---")
-            }
-        }
-    }
-}
-
-class RankCoordinator: Coordinator {
-    var navigationController: UINavigationController
-    var childCoordinators: [Coordinator] = []
-    init(navigationController: UINavigationController) { self.navigationController = navigationController }
-    func start() {
-        let vc = RankViewController() // Используем твой ViewController или заглушку
-        vc.view.backgroundColor = .darkGray
-        vc.title = "Rank (stub)"
-        navigationController.setViewControllers([vc], animated: false)
-    }
-}
-
-class StoreCoordinator: Coordinator {
-    var navigationController: UINavigationController
-    var childCoordinators: [Coordinator] = []
-    init(navigationController: UINavigationController) { self.navigationController = navigationController }
-    func start() {
-        let vc = StoreViewController() // Используем твой ViewController или заглушку
-        vc.view.backgroundColor = .darkGray
-        vc.title = "Store (stub)"
-        navigationController.setViewControllers([vc], animated: false)
-    }
-}
-
-// Удаляем закомментированные заглушки ViewController'ов
-/*
-// ----- ViewController'ы-заглушки для других вкладок -----
-// TODO: Перенести эти классы в соответствующие папки Features/.../Scenes/
-
-// Удаляем эти заглушки, так как реальные классы существуют или будут созданы
-// class EventsViewController: UIViewController {}
-// class LevelingViewController: UIViewController {}
-// class RankViewController: UIViewController {}
-// class StoreViewController: UIViewController {}
-*/
+// LevelingCoordinator, StoreCoordinator теперь реальные координаторы в своих папках
 
