@@ -29,13 +29,14 @@ SensumApp/
 |   |   +-- Views/           (StoryCircleCell.swift, PostCell.swift, etc.)
 |   |
 |   |-- UserProfile/         (Экраны для профиля *ДРУГОГО* пользователя - НЕ в таббаре)
-|   |   |-- Coordinators/    (UserProfileCoordinator.swift - запускается из Feed)
+|   |   |-- Coordinators/    (UserProfileCoordinator.swift)
 |   |   |-- Scenes/
-|   |   |   |-- Container/   (UserProfileContainerViewController.swift - управляет Card/Person/Stats)
-|   |   |   |-- Card/        (UserProfileCardViewController.swift - старый ProfileVC, макет 2)
-|   |   |   |-- FeedGrid/    (UserProfileFeedViewController.swift - макет 3, ПЕРЕИСПОЛЬЗУЕТСЯ!)
-|   |   |   +-- Stats/       (UserProfileStatsViewController.swift - макет 4)
-|   |   +-- Views/           (TopMenuView.swift - используется в Container)
+|   |   |   |-- Container/   (UserProfileContainerViewController.swift)
+|   |   |   |-- Card/        (UserProfileCardViewController.swift)
+|   |   |   |-- FeedGrid/    (UserProfileFeedViewController.swift)
+|   |   |   +-- Stats/       (UserProfileStatsViewController.swift)
+|   |   +-- Views/           (TopMenuView.swift)
+|   |   +-- ViewModels/      (PersonViewModel.swift - TODO: Rename?)
 |   |
 |   |-- CurrentUserProfile/  (Таб 2: Профиль Текущего Пользователя)
 |   |   |-- Coordinators/    (CurrentUserProfileCoordinator.swift)
@@ -63,45 +64,45 @@ SensumApp/
 |       +-- Scenes/          (ChatListViewController.swift, ChatViewController.swift)
 ```
 
-## Phase 1: Refactoring & Setup (Приоритет!)
+## Phase 1: Refactoring & Setup (Завершено!)
 
 *Цель: Перестроить структуру проекта под новую концепцию, переименовать компоненты, настроить базовые координаторы для всех вкладок.*
 
--   [ ] **Rename Feature:** Rename folder `Features/Person` -> `Features/UserProfile`. (Выполнено пользователем)
--   [ ] **Rename/Create UserProfile Components (Модальный профиль другого пользователя):**
+-   [x] **Refactor Feature:** Create `Features/UserProfile` folder structure and move/rename components from old `Features/Person`. (Выполнено)
+-   [x] **Rename/Create UserProfile Components (Модальный профиль другого пользователя):**
     -   [x] Rename `PersonCoordinator` -> `UserProfileCoordinator` (file & class). (Выполнено)
     -   [x] Rename `PersonContainerViewController` -> `UserProfileContainerViewController` (file & class). (Выполнено)
     -   [x] Rename `ProfileViewController` -> `UserProfileCardViewController` (file & class, Макет 2). (Выполнено)
-    -   [ ] Rename `StatsViewController` -> `UserProfileStatsViewController` (file & class, Макет 4).
-    -   [ ] Create placeholder `UserProfileFeedViewController.swift` (file & class, Макет 3).
-    -   [ ] Update `UserProfileContainerViewController` to manage Card/Person/Stats VCs.
-    -   [ ] Update `TopMenuView.swift` segments: "Card", "Person", "Stats". Add back arrow delegate?.
--   [ ] **Create Feed Components (Tab 1 - Placeholders):**
-    -   [ ] Create folder `Features/Feed`.
-    -   [ ] Create `FeedCoordinator.swift` (file & class).
-    -   [ ] Create `FeedViewController.swift` (file & class).
--   [ ] **Create CurrentUserProfile Components (Tab 2 - Placeholders):**
-    -   [ ] Create folder `Features/CurrentUserProfile`.
-    -   [ ] Create `CurrentUserProfileCoordinator.swift` (file & class).
-    -   [ ] Create placeholder `CurrentUserProfileContainerViewController.swift`? (Or use `UserProfileFeedVC` directly).
--   [ ] **Verify/Update Leveling Components (Tab 3):**
-    -   [ ] Verify `Features/Leveling` exists.
-    *   [ ] Verify `LevelingCoordinator.swift` exists (update if needed).
-    *   [ ] Verify `ExerciseSelectionViewController.swift` & `ExerciseExecutionViewController.swift` exist.
--   [ ] **Create Progress Components (Tab 4 - Placeholders):**
-    *   [ ] Create folder `Features/Progress`.
-    *   [ ] Create `ProgressCoordinator.swift` (file & class).
-    *   [ ] Create `ProgressViewController.swift` (file & class).
--   [ ] **Verify/Update Store Components (Tab 5 - Placeholders):**
-    *   [ ] Verify `Features/Store` exists.
-    *   [ ] Verify `StoreCoordinator.swift` exists (update if needed).
-    *   [ ] Verify `StoreViewController.swift` exists.
--   [ ] **Update AppCoordinator (`SceneDelegate.swift`):**
-    *   [ ] Configure `UITabBarController` with: `FeedCoordinator`, `CurrentUserProfileCoordinator`, `LevelingCoordinator`, `ProgressCoordinator`, `StoreCoordinator`.
-    *   [ ] Ensure all coordinators are initialized and started correctly.
--   [ ] **Update Imports & References:** Systematically fix all broken imports and class/file references project-wide after renames.
--   [ ] **Delete Unused Files:** Delete `SensumApp/ViewController.swift`.
--   [ ] **Build & Test:** Ensure the app compiles and runs with the new structure (mostly placeholders).
+    -   [x] Rename `StatsViewController` -> `UserProfileStatsViewController` (file & class, Макет 4). (Выполнено)
+    -   [x] Create placeholder `UserProfileFeedViewController.swift` (file & class, Макет 3). (Выполнено)
+    -   [x] Update `UserProfileContainerViewController` to manage Card/Person/Stats VCs. (Выполнено)
+    -   [x] Update `TopMenuView.swift` segments: "Card", "Person", "Stats". Add back arrow delegate?. (Выполнено)
+-   [x] **Create Feed Components (Tab 1 - Placeholders):**
+    -   [x] Create folder `Features/Feed`. (Выполнено пользователем)
+    -   [x] Create `FeedCoordinator.swift` (file & class). (Выполнено)
+    -   [x] Create `FeedViewController.swift` (file & class). (Выполнено)
+-   [x] **Create CurrentUserProfile Components (Tab 2 - Placeholders):**
+    -   [x] Create folder `Features/CurrentUserProfile`. (Выполнено пользователем)
+    -   [x] Create `CurrentUserProfileCoordinator.swift` (file & class). (Выполнено)
+    -   [x] Create placeholder `CurrentUserProfileContainerViewController.swift`? (Or use `UserProfileFeedVC` directly). (Выполнено - пока без контейнера)
+-   [x] **Verify/Update Leveling Components (Tab 3):**
+    -   [x] Verify `Features/Leveling` exists. (Выполнено)
+    *   [x] Verify `LevelingCoordinator.swift` exists (update if needed). (Создан)
+    *   [x] Verify `ExerciseSelectionViewController.swift` & `ExerciseExecutionViewController.swift` exist. (Выполнено)
+-   [x] **Create Progress Components (Tab 4 - Placeholders):**
+    *   [x] Create folder `Features/Progress`. (Выполнено)
+    *   [x] Create `ProgressCoordinator.swift` (file & class). (Выполнено)
+    *   [x] Create `ProgressViewController.swift` (file & class). (Выполнено)
+-   [x] **Verify/Update Store Components (Tab 5 - Placeholders):**
+    *   [x] Verify `Features/Store` exists. (Выполнено)
+    *   [x] Verify `StoreCoordinator.swift` exists (update if needed). (Создан)
+    *   [x] Verify `StoreViewController.swift` exists. (Выполнено)
+-   [x] **Update AppCoordinator (`SceneDelegate.swift`):**
+    *   [x] Configure `UITabBarController` with: `FeedCoordinator`, `CurrentUserProfileCoordinator`, `LevelingCoordinator`, `ProgressCoordinator`, `StoreCoordinator`. (Выполнено)
+    *   [x] Ensure all coordinators are initialized and started correctly. (Выполнено)
+-   [x] **Update Imports & References:** Systematically fix all broken imports and class/file references project-wide after renames. (Выполнено в процессе)
+-   [x] **Delete Unused Files/Folders:** Delete `SensumApp/ViewController.swift`, `Features/Person`, `Features/Rank`, `Features/Events`. (Выполнено / Задача пользователю)
+-   [x] **Build & Test:** Ensure the app compiles and runs with the new structure (mostly placeholders). (Выполнено - Компилируется!)
 
 ## Phase 2: Backend & Authentication
 

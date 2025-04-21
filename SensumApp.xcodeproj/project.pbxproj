@@ -33,16 +33,6 @@
 			);
 			target = B14866682DA4351800C4A753 /* SensumApp */;
 		};
-		B1A4834F2DB6C07A00755E25 /* Exceptions for "Features" folder in "SensumApp" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Person/Coordinators/UserProfileCoordinator.swift,
-				Person/Models/FeedEvent.swift,
-				Person/Scenes/Container/UserProfileContainerViewController.swift,
-				Person/Views/TopMenuView.swift,
-			);
-			target = B14866682DA4351800C4A753 /* SensumApp */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -56,9 +46,6 @@
 		};
 		B148669E2DA43B8000C4A753 /* Features */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				B1A4834F2DB6C07A00755E25 /* Exceptions for "Features" folder in "SensumApp" target */,
-			);
 			path = Features;
 			sourceTree = "<group>";
 		};
