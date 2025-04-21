@@ -28,14 +28,15 @@ struct FeedEvent { // TODO: Вынести в Models
 // }
 
 // --- Класс ViewController ---
-// Возвращаем соответствие протоколам для ImagePicker
-class ProfileViewController: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate, UIGestureRecognizerDelegate {
+// Переименовываем класс в UserProfileCardViewController
+// Возвращаем соответствие протоколам для ImagePicker (пока оставим, хотя выбор аватара тут не нужен будет)
+class UserProfileCardViewController: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate, UIGestureRecognizerDelegate {
 
     // MARK: - Dependencies
-    var viewModel: PersonViewModel!
-    var coordinator: PersonCoordinator?
-    // Удаляем старый PersonViewControllerDelegate
-    // weak var delegate: PersonViewControllerDelegate?
+    // ViewModel нужно будет адаптировать или заменить
+    var viewModel: PersonViewModel! // Оставим пока старый
+    // Координатор тут не нужен, управляет контейнер
+    // var coordinator: PersonCoordinator?
 
     // MARK: - UI Properties
     private lazy var backgroundImageView: UIImageView = {
@@ -139,31 +140,24 @@ class ProfileViewController: UIViewController, UIImagePickerControllerDelegate, 
     // --- Жизненный цикл и настройка ---
     override func viewDidLoad() {
         super.viewDidLoad()
-        // assert(viewModel != nil, "ViewModel not set for PersonViewController") 
-        // Вместо assert делаем guard, если viewModel опционален
         guard viewModel != nil else {
-             fatalError("ViewModel not injected into PersonViewController") // Или другая обработка ошибки
+             fatalError("ViewModel not injected into UserProfileCardViewController")
         }
 
-        view.backgroundColor = .black
+        view.backgroundColor = .black // Оставим черный фон
         setupViews()
         setupConstraints()
-        setupAvatarTapGesture(for: backgroundImageView)
+        // Убираем обработку тапа по аватару, это не для экрана Card
+        // setupAvatarTapGesture(for: backgroundImageView) 
         updateProfileDisplayFromViewModel() 
-        // TODO: Настроить делегата для topMenuView
+        // TODO: Убрать ненужную логику делегата TopMenuView из этого VC
     }
 
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        navigationController?.setNavigationBarHidden(true, animated: animated)
-        // Обновляем UI ИЗ ViewModel
-        updateProfileDisplayFromViewModel()
-    }
-
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-        navigationController?.setNavigationBarHidden(false, animated: animated)
-    }
+    // Убираем viewWillAppear/Disappear, т.к. управляет контейнер
+    /*
+    override func viewWillAppear(_ animated: Bool) { ... }
+    override func viewWillDisappear(_ animated: Bool) { ... }
+    */
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
@@ -185,11 +179,6 @@ class ProfileViewController: UIViewController, UIImagePickerControllerDelegate, 
         bottomInfoContainerView.addSubview(levelLabel)
         bottomInfoContainerView.addSubview(xpProgressBar)
         bottomInfoContainerView.addSubview(xpLabel)
-
-        // Назначаем обработчик нажатия на фоновый аватар
-        setupAvatarTapGesture(for: backgroundImageView)
-        // Назначаем обработчик нажатия на статус
-        setupStatusLabelTapGesture()
     }
 
     private func setupConstraints() {
@@ -254,20 +243,19 @@ class ProfileViewController: UIViewController, UIImagePickerControllerDelegate, 
 
     // MARK: - Data Handling
     private func updateProfileDisplayFromViewModel() {
-        // Получаем данные из ViewModel
+        // Логика остается, будет получать данные из адаптированной ViewModel
         usernameLabel.text = viewModel.usernameText
         statusLabel.text = viewModel.statusText
         levelLabel.text = viewModel.levelText
         xpLabel.text = viewModel.xpText
-        xpProgressBar.setProgress(viewModel.xpProgress, animated: view.window != nil) // Анимируем только если view видима
+        xpProgressBar.setProgress(viewModel.xpProgress, animated: view.window != nil)
         
-        // Устанавливаем аватары из ViewModel
         if let avatar = viewModel.avatarImage {
             backgroundImageView.image = avatar
             backgroundImageView.contentMode = .scaleAspectFill
             miniAvatarImageView.image = avatar
         } else {
-            // Устанавливаем плейсхолдеры
+            // Плейсхолдеры
             backgroundImageView.image = UIImage(systemName: "person.crop.circle.fill")
             backgroundImageView.tintColor = .darkGray
             backgroundImageView.contentMode = .scaleAspectFit 
@@ -278,166 +266,35 @@ class ProfileViewController: UIViewController, UIImagePickerControllerDelegate, 
         }
     }
 
+    // Убираем все, что связано с редактированием аватара и статуса
     // MARK: - Avatar Handling
-    private func setupAvatarTapGesture(for imageView: UIImageView) {
-        // Убедимся, что старый жест удален, если он был
-        imageView.gestureRecognizers?.forEach { imageView.removeGestureRecognizer($0) }
-        
-        imageView.isUserInteractionEnabled = true // Убедимся, что интерактивность включена
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(avatarTapped))
-        imageView.addGestureRecognizer(tapGesture)
-    }
-
-    @objc private func avatarTapped(_ sender: UITapGestureRecognizer) {
-        // Определяем, по какому ImageView тапнули (если нужно будет разное поведение)
-        // let tappedImageView = sender.view as? UIImageView
-        // if tappedImageView == backgroundImageView { ... }
-        
-        // TODO: Проверить права доступа к галерее
-        let imagePickerController = UIImagePickerController()
-        imagePickerController.delegate = self
-        imagePickerController.sourceType = .photoLibrary
-        // imagePickerController.allowsEditing = true // Разрешить редактирование?
-        present(imagePickerController, animated: true, completion: nil)
-    }
+    /*
+    private func setupAvatarTapGesture(for imageView: UIImageView) { ... }
+    @objc private func avatarTapped(_ sender: UITapGestureRecognizer) { ... }
+    */
     
-    // MARK: - Status Handling (Новый раздел)
-    private func setupStatusLabelTapGesture() {
-        statusLabel.isUserInteractionEnabled = true
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(statusLabelTapped))
-        statusLabel.addGestureRecognizer(tapGesture)
-    }
-    
-    @objc private func statusLabelTapped() {
-        // Показываем Alert для редактирования статуса
-        let alertController = UIAlertController(title: "Изменить статус", message: nil, preferredStyle: .alert)
-        
-        // Добавляем текстовое поле
-        alertController.addTextField { [weak self] textField in
-            textField.placeholder = "Введите новый статус..."
-            // Устанавливаем текущий статус как начальное значение
-            textField.text = self?.viewModel.statusText.contains("placeholder") ?? true ? "" : self?.viewModel.statusText
-        }
-        
-        // Кнопка Сохранить
-        let saveAction = UIAlertAction(title: "Сохранить", style: .default) { [weak self, weak alertController] _ in
-            guard let self = self, let textField = alertController?.textFields?.first else { return }
-            let newStatus = textField.text ?? "" // Получаем новый статус
-            
-            // Вызываем ViewModel для сохранения
-            self.viewModel.saveNewStatus(newStatus)
-            
-            // Обновляем UI (ViewModel должна была обновить свой userProfile)
-            self.updateProfileDisplayFromViewModel()
-        }
-        
-        // Кнопка Отмена
-        let cancelAction = UIAlertAction(title: "Отмена", style: .cancel, handler: nil)
-        
-        alertController.addAction(saveAction)
-        alertController.addAction(cancelAction)
-        
-        present(alertController, animated: true, completion: nil)
-    }
+    // MARK: - Status Handling
+    /*
+    private func setupStatusLabelTapGesture() { ... }
+    @objc private func statusLabelTapped() { ... }
+    */
     
     // MARK: - Actions
     @objc private func followButtonTapped() {
-        print("Follow button tapped - Action Placeholder")
+        print("Follow button tapped - Action Placeholder - Should be handled by Container/ViewModel?")
     }
     
-    // Метод settingsButtonTapped удален, т.к. обработка идет через делегат TopMenuViewDelegate
-    /*
-    @objc private func settingsButtonTapped() {
-        delegate?.personViewControllerDidTapSettings(self)
-    }
-    */
-
 }
 
+// Убираем ненужные расширения
+/*
 // MARK: - UIImagePickerControllerDelegate & UINavigationControllerDelegate
-extension ProfileViewController {
-    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-        guard let selectedImage = info[.originalImage] as? UIImage else {
-            picker.dismiss(animated: true, completion: nil)
-            return
-        }
-        // Обновляем UI через ViewModel
-        viewModel.saveNewAvatar(selectedImage) 
-        // Обновляем UI немедленно (ViewModel сам обновит свое свойство avatarImage)
-        backgroundImageView.image = selectedImage
-        miniAvatarImageView.image = selectedImage
-        backgroundImageView.contentMode = .scaleAspectFill
-        
-        picker.dismiss(animated: true, completion: nil)
-    }
-
-    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-        picker.dismiss(animated: true, completion: nil)
-    }
-}
+extension UserProfileCardViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate { ... }
 
 // MARK: - Avatar File Management Helpers
-extension ProfileViewController {
-    // Оставляем эти хелперы приватными для VC, пока ViewModel не реализована
-    private func getAvatarFileURL(forUserID userID: UUID) -> URL? {
-        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
-        let fileName = "avatar_\(userID.uuidString).png"
-        return documentsDirectory.appendingPathComponent(fileName)
-    }
-
-    private func saveAvatarImage(_ image: UIImage, forUserID userID: UUID) -> Bool {
-        guard let fileURL = getAvatarFileURL(forUserID: userID), let imageData = image.pngData() else { return false }
-        do {
-            try imageData.write(to: fileURL, options: .atomic)
-            return true
-        } catch {
-            print("Error saving avatar image: \(error)")
-            return false
-        }
-    }
-
-    private func loadAvatarImage(forUserID userID: UUID) -> UIImage? {
-        guard let fileURL = getAvatarFileURL(forUserID: userID),
-              FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
-        do {
-            let imageData = try Data(contentsOf: fileURL)
-            return UIImage(data: imageData)
-        } catch {
-            print("Error loading avatar image: \(error)")
-            return nil
-        }
-    }
-}
+extension UserProfileCardViewController { ... }
 
 // MARK: - TopMenuViewDelegate
-extension ProfileViewController: TopMenuViewDelegate {
-    func topMenuViewDidSelect(segment: TopMenuView.Segment) {
-        print("--- PersonVC: Выбран сегмент меню: \(segment) ---")
-        // Вызываем методы координатора для навигации
-        switch segment {
-        case .profile:
-            // Ничего не делаем, мы уже здесь
-            // (Или можно обеспечить возврат, если были показаны Stats/Achievements модально)
-            break
-        case .stats:
-            print("--- ProfileVC: Stats selected (handled by Container) ---") // Добавим лог для ясности
-        // case .achievements: // Удалено
-        //    coordinator?.showAchievements()
-        //    break
-        }
-    }
-    
-    func topMenuViewDidTapSettings() {
-        print("--- PersonVC: Нажата кнопка настроек --- ")
-        // Вызываем координатора
-        coordinator?.showSettings()
-    }
-}
-
-// Удаляем пустой UIGestureRecognizerDelegate
-/*
-extension PersonViewController {
-    // func gestureRecognizer(...) -> Bool { return true }
-}
+extension UserProfileCardViewController: TopMenuViewDelegate { ... }
 */
 
