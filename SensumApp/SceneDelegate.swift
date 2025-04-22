@@ -7,6 +7,7 @@
 
 import UIKit
 import MediaPipeTasksVision
+import Combine // Добавляем Combine
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
@@ -77,27 +78,47 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
     var childCoordinators: [Coordinator] = []
     
     // Добавляем AuthService
-    private lazy var authService: AuthServiceProtocol = AuthService()
+    private let authService: AuthServiceProtocol = AuthService()
     
     // Храним ссылку на AuthCoordinator, если он активен
     private var authCoordinator: AuthCoordinator?
+    private var cancellables = Set<AnyCancellable>() // Для подписки
 
     init(window: UIWindow) {
         self.window = window
         self.navigationController = UINavigationController() // Заглушка для протокола
+        setupAuthenticationSubscription() // Подписываемся СРАЗУ
     }
 
     func start() {
-        // Проверяем начальное состояние аутентификации
+        // Просто вызываем проверку начального состояния
+        // Подписка сама решит, какой flow показать
         authService.checkAuthenticationState()
-        
-        if authService.authenticationState.value == .signedIn {
-            print("AppCoordinator: User already signed in. Starting main flow.")
-            showMainAppFlow()
-        } else {
-            print("AppCoordinator: User not signed in. Starting auth flow.")
-            showAuthenticationFlow()
-        }
+        window.makeKeyAndVisible()
+        window.backgroundColor = .black 
+    }
+    
+    // Настраиваем подписку на состояние аутентификации
+    private func setupAuthenticationSubscription() {
+        authService.authenticationState
+            .receive(on: DispatchQueue.main) // Переключаем на главный поток для UI
+            // Убираем дублирующиеся значения (чтобы не переключать флоу лишний раз)
+            .removeDuplicates()
+            .sink { [weak self] state in
+                guard let self = self else { return }
+                print("AppCoordinator: Received auth state: \(state)")
+                switch state {
+                case .signedIn:
+                    self.showMainAppFlow()
+                case .signedOut, .unknown:
+                    // Показываем флоу аутентификации, только если он еще не показан
+                    // (чтобы избежать зацикливания при выходе)
+                    if self.authCoordinator == nil {
+                        self.showAuthenticationFlow()
+                    }
+                }
+            }
+            .store(in: &cancellables)
     }
     
     // Показывает основной TabBar интерфейс
@@ -106,9 +127,17 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
         if let authCoordinator = authCoordinator {
             removeChild(authCoordinator)
             self.authCoordinator = nil
+            print("AppCoordinator: Removed AuthCoordinator")
         }
         
-        // --- Код создания TabBarController (переносим сюда из start()) ---
+        // Проверяем, не показываем ли мы уже TabBar
+        if window.rootViewController is UITabBarController {
+            print("AppCoordinator: Main flow (TabBar) already presented.")
+            return
+        }
+        
+        print("AppCoordinator: Setting up Main flow (TabBar)...")
+        // --- Код создания TabBarController ---
         let tabBarController = UITabBarController()
         
         // 1. Feed Coordinator
@@ -120,7 +149,7 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
 
         // 2. Current User Profile Coordinator
         let profileNavController = UINavigationController()
-        let currentUserProfileCoordinator = CurrentUserProfileCoordinator(navigationController: profileNavController)
+        let currentUserProfileCoordinator = CurrentUserProfileCoordinator(navigationController: profileNavController, authService: authService /*, другие сервисы если нужны */)
         addChild(currentUserProfileCoordinator)
         currentUserProfileCoordinator.start()
         profileNavController.tabBarItem = UITabBarItem(title: "Person", image: UIImage(systemName: "person.fill"), tag: 1)
@@ -180,28 +209,33 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
     
     // Показывает флоу аутентификации
     private func showAuthenticationFlow() {
-        // Убираем старые дочерние координаторы, если были
+        // Проверяем, не показываем ли мы уже Auth флоу
+        if authCoordinator != nil, window.rootViewController === authCoordinator?.navigationController {
+             print("AppCoordinator: Auth flow already presented.")
+            return
+        }
+        
+        print("AppCoordinator: Setting up Auth flow...")
+        // Убираем старые дочерние координаторы таббара
         childCoordinators.removeAll()
         
-        // Создаем отдельный Navigation Controller для флоу аутентификации
         let authNavController = UINavigationController()
         authCoordinator = AuthCoordinator(navigationController: authNavController, authService: authService)
-        authCoordinator?.delegate = self // Устанавливаем себя делегатом
+        authCoordinator?.delegate = self
         addChild(authCoordinator!)
         authCoordinator?.start()
         
-        // Устанавливаем authNavController как корневой (он покажет Login/Register)
         window.rootViewController = authNavController
-        window.makeKeyAndVisible()
-        window.backgroundColor = .black // Или другой фон для этого флоу
     }
     
     // MARK: - AuthCoordinatorDelegate
     
     // Вызывается, когда AuthCoordinator завершает работу (пользователь вошел)
     func didFinishAuthentication(coordinator: AuthCoordinator) {
-        print("AppCoordinator: Auth flow finished. Switching to main flow.")
-        showMainAppFlow()
+        print("AppCoordinator: Auth flow finished notification received.")
+        // AuthService уже должен был переключить состояние на .signedIn,
+        // подписка в setupAuthenticationSubscription должна вызвать showMainAppFlow()
+        // Не нужно вызывать showMainAppFlow() прямо отсюда, чтобы избежать двойного вызова.
     }
 }
 

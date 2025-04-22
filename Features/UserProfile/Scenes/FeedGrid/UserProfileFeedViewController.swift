@@ -1,5 +1,6 @@
 import UIKit
 import Combine // Добавляем для биндингов
+import Kingfisher // <-- Импортируем Kingfisher
 // TODO: Импортировать библиотеку для загрузки изображений (Kingfisher, SDWebImage, Nuke)?
 
 // Добавляем делегат для кнопки Выхода
@@ -252,15 +253,34 @@ class UserProfileFeedViewController: UIViewController {
                 self.updateStatStack(self.followersStatStack, value: "\(user.followerCount)", label: "Followers")
                 self.updateStatStack(self.followingStatStack, value: "\(user.followingCount)", label: "Following")
                 
-                // TODO: Загрузить аватар из user.avatarURL
-                // Например, с использованием Kingfisher:
-                /*
+                print("Attempting to load avatar from URL: \(user.avatarURL ?? "nil")") 
+                
+                let placeholder = UIImage(systemName: "person.circle.fill")?.withTintColor(.darkGray, renderingMode: .alwaysOriginal)
+                
                 if let urlString = user.avatarURL, let url = URL(string: urlString) {
-                    self.avatarImageView.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill"))
+                    self.avatarImageView.kf.indicatorType = .activity 
+                    self.avatarImageView.kf.setImage(
+                        with: url, 
+                        placeholder: placeholder, 
+                        options: [
+                            .transition(.fade(0.2)),
+                            .cacheOriginalImage
+                        ],
+                        completionHandler: { result in
+                            switch result {
+                            case .success(let value):
+                                print("Kingfisher: Image loaded successfully from \(value.source.url?.absoluteString ?? "N/A")")
+                            case .failure(let error):
+                                print("Kingfisher Error: Failed to load image - \(error.localizedDescription)")
+                                self.avatarImageView.image = placeholder 
+                                self.avatarImageView.tintColor = .darkGray
+                            }
+                        }
+                    )
                 } else {
-                    self.avatarImageView.image = UIImage(systemName: "person.circle.fill")
+                    self.avatarImageView.image = placeholder
+                    self.avatarImageView.tintColor = .darkGray 
                 }
-                */
             }
             .store(in: &cancellables)
         

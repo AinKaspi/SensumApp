@@ -49,9 +49,11 @@ class UserProfileService: UserProfileServiceProtocol {
                     // Пытаемся декодировать данные в модель User
                     let user = try document.data(as: User.self)
                     completion(.success(user))
-                } catch let error {
-                    print("UserProfileService Error (Decoding User): \(error.localizedDescription)")
-                    completion(.failure(error))
+                } catch let decodingError {
+                    // Печатаем детальную ошибку декодирования
+                    print("UserProfileService Error (Decoding User): \(decodingError.localizedDescription)")
+                    print("Full decoding error details: \(decodingError)")
+                    completion(.failure(decodingError))
                 }
             } else {
                 let fetchError = error ?? NSError(domain: "UserProfileService", code: -2, userInfo: [NSLocalizedDescriptionKey: "User document not found"]) 

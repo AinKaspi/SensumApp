@@ -48,13 +48,16 @@ class UserProfileFeedViewModel {
     func fetchUserProfileData() {
         isLoadingProfile = true
         errorMessage = nil
+        print("Fetching profile for userID: \(userID)")
         userProfileService.fetchUserProfile(userID: userID) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isLoadingProfile = false
                 switch result {
                 case .success(let user):
+                    print("Profile fetched successfully: \(user)")
                     self?.userProfile = user
                 case .failure(let error):
+                    print("Profile fetch failed: \(error.localizedDescription)")
                     self?.errorMessage = "Failed to load profile: \(error.localizedDescription)"
                 }
             }
