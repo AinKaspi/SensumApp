@@ -13,7 +13,7 @@ protocol UserProfileFeedViewControllerDelegate: AnyObject {
 
 // Этот VC будет отображать Макет 3 (Шапка с подписчиками, сетка постов)
 // Он будет переиспользоваться для CurrentUserProfile и UserProfile (другого пользователя)
-class UserProfileFeedViewController: UIViewController {
+class UserProfileFeedViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
 
     // Добавляем ViewModel
     var viewModel: UserProfileFeedViewModel! // Используем !, т.к. он будет инжектирован координатором
@@ -140,17 +140,26 @@ class UserProfileFeedViewController: UIViewController {
     // TODO: Добавить разделитель
     // TODO: Добавить переключатель Grid/List
     
-    // --- Сетка Постов (Placeholder) ---
+    // --- Сетка Постов ---
     private lazy var postsCollectionView: UICollectionView = {
-        // TODO: Настроить layout для сетки
         let layout = UICollectionViewFlowLayout()
+        // Настраиваем layout для сетки
+        let spacing: CGFloat = 1
+        let itemsPerRow: CGFloat = 3
+        let totalSpacing = (itemsPerRow - 1) * spacing
+        let itemWidth = (view.bounds.width - totalSpacing) / itemsPerRow
+        layout.itemSize = CGSize(width: itemWidth, height: itemWidth) // Делаем ячейки квадратными
+        layout.minimumInteritemSpacing = spacing
+        layout.minimumLineSpacing = spacing
+        layout.scrollDirection = .vertical
+        
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.backgroundColor = .clear
-        // TODO: Зарегистрировать ячейку поста
-        // collectionView.register(PostCell.self, forCellWithReuseIdentifier: "PostCell")
-        // collectionView.dataSource = self
-        // collectionView.delegate = self
+        // Регистрируем ячейку
+        collectionView.register(PostGridCell.self, forCellWithReuseIdentifier: PostGridCell.identifier)
+        collectionView.dataSource = self // Устанавливаем dataSource
+        collectionView.delegate = self   // Устанавливаем delegate (для FlowLayout и нажатий)
         return collectionView
     }()
 
@@ -305,12 +314,26 @@ class UserProfileFeedViewController: UIViewController {
             }
             .store(in: &cancellables)
             
-        // TODO: Добавить подписки для:
-        // - viewModel.$userPosts -> обновить postsCollectionView
-        // - viewModel.$isLoadingPosts -> индикатор для постов
-        // - viewModel.$isFollowing -> обновить вид кнопки Follow/Edit
-        // - viewModel.$isCurrentUser -> обновить вид кнопки Follow/Edit
-        
+        // Подписка на посты пользователя
+        viewModel.$userPosts
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in // Нам не нужны сами посты здесь, просто сигнал к перезагрузке
+                print("Received new posts data. Reloading collection view...")
+                self?.postsCollectionView.reloadData()
+                // Обновляем счетчик постов в шапке
+                self?.updateStatStack(self?.postsStatStack ?? UIStackView(), value: "\(self?.viewModel.userPosts.count ?? 0)", label: "Posts")
+            }
+            .store(in: &cancellables)
+            
+        // Подписка на состояние загрузки постов
+        viewModel.$isLoadingPosts
+             .receive(on: DispatchQueue.main)
+             .sink { [weak self] isLoading in
+                 // TODO: Показать/скрыть индикатор загрузки для сетки постов
+                 print("Posts loading state: \(isLoading)")
+             }
+             .store(in: &cancellables)
+            
         // Скрываем/показываем кнопки Edit/Follow/Message
         // Пока просто управляем editProfileButton
         editProfileButton.isHidden = !viewModel.isCurrentUser
@@ -341,4 +364,38 @@ class UserProfileFeedViewController: UIViewController {
     }
     
     // TODO: Actions для Follow/Message
+}
+
+// MARK: - UICollectionViewDataSource
+
+extension UserProfileFeedViewController {
+    
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return viewModel.userPosts.count
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PostGridCell.identifier, for: indexPath) as? PostGridCell else {
+            fatalError("Unable to dequeue PostGridCell")
+        }
+        let post = viewModel.userPosts[indexPath.item]
+        cell.configure(with: post)
+        return cell
+    }
+}
+
+// MARK: - UICollectionViewDelegateFlowLayout
+
+// Delegate нужен, чтобы FlowLayout работал корректно (размеры и отступы)
+// Конкретные методы для этого layout не требуются, т.к. все задано в init
+// extension UserProfileFeedViewController: UICollectionViewDelegateFlowLayout {}
+
+// MARK: - UICollectionViewDelegate
+
+extension UserProfileFeedViewController: UICollectionViewDelegate {
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let selectedPost = viewModel.userPosts[indexPath.item]
+        print("Selected post with ID: \(selectedPost.id ?? "N/A")")
+        // TODO: Реализовать переход к детальному экрану поста?
+    }
 } 

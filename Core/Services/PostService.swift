@@ -37,7 +37,7 @@ class PostService: PostServiceProtocol {
     func fetchPosts(forUserID userID: String, completion: @escaping (Result<[Post], Error>) -> Void) {
         postsCollection
             .whereField("userID", isEqualTo: userID)
-            .order(by: "createdAt", descending: true) // Сортируем по дате
+            .order(by: "createdAt", descending: true)
             // TODO: Добавить пагинацию (limit, startAfterDocument)
             .getDocuments { snapshot, error in
                 if let error = error {
