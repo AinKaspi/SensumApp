@@ -2,68 +2,6 @@
 
 ## Концептуальное Дерево Архитектуры (Планируемое)
 
-```
-SensumApp/
-|-- App/
-|   |-- AppDelegate.swift
-|   |-- SceneDelegate.swift  (Содержит AppCoordinator)
-|   +-- Coordinator.swift    (Базовый протокол)
-|
-|-- Core/
-|   |-- Models/              (User.swift, Post.swift, Follow.swift, Stats.swift, etc.)
-|   |-- Networking/          (APIService.swift, FirebaseService.swift, etc.)
-|   |-- Services/            (AuthService.swift, StorageService.swift, FeedService.swift, etc.)
-|   +-- Utils/               (Extensions, Helpers, etc.)
-|
-|-- Features/
-|   |-- Authentication/      (Флоу входа/регистрации)
-|   |   |-- Coordinators/    (AuthCoordinator.swift)
-|   |   |-- Scenes/
-|   |   |   |-- Login/       (LoginViewController.swift, LoginViewModel.swift)
-|   |   |   +-- Register/    (RegisterViewController.swift, RegisterViewModel.swift)
-|   |
-|   |-- Feed/                (Таб 1: Лента)
-|   |   |-- Coordinators/    (FeedCoordinator.swift)
-|   |   |-- Scenes/
-|   |   |   +-- FeedList/    (FeedViewController.swift, FeedViewModel.swift)
-|   |   +-- Views/           (StoryCircleCell.swift, PostCell.swift, etc.)
-|   |
-|   |-- UserProfile/         (Экраны для профиля *ДРУГОГО* пользователя - НЕ в таббаре)
-|   |   |-- Coordinators/    (UserProfileCoordinator.swift)
-|   |   |-- Scenes/
-|   |   |   |-- Container/   (UserProfileContainerViewController.swift)
-|   |   |   |-- Card/        (UserProfileCardViewController.swift)
-|   |   |   |-- FeedGrid/    (UserProfileFeedViewController.swift)
-|   |   |   +-- Stats/       (UserProfileStatsViewController.swift)
-|   |   +-- Views/           (TopMenuView.swift)
-|   |   +-- ViewModels/      (PersonViewModel.swift - TODO: Rename?)
-|   |
-|   |-- CurrentUserProfile/  (Таб 2: Профиль Текущего Пользователя)
-|   |   |-- Coordinators/    (CurrentUserProfileCoordinator.swift)
-|   |   |-- Scenes/          (Использует UserProfileFeedViewController, UserProfileStatsViewController)
-|   |   |   +-- Container?/  (Возможно, нужен свой контейнер или доп. логика)
-|   |
-|   |-- Create/              (Таб 3: Создать - Пока заменен на Leveling)
-|   |   |-- ... (Заглушка)
-|   |
-|   |-- Leveling/            (Таб 3: Тренировки)
-|   |   |-- Coordinators/    (LevelingCoordinator.swift)
-|   |   |-- Scenes/          (ExerciseSelectionViewController.swift, ExerciseExecutionViewController.swift)
-|   |   +-- ... (ViewModels, Helpers, Views)
-|   |
-|   |-- Progress/            (Таб 4: Прогресс - Заглушка)
-|   |   |-- Coordinators/    (ProgressCoordinator.swift)
-|   |   +-- Scenes/          (ProgressViewController.swift)
-|   |
-|   |-- Store/               (Таб 5: Магазин - Заглушка)
-|   |   |-- Coordinators/    (StoreCoordinator.swift)
-|   |   +-- Scenes/          (StoreViewController.swift)
-|   |
-|   +-- Messaging/           (Позже: Чаты)
-|       |-- Coordinators/    (MessagingCoordinator.swift)
-|       +-- Scenes/          (ChatListViewController.swift, ChatViewController.swift)
-```
-
 ## Phase 1: Refactoring & Setup (ЗАВЕРШЕНО!)
 
 *Цель: Перестроить структуру проекта под новую концепцию, переименовать компоненты, настроить базовые координаторы для всех вкладок.*
@@ -104,36 +42,35 @@ SensumApp/
 -   [x] **Delete Unused Files/Folders:** Delete `SensumApp/ViewController.swift`, `Features/Person`, `Features/Rank`, `Features/Events`. (Выполнено пользователем)
 -   [x] **Build & Test:** Ensure the app compiles and runs with the new structure (mostly placeholders). (Выполнено - Компилируется!)
 
-## Phase 2: Backend & Authentication
-
+## Phase 2: Backend & Authentication (Завершено - База)
 *Цель: Настроить Firebase, реализовать вход и регистрацию.*
 
--   [ ] Настроить Firebase Project (Auth, Firestore, Storage).
--   [ ] Реализовать `AuthService`.
--   [ ] Создать `AuthCoordinator`.
--   [ ] Реализовать `AppCoordinator` для запуска `AuthCoordinator`.
--   [ ] Создать UI и ViewModel для Login/Register (Email/Password, Google Sign-In).
+-   [x] Настроить Firebase Project (Auth, Firestore, Storage). (Выполнено)
+-   [x] Реализовать `AuthService`. (Выполнено)
+-   [x] Создать `AuthCoordinator`. (Выполнено)
+-   [x] Реализовать `AppCoordinator` для запуска `AuthCoordinator`. (Выполнено)
+-   [x] Создать UI и ViewModel для Login/Register (Email/Password). (Базово выполнено)
+-   [ ] Реализовать Google Sign-In.
+-   [ ] Реализовать UI биндинги и показ ошибок в Login/Register.
 
-## Phase 3: Core Models & Services
-
+## Phase 3: Core Models & Services (Завершено - База)
 *Цель: Определить структуру данных и сервисы для взаимодействия с бэкендом.*
 
--   [ ] Определить Firestore Модели (`User`, `Post` - фото+текст, `Follow`, `Stats`).
--   [ ] Создать `StorageService`.
--   [ ] Создать `UserProfileService`.
--   [ ] Создать `PostService`.
--   [ ] Создать `FollowService`.
+-   [x] Определить Firestore Модели (`User`, `Post` - фото+текст). (Выполнено)
+-   [x] Создать `StorageService`. (Выполнено)
+-   [x] Создать `UserProfileService`. (Выполнено)
+-   [x] Создать `PostService`. (Выполнено)
+-   [x] Создать `FollowService`. (Выполнено)
+-   [ ] Определить модель `Follow`?
 -   [ ] Создать `FeedService`.
 
-## Phase 4: Feature Implementation - Feed & CurrentUserProfile
-
+## Phase 4: Feature Implementation - Feed & CurrentUserProfile (В процессе)
 *Цель: Реализовать основные экраны - ленту и профиль текущего пользователя.*
 
 -   [ ] **Feed (Tab 1):** UI ленты, "сторис", ViewModel, загрузка данных, навигация на `UserProfileCoordinator`.
--   [ ] **CurrentUserProfile (Tab 2):** Координатор, переиспользование `UserProfileFeedViewController`, отображение данных текущего юзера, настройка UI (Edit).
+-   [x] **CurrentUserProfile (Tab 2):** Координатор, переиспользование `UserProfileFeedViewController`, отображение данных (аватар, шапка, сетка постов), настройка UI (Edit). (Базово выполнено)
 
 ## Phase 5: Feature Implementation - UserProfile (Modal)
-
 *Цель: Реализовать показ профиля другого пользователя.*
 
 -   [ ] Реализация `UserProfileContainerViewController` (слайдер Card/Person/Stats).
@@ -143,7 +80,6 @@ SensumApp/
 -   [ ] Настроить представление/переход из `FeedCoordinator`.
 
 ## Phase 6: Other Tabs & Features
-
 *Цель: Реализовать заглушки/базовый функционал остальных вкладок и фич.*
 
 -   [ ] Leveling (Tab 3) - Интеграция существующей логики.
@@ -159,3 +95,14 @@ SensumApp/
 -   [ ] Исследовать и исправить баги компиляции Xcode 16 beta (`contentInsetAdjustmentBehavior`, `isTranslucent`).
 -   [ ] Добавить проверку прав доступа к галерее.
 -   [ ] Решить, как будет работать навигация на Настройки (из `UserProfile` или `CurrentUserProfile`).
+-   [x] Implement `FeedViewController` to display posts (basic structure)
+-   [x] Implement `PostCell` for displaying individual posts
+-   [x] Connect `FeedViewModel` to `FeedViewController`
+-   [x] Implement denormalization for author data in posts (`Post` model, `PostService`)
+-   [x] Update `PostCell` to use denormalized data
+-   [x] Add "New Post" button to `UserProfileFeedViewController`
+-   [x] Implement image selection logic in `UserProfileFeedViewController`
+-   [x] Create `CreatePostViewController.swift` (UI Structure)
+-   [x] Create `CreatePostViewModel.swift` (Logic for sharing)
+-   [x] Connect `CreatePostViewController` and `CreatePostViewModel`
+-   [x] Update `CurrentUserProfileCoordinator` to show `CreatePostViewController`

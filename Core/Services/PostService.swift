@@ -1,9 +1,10 @@
 import Foundation
 import FirebaseFirestore
 
-// Протокол для PostService
+
+// Обновляем протокол, чтобы передавать данные для денормализации
 protocol PostServiceProtocol {
-    func createPost(post: Post, completion: @escaping (Error?) -> Void)
+    func createPost(imageURL: String, caption: String?, completion: @escaping (Error?) -> Void)
     func fetchPosts(forUserID userID: String, completion: @escaping (Result<[Post], Error>) -> Void)
     func fetchFeedPosts(limit: Int, completion: @escaping (Result<[Post], Error>) -> Void)
     // TODO: Добавить методы для пагинации, лайков, комментариев, удаления и т.д.
@@ -12,24 +13,61 @@ protocol PostServiceProtocol {
 class PostService: PostServiceProtocol {
     
     private let db = Firestore.firestore()
+    // Добавляем зависимости
+    private let authService: AuthServiceProtocol
+    private let userProfileService: UserProfileServiceProtocol
     
     private var postsCollection: CollectionReference {
         return db.collection("posts")
     }
     
-    // Создает пост
-    func createPost(post: Post, completion: @escaping (Error?) -> Void) {
-        do {
-            // Firestore автоматически сгенерирует ID для нового документа
-            _ = try postsCollection.addDocument(from: post) { error in
-                if let error = error {
-                    print("PostService Error (Create): \(error.localizedDescription)")
+    // Обновляем init
+    init(authService: AuthServiceProtocol = AuthService(),
+         userProfileService: UserProfileServiceProtocol = UserProfileService()) {
+        self.authService = authService
+        self.userProfileService = userProfileService
+    }
+    
+    // Обновляем метод создания поста
+    func createPost(imageURL: String, caption: String?, completion: @escaping (Error?) -> Void) {
+        guard let currentUserID = authService.currentUserID else {
+            completion(NSError(domain: "PostService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])) 
+            return
+        }
+        
+        // 1. Получаем данные текущего пользователя для денормализации
+        userProfileService.fetchUserProfile(userID: currentUserID) { [weak self] result in
+            guard let self = self else { return }
+            
+            switch result {
+            case .success(let user):
+                // 2. Создаем объект Post с данными автора
+                let newPost = Post(userID: currentUserID,
+                                   imageURL: imageURL,
+                                   caption: caption,
+                                   createdAt: Timestamp(),
+                                   likeCount: 0,
+                                   commentCount: 0,
+                                   authorUsername: user.username, // <-- Денормализация
+                                   authorAvatarURL: user.avatarURL) // <-- Денормализация
+                
+                // 3. Сохраняем пост в Firestore
+                do {
+                    _ = try self.postsCollection.addDocument(from: newPost) { error in
+                        if let error = error {
+                            print("PostService Error (Create - Firestore Add): \(error.localizedDescription)")
+                        }
+                        completion(error)
+                    }
+                } catch let error {
+                    print("PostService Error (Encoding Post): \(error.localizedDescription)")
+                    completion(error)
                 }
-                completion(error)
+                
+            case .failure(let error):
+                print("PostService Error (Create - Fetching User Profile): \(error.localizedDescription)")
+                completion(error) // Ошибка получения профиля = ошибка создания поста
             }
-        } catch let error {
-            print("PostService Error (Encoding Post): \(error.localizedDescription)")
-            completion(error)
         }
     }
     

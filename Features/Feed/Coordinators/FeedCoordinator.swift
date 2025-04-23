@@ -4,15 +4,23 @@ class FeedCoordinator: Coordinator {
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
 
-    init(navigationController: UINavigationController) {
+    // Добавляем зависимости для VM
+    private let postService: PostServiceProtocol
+    
+    init(navigationController: UINavigationController, 
+         postService: PostServiceProtocol = PostService()) {
         self.navigationController = navigationController
+        self.postService = postService
         // TODO: Настроить внешний вид Navigation Bar для ленты? Или он будет скрыт?
     }
 
     func start() {
+        // Создаем ViewModel
+        let viewModel = FeedViewModel(postService: postService)
+        
         let vc = FeedViewController()
-        // TODO: Создать и передать FeedViewModel
         vc.coordinator = self // Передаем себя для навигации (например, на профиль юзера)
+        vc.viewModel = viewModel // <-- Передаем ViewModel
         navigationController.setViewControllers([vc], animated: false)
     }
     

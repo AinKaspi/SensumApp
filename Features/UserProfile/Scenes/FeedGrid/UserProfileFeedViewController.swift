@@ -2,6 +2,8 @@ import UIKit
 import Combine // Добавляем для биндингов
 import Kingfisher // <-- Импортируем Kingfisher
 // TODO: Импортировать библиотеку для загрузки изображений (Kingfisher, SDWebImage, Nuke)?
+// Импортируем PhotosUI для PHPicker
+import PhotosUI // <-- Добавляем импорт для PHPicker
 
 // Добавляем делегат для кнопки Выхода
 protocol UserProfileFeedViewControllerDelegate: AnyObject {
@@ -11,9 +13,9 @@ protocol UserProfileFeedViewControllerDelegate: AnyObject {
     func didRequestSignOut() // Новый метод
 }
 
-// Этот VC будет отображать Макет 3 (Шапка с подписчиками, сетка постов)
-// Он будет переиспользоваться для CurrentUserProfile и UserProfile (другого пользователя)
-class UserProfileFeedViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
+// Добавляем делегат для UIImagePickerController
+// Обновляем: используем PHPickerViewControllerDelegate и добавляем CreatePostViewControllerDelegate
+class UserProfileFeedViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, PHPickerViewControllerDelegate, CreatePostViewControllerDelegate {
 
     // Добавляем ViewModel
     var viewModel: UserProfileFeedViewModel! // Используем !, т.к. он будет инжектирован координатором
@@ -124,6 +126,21 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
         return button
     }()
     
+    // Новая кнопка "New Post"
+    private lazy var newPostButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setTitle("New Post", for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        button.setTitleColor(.white, for: .normal)
+        button.backgroundColor = .systemBlue // Другой цвет для отличия
+        button.layer.cornerRadius = 6
+        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+        button.addTarget(self, action: #selector(newPostButtonTapped), for: .touchUpInside)
+        // TODO: Показывать только если isCurrentUser?
+        return button
+    }()
+    
     // Добавляем кнопку Выхода (будет ниже)
     private lazy var signOutButton: UIButton = {
         let button = UIButton(type: .system)
@@ -189,8 +206,9 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
         profileHeaderView.addSubview(statsStackView)
         
         // Добавляем кнопки в стек действий
-        // TODO: Логика добавления Edit или Follow/Message
-        actionButtonsStackView.addArrangedSubview(editProfileButton) 
+        // Пока добавим обе: Edit и New Post
+        actionButtonsStackView.addArrangedSubview(editProfileButton)
+        actionButtonsStackView.addArrangedSubview(newPostButton) 
     }
 
     private func setupConstraints() {
@@ -334,12 +352,12 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
              }
              .store(in: &cancellables)
             
-        // Скрываем/показываем кнопки Edit/Follow/Message
-        // Пока просто управляем editProfileButton
-        editProfileButton.isHidden = !viewModel.isCurrentUser
-        actionButtonsStackView.isHidden = !viewModel.isCurrentUser // Скрываем весь стек, если не текущий юзер? Или добавить Follow/Message?
-        // TODO: Добавить кнопки Follow/Message и управлять их видимостью
-        signOutButton.isHidden = !viewModel.isCurrentUser // Кнопка Выхода видна только для текущего пользователя
+        // Скрываем/показываем кнопки Edit/NewPost/SignOut
+        let isCurrentUser = viewModel.isCurrentUser
+        editProfileButton.isHidden = !isCurrentUser
+        newPostButton.isHidden = !isCurrentUser // New Post тоже только для себя
+        actionButtonsStackView.isHidden = !isCurrentUser // Стек показываем только для себя?
+        signOutButton.isHidden = !isCurrentUser
     }
     
     // Вспомогательный метод для обновления стека статов
@@ -363,6 +381,95 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
         delegate?.didRequestSignOut()
     }
     
+    // Action для кнопки New Post
+    @objc private func newPostButtonTapped() {
+        print("New Post button tapped")
+        // TODO: Проверить права доступа к галерее
+        presentImagePicker()
+    }
+    
+    // MARK: - Image Picker Logic
+
+    // Меняем на PHPicker
+    private func presentImagePicker() {
+        var config = PHPickerConfiguration()
+        config.filter = .images // Только изображения
+        config.selectionLimit = 1 // Только одно фото
+        let picker = PHPickerViewController(configuration: config)
+        picker.delegate = self
+        present(picker, animated: true)
+    }
+
+    // MARK: - PHPickerViewControllerDelegate
+
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+
+        guard let provider = results.first?.itemProvider else { return }
+
+        if provider.canLoadObject(ofClass: UIImage.self) {
+            provider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
+                guard let self = self, let selectedImage = image as? UIImage else {
+                    print("Failed to load selected image from picker.")
+                    // TODO: Show error to user
+                    return
+                }
+
+                DispatchQueue.main.async {
+                    print("Image selected via PHPicker. Size: \(selectedImage.size)")
+                    // Шаг 3: Показываем CreatePostViewController
+                    self.showCreatePostScreen(image: selectedImage)
+                }
+            }
+        } else {
+            print("Cannot load UIImage object from provider.")
+            // TODO: Show error to user
+        }
+    }
+
+    // MARK: - Navigation to Create Post
+
+    private func showCreatePostScreen(image: UIImage) {
+        // 1. Создаем ViewModel
+        let viewModel = CreatePostViewModel(selectedImage: image)
+
+        // 2. Создаем ViewController
+        let createPostVC = CreatePostViewController(viewModel: viewModel)
+        createPostVC.delegate = self // Устанавливаем себя делегатом
+
+        // 3. Оборачиваем в UINavigationController для показа navigation bar
+        let navigationController = UINavigationController(rootViewController: createPostVC)
+        navigationController.modalPresentationStyle = .fullScreen // Или .automatic
+
+        // 4. Показываем модально
+        present(navigationController, animated: true)
+    }
+
+    // MARK: - CreatePostViewControllerDelegate
+
+    func didFinishCreatingPost(_ controller: CreatePostViewController) {
+        print("CreatePostViewController finished creating post.")
+        controller.dismiss(animated: true) {
+            // Обновляем ленту постов пользователя после успешного создания
+            self.viewModel.fetchUserPostsData()
+            print("CreatePostViewController dismissed. (Finished & Reloading posts)")
+        }
+    }
+
+    func didCancelCreatingPost(_ controller: CreatePostViewController) {
+        print("CreatePostViewController cancelled.")
+        controller.dismiss(animated: true) {
+            print("CreatePostViewController dismissed. (Cancelled)")
+        }
+    }
+
+    // Вспомогательный Alert для теста (можно удалить или оставить для других нужд)
+    private func showAlert(title: String, message: String) {
+         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+         alert.addAction(UIAlertAction(title: "OK", style: .default))
+         present(alert, animated: true)
+     }
+     
     // TODO: Actions для Follow/Message
 }
 

@@ -14,6 +14,10 @@ struct Post: Codable, Identifiable {
     var likeCount: Int = 0
     var commentCount: Int = 0
     
+    // Денормализованные данные автора (для эффективности ленты)
+    var authorUsername: String? 
+    var authorAvatarURL: String?
+    
     // Опционально: можно добавить соотношение сторон (aspect ratio) для фото
     // var aspectRatio: CGFloat?
     

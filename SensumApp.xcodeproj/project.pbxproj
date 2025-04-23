@@ -42,6 +42,7 @@
 		B1AE8A4B2DB6EEF20089728F /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B1AE8A4A2DB6EEF20089728F /* GoogleSignIn */; };
 		B1AE8A4D2DB6EEF20089728F /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B1AE8A4C2DB6EEF20089728F /* GoogleSignInSwift */; };
 		B1AE8A522DB7B65B0089728F /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = B1AE8A512DB7B65B0089728F /* Kingfisher */; };
+		B1AE8A652DB8E4F90089728F /* UITextView+Combine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1AE8A622DB8E4F90089728F /* UITextView+Combine.swift */; };
 		B1BE36972DA6A6ED00BF1C55 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BE36962DA6A6ED00BF1C55 /* UserProfile.swift */; };
 		B1BE369A2DA6A75400BF1C55 /* DataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BE36992DA6A75400BF1C55 /* DataManager.swift */; };
 /* End PBXBuildFile section */
@@ -58,6 +59,7 @@
 		B14866692DA4351800C4A753 /* SensumApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SensumApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B190B3002DB6CF86007376B9 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		B1A6E6E92DA7F0F500E9E9EB /* ROADMAP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ROADMAP.md; sourceTree = "<group>"; };
+		B1AE8A622DB8E4F90089728F /* UITextView+Combine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UITextView+Combine.swift"; sourceTree = "<group>"; };
 		B1BE36962DA6A6ED00BF1C55 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		B1BE36992DA6A75400BF1C55 /* DataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataManager.swift; sourceTree = "<group>"; };
 		C8CC09B1CFD35DA88F18E31E /* Pods-SensumApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SensumApp.debug.xcconfig"; path = "Target Support Files/Pods-SensumApp/Pods-SensumApp.debug.xcconfig"; sourceTree = "<group>"; };
@@ -169,6 +171,7 @@
 		B14866602DA4351800C4A753 = {
 			isa = PBXGroup;
 			children = (
+				B1AE8A642DB8E4F90089728F /* Common */,
 				B190B3022DB6CF86007376B9 /* Core */,
 				B1A6E6E92DA7F0F500E9E9EB /* ROADMAP.md */,
 				B1BE36982DA6A74900BF1C55 /* Managers */,
@@ -205,6 +208,22 @@
 				B190B3012DB6CF86007376B9 /* Services */,
 			);
 			path = Core;
+			sourceTree = "<group>";
+		};
+		B1AE8A632DB8E4F90089728F /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				B1AE8A622DB8E4F90089728F /* UITextView+Combine.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		B1AE8A642DB8E4F90089728F /* Common */ = {
+			isa = PBXGroup;
+			children = (
+				B1AE8A632DB8E4F90089728F /* Extensions */,
+			);
+			path = Common;
 			sourceTree = "<group>";
 		};
 		B1BE36952DA6A6CF00BF1C55 /* Models */ = {
@@ -339,6 +358,7 @@
 				B1BE369A2DA6A75400BF1C55 /* DataManager.swift in Sources */,
 				B1BE36972DA6A6ED00BF1C55 /* UserProfile.swift in Sources */,
 				B190B3032DB6CF86007376B9 /* AuthService.swift in Sources */,
+				B1AE8A652DB8E4F90089728F /* UITextView+Combine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

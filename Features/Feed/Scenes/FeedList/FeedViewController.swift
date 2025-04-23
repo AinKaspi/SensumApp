@@ -1,10 +1,13 @@
 import UIKit
+import Combine
 
 class FeedViewController: UIViewController {
 
     // Координатор для навигации
     weak var coordinator: FeedCoordinator?
-    // TODO: Добавить ViewModel
+    // Добавляем ViewModel
+    var viewModel: FeedViewModel!
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - UI Elements (Placeholders)
 
@@ -54,22 +57,25 @@ class FeedViewController: UIViewController {
     }()
 
     // Основная лента
-    private lazy var feedTableView: UITableView = { // TODO: Или UICollectionView?
+    private lazy var feedTableView: UITableView = {
         let tableView = UITableView()
         tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
-        tableView.register(UITableViewCell.self, forCellReuseIdentifier: "PostCell") // Заменить на PostCell
-        tableView.dataSource = self // Временно
-        tableView.delegate = self // Временно
+        // Регистрируем кастомную ячейку
+        tableView.register(PostCell.self, forCellReuseIdentifier: PostCell.identifier)
+        tableView.dataSource = self 
+        tableView.delegate = self 
         return tableView
     }()
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        assert(viewModel != nil, "ViewModel not injected")
         view.backgroundColor = .black
         setupViews()
         setupConstraints()
+        setupBindings()
     }
     
     // Скрываем системный Navigation Bar
@@ -110,27 +116,53 @@ class FeedViewController: UIViewController {
         coordinator?.showMessages()
     }
     
+    // MARK: - Bindings
+    private func setupBindings() {
+        // Подписка на посты ленты
+        viewModel.$feedPosts
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                print("FeedVC: Received new feed posts. Reloading table view...")
+                self?.feedTableView.reloadData()
+            }
+            .store(in: &cancellables)
+            
+        // TODO: Добавить биндинги для isLoading, errorMessage, stories
+    }
+    
     // TODO: Добавить методы для обработки нажатий на сторис/пользователей в ленте
 }
 
-// Временные DataSource/Delegate
+// Обновляем DataSource
 extension FeedViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return 5 // Placeholder
+        return viewModel.feedPosts.count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "PostCell", for: indexPath)
-        cell.backgroundColor = indexPath.row % 2 == 0 ? .darkGray : .black
-        cell.textLabel?.textColor = .white
-        cell.textLabel?.text = "Post Placeholder \(indexPath.row)"
-        // TODO: Настроить реальную PostCell
+        guard let cell = tableView.dequeueReusableCell(withIdentifier: PostCell.identifier, for: indexPath) as? PostCell else {
+            fatalError("Unable to dequeue PostCell")
+        }
+        let post = viewModel.feedPosts[indexPath.row]
+        
+        // Передаем только пост, автор уже внутри
+        cell.configure(with: post)
+        
         return cell
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        // Примерная высота для фото 9:16 + отступы/текст
+        // Рассчитываем высоту: (высота картинки 9:16) + (верхний отступ + аватар + отступ) + (отступ + caption + нижний отступ) + (отступы для кнопок действий)
+        let padding: CGFloat = 8
+        let avatarHeight: CGFloat = 30
         let screenWidth = tableView.bounds.width
-        return (screenWidth / 9 * 16) + 80 
+        let imageHeight = (screenWidth / 9 * 16)
+        // TODO: Рассчитать высоту caption более точно?
+        let captionHeightEstimate: CGFloat = 40 // Примерная высота для 2 строк
+        let actionButtonsHeight: CGFloat = 40 // Примерная высота для кнопок Like/Comment
+        
+        return padding + avatarHeight + padding + imageHeight + padding + captionHeightEstimate + padding + actionButtonsHeight + padding
     }
+    
+    // TODO: Добавить обработку нажатий на аватар/имя в ячейке
 } 
