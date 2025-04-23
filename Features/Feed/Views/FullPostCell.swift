@@ -6,10 +6,20 @@ protocol FullPostCellDelegate: AnyObject {
     func didTapUsername(in cell: FullPostCell)
 }
 
+// НОВЫЙ ПРОТОКОЛ ДЕЛЕГАТА
+protocol FullPostCellLayoutDelegate: AnyObject {
+    func fullPostCell(_ cell: FullPostCell, didCalculateAspectRatio ratio: CGFloat, at indexPath: IndexPath)
+}
+
 class FullPostCell: UICollectionViewCell {
 
     static let identifier = "FullPostCell"
     weak var delegate: FullPostCellDelegate?
+    weak var layoutDelegate: FullPostCellLayoutDelegate?
+    var indexPath: IndexPath?
+
+    // ВОЗВРАЩАЕМ свойство для хранения констрейнта
+    private var imageAspectRatioConstraint: NSLayoutConstraint?
 
     // MARK: - UI Elements
 
@@ -20,7 +30,7 @@ class FullPostCell: UICollectionViewCell {
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
         imageView.layer.cornerRadius = 18 // Маленький аватар
-        imageView.backgroundColor = .darkGray // Placeholder
+        imageView.backgroundColor = .darkGray // Placeholder color
         imageView.image = UIImage(systemName: "person.circle.fill")
         imageView.tintColor = .lightGray
         return imageView
@@ -40,9 +50,10 @@ class FullPostCell: UICollectionViewCell {
     private lazy var postImageView: UIImageView = {
         let imageView = UIImageView()
         imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.contentMode = .scaleAspectFit // Чтобы видеть все изображение без обрезки
+        imageView.contentMode = .scaleAspectFit
         imageView.clipsToBounds = true
-        imageView.backgroundColor = .black // Фон под картинкой черный
+        // Убираем фон
+        imageView.backgroundColor = .black 
         return imageView
     }()
 
@@ -52,6 +63,10 @@ class FullPostCell: UICollectionViewCell {
         label.translatesAutoresizingMaskIntoConstraints = false
         label.font = .systemFont(ofSize: 13, weight: .semibold)
         label.textColor = .white // Белый текст (Пункт 5)
+        // Убираем фон
+        label.backgroundColor = .clear
+        // Не даем этому лейблу сжиматься по вертикали
+        label.setContentCompressionResistancePriority(.required, for: .vertical)
         return label
     }()
 
@@ -61,6 +76,10 @@ class FullPostCell: UICollectionViewCell {
         label.font = .systemFont(ofSize: 14)
         label.textColor = .white // Белый текст (Пункт 5)
         label.numberOfLines = 0 // Может быть длинным
+        // Убираем фон
+        label.backgroundColor = .clear
+        // Не даем и этому лейблу сжиматься по вертикали
+        label.setContentCompressionResistancePriority(.required, for: .vertical)
         return label
     }()
 
@@ -68,7 +87,8 @@ class FullPostCell: UICollectionViewCell {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        contentView.backgroundColor = .black // Черный фон ячейки (Пункт 5)
+        // Убираем фон
+        contentView.backgroundColor = .black
         setupViews()
         setupConstraints()
     }
@@ -89,10 +109,17 @@ class FullPostCell: UICollectionViewCell {
 
     private func setupConstraints() {
         let padding: CGFloat = 10
-        let headerHeight: CGFloat = 50 // Высота шапки с аватаром/именем
-        let footerPadding: CGFloat = 8 // Отступ между элементами футера
+        let footerPadding: CGFloat = 8
+        
+        // Создаем дефолтный констрейнт соотношения сторон 1:1
+        // Он будет активирован ниже
+        imageAspectRatioConstraint = postImageView.heightAnchor.constraint(equalTo: postImageView.widthAnchor, multiplier: 1.0)
+        imageAspectRatioConstraint?.priority = .required // Используем required, т.к. он будет основным
 
         NSLayoutConstraint.activate([
+            // УДАЛЯЕМ КОНСТРЕЙНТ ШИРИНЫ contentView
+            // contentView.widthAnchor.constraint(equalToConstant: UIScreen.main.bounds.width),
+            
             // Header
             authorAvatarImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             authorAvatarImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: padding),
@@ -103,17 +130,15 @@ class FullPostCell: UICollectionViewCell {
             authorUsernameButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
             authorUsernameButton.centerYAnchor.constraint(equalTo: authorAvatarImageView.centerYAnchor),
 
-            // Post Image - изменяем констрейнты для растягивания по высоте
-            postImageView.topAnchor.constraint(equalTo: authorAvatarImageView.bottomAnchor, constant: padding), // Верх под хедером
+            // Post Image
+            postImageView.topAnchor.constraint(equalTo: authorAvatarImageView.bottomAnchor, constant: padding),
             postImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             postImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            // УДАЛЕНО: Высота больше не привязана к ширине
-            // postImageView.heightAnchor.constraint(equalTo: contentView.widthAnchor, multiplier: 1.0),
-            // ДОБАВЛЕНО: Низ картинки привязан к верху лайков (с отступом)
-            postImageView.bottomAnchor.constraint(equalTo: likeCountLabel.topAnchor, constant: -footerPadding),
+            // АКТИВИРУЕМ дефолтный констрейнт соотношения сторон
+            imageAspectRatioConstraint!,
 
             // Footer
-            // likeCountLabel.topAnchor.constraint(equalTo: postImageView.bottomAnchor, constant: footerPadding), // Этот констрейнт уже не нужен, т.к. низ картинки привязан к верху лайков
+            likeCountLabel.topAnchor.constraint(equalTo: postImageView.bottomAnchor, constant: footerPadding),
             likeCountLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             likeCountLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
 
@@ -123,24 +148,34 @@ class FullPostCell: UICollectionViewCell {
             captionLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -padding)
         ])
         
-        print("FullPostCell: setupConstraints выполнен, контент имеет размеры: \(contentView.bounds)")
+        print("FullPostCell: setupConstraints (с ДЕФОЛТНЫМ соотношением 1:1) выполнен")
     }
 
     override func prepareForReuse() {
         super.prepareForReuse()
         postImageView.kf.cancelDownloadTask()
         postImageView.image = nil
+        // Сбрасываем делегатов и indexPath
+        delegate = nil
+        layoutDelegate = nil
+        indexPath = nil
         authorAvatarImageView.kf.cancelDownloadTask()
         authorAvatarImageView.image = UIImage(systemName: "person.circle.fill")?.withTintColor(.lightGray)
         authorUsernameButton.setTitle(nil, for: .normal)
         likeCountLabel.text = nil
-        captionLabel.attributedText = nil // Используем attributedText
+        captionLabel.attributedText = nil
+        // Сбрасываем констрейнт к дефолтному значению 1:1 при переиспользовании
+        updateImageAspectRatioConstraint(multiplier: 1.0)
+        postImageView.image = nil // Убедимся, что картинки нет
     }
 
     // MARK: - Configuration
 
-    func configure(with post: Post) {
-        print("FullPostCell: Начало конфигурации с постом ID=\(post.id ?? "nil")")
+    func configure(with post: Post, indexPath: IndexPath) {
+        print("FullPostCell: Начало конфигурации с постом ID=\(post.id ?? "nil"), indexPath: \(indexPath)")
+        self.indexPath = indexPath
+
+        postImageView.image = nil
         
         // Автор
         authorUsernameButton.setTitle(post.authorUsername ?? "Unknown User", for: .normal)
@@ -159,23 +194,34 @@ class FullPostCell: UICollectionViewCell {
         if let url = URL(string: post.imageURL) {
             print("FullPostCell: Загрузка изображения поста из URL: \(post.imageURL)")
             postImageView.kf.indicatorType = .activity
-            // Загружаем изображение без плейсхолдера, т.к. фон черный
             postImageView.kf.setImage(
-                with: url, 
+                with: url,
                 options: [.transition(.fade(0.2))],
-                completionHandler: { result in
+                completionHandler: { [weak self] result in
+                    guard let self = self, let currentIndexPath = self.indexPath else { return }
                     switch result {
                     case .success(let value):
-                        print("FullPostCell: Изображение поста успешно загружено, размер: \(value.image.size)")
+                        print("FullPostCell: Изображение поста успешно загружено для indexPath \(currentIndexPath), размер: \(value.image.size)")
+                        guard value.image.size.width > 0 else { return } // Проверка ширины
+                        let actualAspectRatio = value.image.size.height / value.image.size.width
+                        // 1. Обновляем МНОЖИТЕЛЬ констрейнта и вызываем layoutIfNeeded
+                        self.updateImageAspectRatioConstraint(multiplier: actualAspectRatio)
+                        self.layoutIfNeeded() // Заставляем ячейку перерисоваться немедленно
+                        // 2. Сообщаем контроллеру
+                        self.layoutDelegate?.fullPostCell(self, didCalculateAspectRatio: actualAspectRatio, at: currentIndexPath)
                     case .failure(let error):
-                        print("FullPostCell: ОШИБКА загрузки изображения поста: \(error.localizedDescription)")
+                        print("FullPostCell: ОШИБКА загрузки изображения поста для indexPath \(currentIndexPath): \(error.localizedDescription)")
+                        // При ошибке можно оставить ratio 1:1 или установить другой
+                        self.updateImageAspectRatioConstraint(multiplier: 1.0)
+                        self.layoutIfNeeded()
                     }
                 }
             )
         } else {
-            print("FullPostCell: ОШИБКА - URL изображения поста пустой или некорректный: \(post.imageURL)")
-            // Если URL нет, показываем заглушку
-            postImageView.image = UIImage(systemName: "photo.fill")?.withTintColor(.darkGray)
+             print("FullPostCell: ОШИБКА - URL изображения поста пустой или некорректный: \(post.imageURL)")
+             // Ставим дефолтный ratio 1:1
+             updateImageAspectRatioConstraint(multiplier: 1.0)
+             self.layoutIfNeeded()
         }
 
         // Лайки (Пункт 3)
@@ -196,7 +242,33 @@ class FullPostCell: UICollectionViewCell {
         captionLabel.attributedText = attributedCaption
         print("FullPostCell: Установлена подпись: \(post.caption ?? "")")
         
-        print("FullPostCell: Конфигурация завершена")
+        print("FullPostCell: Конфигурация завершена для indexPath \(indexPath)")
+    }
+
+    // Обновленный метод - меняет multiplier существующего констрейнта
+    private func updateImageAspectRatioConstraint(multiplier: CGFloat) {
+        guard let constraint = imageAspectRatioConstraint else { return }
+        
+        // Проверяем, изменился ли множитель, чтобы избежать лишней работы
+        if constraint.multiplier != multiplier {
+            // Деактивируем старый
+            constraint.isActive = false
+            // Создаем новый с тем же firstItem, attribute, relatedBy, secondItem, attribute
+            // но новым multiplier
+            imageAspectRatioConstraint = NSLayoutConstraint(item: constraint.firstItem as Any,
+                                                          attribute: constraint.firstAttribute,
+                                                          relatedBy: constraint.relation,
+                                                          toItem: constraint.secondItem,
+                                                          attribute: constraint.secondAttribute,
+                                                          multiplier: multiplier, // Новый множитель
+                                                          constant: constraint.constant)
+            imageAspectRatioConstraint?.priority = .required
+            // Активируем новый
+            imageAspectRatioConstraint?.isActive = true
+            print("FullPostCell: Обновлен multiplier aspect ratio constraint: \(multiplier)")
+        } else {
+             print("FullPostCell: Multiplier aspect ratio constraint уже равен \(multiplier), обновление не требуется.")
+        }
     }
 
     // MARK: - Actions

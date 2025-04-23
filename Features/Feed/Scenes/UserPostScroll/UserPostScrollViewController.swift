@@ -14,21 +14,26 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDataSource
     private let initialIndex: Int // Индекс поста, с которого начинаем
     weak var delegate: UserPostScrollViewControllerDelegate?
 
+    // Добавляем кэш для соотношений сторон
+    private var knownAspectRatios: [IndexPath: CGFloat] = [:]
+
     // MARK: - UI Elements
 
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
-        layout.minimumLineSpacing = 0 // Нет отступа между постами
-        // Размер ячейки будет равен размеру видимой области collection view
-        // Установим его в viewWillLayoutSubviews или layoutSubviews
+        layout.minimumLineSpacing = 10
+        layout.minimumInteritemSpacing = 0
+        // УБИРАЕМ estimatedItemSize - ширина будет задана констрейнтом в ячейке
+        // layout.estimatedItemSize = ...
 
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
         cv.translatesAutoresizingMaskIntoConstraints = false
         cv.backgroundColor = .black // Черный фон (Пункт 5)
         cv.dataSource = self
         cv.delegate = self
-        cv.isPagingEnabled = true // Постраничная прокрутка
+        // Отключаем постраничную прокрутку
+        cv.isPagingEnabled = false
         cv.showsVerticalScrollIndicator = false
         cv.register(FullPostCell.self, forCellWithReuseIdentifier: FullPostCell.identifier)
         return cv
@@ -56,12 +61,15 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDataSource
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .black // Черный фон (Пункт 5)
+        view.backgroundColor = .black
+        
+        // УБИРАЕМ установку estimatedItemSize отсюда
+        
         setupViews()
         setupConstraints()
         setupNavigationBar()
         
-        print("UserPostScrollViewController: viewDidLoad, размер коллекции: \(collectionView.bounds.size), посты: \(allPosts.count)")
+        print("UserPostScrollViewController: viewDidLoad...")
 
         // Прокручиваем к начальному посту ПОСЛЕ того, как layout будет готов
         // Использование DispatchQueue.main.async гарантирует, что scrollToItem вызовется
@@ -77,18 +85,28 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDataSource
         }
     }
 
+    // УБИРАЕМ флаг и логику установки estimatedItemSize
+    // private var estimatedSizeHasBeenSet = false
+    
     override func viewWillLayoutSubviews() {
         super.viewWillLayoutSubviews()
-        // УДАЛЕНО: Установка itemSize здесь ненадежна. Будем использовать делегат.
+        
+        // УБИРАЕМ установку estimatedItemSize
         /*
-        if let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout {
-            let oldSize = layout.itemSize
-            layout.itemSize = collectionView.bounds.size
-            print("UserPostScrollViewController: Обновлен размер ячейки с \(oldSize) на \(layout.itemSize)")
+        if !estimatedSizeHasBeenSet, view.bounds.width > 0 {
+            if let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+                layout.estimatedItemSize = CGSize(width: view.bounds.width, height: 600) 
+                estimatedSizeHasBeenSet = true
+                print("UserPostScrollViewController: Установлен estimatedItemSize = \(layout.estimatedItemSize) в viewWillLayoutSubviews")
+            }
         }
         */
-        // Можно оставить этот метод пустым или удалить, если больше ничего не нужно делать при изменении layout.
-        // Для чистоты можно и удалить, если super.viewWillLayoutSubviews() больше не требуется здесь.
+       
+        // Можно инвалидировать layout при изменении ширины, чтобы ячейки пересчитались
+        // (хотя констрейнт ширины в ячейке должен сам это обработать)
+        // if let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+        //     layout.invalidateLayout()
+        // }
     }
 
 
@@ -126,31 +144,81 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDataSource
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: FullPostCell.identifier, for: indexPath) as? FullPostCell else {
-            print("UserPostScrollViewController: ОШИБКА! Не удалось получить ячейку FullPostCell")
             fatalError("Unable to dequeue FullPostCell")
         }
         let post = allPosts[indexPath.item]
         print("UserPostScrollViewController: cellForItemAt \(indexPath.item) - конфигурация ячейки с постом ID=\(post.id ?? "nil")")
-        cell.configure(with: post)
-        // Устанавливаем делегата для обработки нажатия на имя
+
+        // Устанавливаем делегатов и indexPath
         cell.delegate = self
-        
-        // Вызовем layout, чтобы обновить subviews и размеры
-        cell.layoutIfNeeded()
-        
-        // Логируем размеры ячейки
+        cell.layoutDelegate = self
+        cell.indexPath = indexPath
+
+        // Вызываем configure с indexPath
+        cell.configure(with: post, indexPath: indexPath)
+
         print("UserPostScrollViewController: Размеры ячейки после конфигурации - frame: \(cell.frame), bounds: \(cell.bounds), contentView: \(cell.contentView.bounds)")
-        
+
         return cell
     }
 
     // MARK: - UICollectionViewDelegateFlowLayout
-    // РАСКОММЕНТИРОВАНО: Используем этот метод для установки размера ячейки.
-    // Он вызывается для каждой ячейки, гарантируя использование актуальных bounds.
+    // ВОЗВРАЩАЕМ МЕТОД ДЕЛЕГАТА ДЛЯ РАСЧЕТА РАЗМЕРА
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-       // Каждая ячейка должна занимать всю доступную область collection view.
-       print("UserPostScrollViewController: sizeForItemAt запрошен, возвращаем \(collectionView.bounds.size)")
-       return collectionView.bounds.size
+
+        let cellWidth = collectionView.bounds.width
+        guard cellWidth > 0 else {
+            // Если ширина еще 0, возвращаем временный размер (или .zero)
+            return CGSize(width: 50, height: 50) // Или UIScreen.main.bounds.size
+        }
+
+        // --- Расчет высоты --- 
+        var totalHeight: CGFloat = 0
+        let padding: CGFloat = 10
+        let footerPadding: CGFloat = 8
+
+        // 1. Хедер
+        totalHeight += padding // Отступ сверху
+        totalHeight += 36 // Высота аватара
+        totalHeight += padding // Отступ под аватаром
+
+        // 2. Изображение - используем КЭШИРОВАННОЕ или дефолтное (1:1) соотношение
+        let aspectRatio = knownAspectRatios[indexPath] ?? 1.0 // Используем 1.0 если еще не посчитано
+        let imageHeight = cellWidth * aspectRatio
+        totalHeight += imageHeight
+
+        // 3. Футер (лайки + подпись)
+        totalHeight += footerPadding // Отступ над лайками
+        // Примерная высота для лайков (одна строка)
+        totalHeight += 20 
+        totalHeight += footerPadding // Отступ под лайками
+        // Примерная высота для подписи (допустим, 2 строки)
+        // TODO: Более точный расчет высоты текста?
+        let post = allPosts[indexPath.item]
+        let captionHeight = calculateEstimatedCaptionHeight(for: post.caption ?? "", width: cellWidth - 2 * padding)
+        totalHeight += captionHeight
+        totalHeight += padding // Отступ снизу
+        
+        print("UserPostScrollViewController: sizeForItemAt \(indexPath.item) - AspectRatio: \(aspectRatio) - Calculated Size: (\(cellWidth), \(totalHeight))")
+
+        return CGSize(width: cellWidth, height: totalHeight)
+    }
+    
+    // Вспомогательная функция для примерного расчета высоты подписи
+    // (Может потребоваться более точный расчет)
+    private func calculateEstimatedCaptionHeight(for text: String, width: CGFloat) -> CGFloat {
+        // Если текст пустой, высота 0
+        guard !text.isEmpty else { return 0 }
+        
+        let approximateFont = UIFont.systemFont(ofSize: 14) // Шрифт из FullPostCell
+        let constraintRect = CGSize(width: width, height: .greatestFiniteMagnitude)
+        let boundingBox = text.boundingRect(with: constraintRect, 
+                                              options: .usesLineFragmentOrigin,
+                                              attributes: [.font: approximateFont], 
+                                              context: nil)
+        
+        // Добавим небольшой запас
+        return ceil(boundingBox.height) + 5 
     }
 }
 
@@ -161,5 +229,25 @@ extension UserPostScrollViewController: FullPostCellDelegate {
         let post = allPosts[indexPath.item]
         print("Username tapped for post by user ID: \(post.userID)")
         delegate?.didTapUsername(userID: post.userID)
+    }
+}
+
+// РЕАЛИЗАЦИЯ ДЕЛЕГАТА ОТ ЯЧЕЙКИ
+extension UserPostScrollViewController: FullPostCellLayoutDelegate {
+    func fullPostCell(_ cell: FullPostCell, didCalculateAspectRatio ratio: CGFloat, at indexPath: IndexPath) {
+        // Проверяем, изменилось ли соотношение сторон, чтобы избежать лишних инвалидаций
+        // и потенциальных циклов
+        let existingRatio = knownAspectRatios[indexPath]
+        if existingRatio != ratio {
+            print("UserPostScrollViewController: Получен новый aspect ratio \(ratio) для indexPath \(indexPath). Старый: \(existingRatio ?? -1). Инвалидируем layout.")
+            knownAspectRatios[indexPath] = ratio
+            
+            // Инвалидируем layout для этой ячейки
+            let context = UICollectionViewFlowLayoutInvalidationContext()
+            context.invalidateItems(at: [indexPath])
+            collectionView.collectionViewLayout.invalidateLayout(with: context)
+            // Примечание: Иногда может потребоваться collectionView.layoutIfNeeded() после инвалидации,
+            // если обновление происходит не сразу, но обычно invalidateLayout(with:) достаточно.
+        }
     }
 } 
