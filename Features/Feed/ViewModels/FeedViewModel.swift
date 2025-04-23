@@ -1,6 +1,11 @@
 import Foundation
 import Combine
 
+// Добавляем имя уведомления (если оно еще не глобально)
+// extension Notification.Name {
+//    static let didCreateNewPost = Notification.Name("didCreateNewPostNotification")
+// }
+
 class FeedViewModel {
     
     // Зависимости
@@ -18,7 +23,22 @@ class FeedViewModel {
     init(postService: PostServiceProtocol = PostService()) {
         self.postService = postService
         fetchFeed()
+        
+        // ---> Подписываемся на уведомление о создании нового поста <---
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleNewPostCreated),
+            name: .didCreateNewPost, // Используем имя, определенное ранее
+            object: nil)
     }
+    
+    deinit {
+        // ---> Отписываемся от уведомлений <---
+        NotificationCenter.default.removeObserver(self, name: .didCreateNewPost, object: nil)
+        print("FeedViewModel deinitialized and observer removed.")
+    }
+    
+    // MARK: - Data Fetching
     
     func fetchFeed() {
         isLoading = true
@@ -43,10 +63,18 @@ class FeedViewModel {
     }
     
     func refreshFeed() {
-        // TODO: Реализовать обновление ленты (pull-to-refresh)
+        print("FeedViewModel: Refreshing feed...")
         fetchFeed()
     }
     
     // TODO: Добавить методы для пагинации (загрузка старых постов)
     // TODO: Добавить методы для обработки лайков/комментариев
+    
+    // MARK: - Notification Handling
+    
+    // ---> Метод для обработки уведомления <---
+    @objc private func handleNewPostCreated() {
+        print("FeedViewModel: Received notification that a new post was created. Refreshing feed.")
+        refreshFeed()
+    }
 } 

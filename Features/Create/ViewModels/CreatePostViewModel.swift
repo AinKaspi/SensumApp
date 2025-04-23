@@ -1,6 +1,11 @@
 import UIKit
 import Combine
 
+// Добавляем имя уведомления
+extension Notification.Name {
+    static let didCreateNewPost = Notification.Name("didCreateNewPostNotification")
+}
+
 /// View model responsible for managing the state and logic of the Create Post screen.
 final class CreatePostViewModel {
 
@@ -74,6 +79,8 @@ final class CreatePostViewModel {
             switch completionResult {
             case .finished:
                 print("Post shared successfully via Combine chain.")
+                // ---> Отправляем уведомление об успешном создании поста <---
+                NotificationCenter.default.post(name: .didCreateNewPost, object: nil)
                 completion(nil)
             case .failure(let error):
                 print("Error sharing post via Combine chain: \(error.localizedDescription)")

@@ -92,6 +92,7 @@
 
 ## Ongoing / TODOs
 
+-   [x] Analyze project structure, logic, and architecture (Completed)
 -   [ ] Исследовать и исправить баги компиляции Xcode 16 beta (`contentInsetAdjustmentBehavior`, `isTranslucent`).
 -   [ ] Добавить проверку прав доступа к галерее.
 -   [ ] Решить, как будет работать навигация на Настройки (из `UserProfile` или `CurrentUserProfile`).
@@ -106,3 +107,7 @@
 -   [x] Create `CreatePostViewModel.swift` (Logic for sharing)
 -   [x] Connect `CreatePostViewController` and `CreatePostViewModel`
 -   [x] Update `CurrentUserProfileCoordinator` to show `CreatePostViewController`
+-   [x] Implement Post Detail View (Navigate from grid/feed)
+-   [x] Create fullscreen post carousel viewer (`UserPostScrollViewController.swift`)
+-   [x] Implement fullscreen post cell (`FullPostCell.swift`)
+-   [x] Update `CurrentUserProfileCoordinator` to show fullscreen post carousel

@@ -1,7 +1,7 @@
 import UIKit
 
 // Добавляем соответствие UserProfileFeedViewControllerDelegate
-class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerDelegate {
+class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerDelegate, UserPostScrollViewControllerDelegate {
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
     
@@ -92,4 +92,37 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
     }
     
     // TODO: Добавить методы для навигации (например, на экран редактирования профиля)
+    
+    // MARK: - Post Navigation
+    
+    func showUserPostScroll(posts: [Post], startIndex: Int) {
+        print("CurrentUserProfileCoordinator: showUserPostScroll вызван с \(posts.count) постами, индекс: \(startIndex)")
+        
+        // Проверка, что массив не пуст
+        guard !posts.isEmpty else {
+            print("CurrentUserProfileCoordinator: ОШИБКА - массив постов пуст!")
+            return
+        }
+        
+        // Проверка, что индекс в пределах массива
+        guard startIndex >= 0 && startIndex < posts.count else {
+            print("CurrentUserProfileCoordinator: ОШИБКА - индекс \(startIndex) вне границ массива (0...\(posts.count-1))")
+            return
+        }
+        
+        // Перед показом следующего экрана делаем Navigation Bar видимым
+        navigationController.isNavigationBarHidden = false
+        
+        let userPostScrollVC = UserPostScrollViewController(posts: posts, startIndex: startIndex)
+        userPostScrollVC.delegate = self // Устанавливаем себя в качестве делегата
+        print("CurrentUserProfileCoordinator: Переход на UserPostScrollViewController")
+        navigationController.pushViewController(userPostScrollVC, animated: true)
+    }
+    
+    // MARK: - UserPostScrollViewControllerDelegate
+    
+    func didTapUsername(userID: String) {
+        print("CurrentUserProfileCoordinator: User profile requested for userID: \(userID)")
+        // TODO: Реализовать навигацию на профиль пользователя
+    }
 } 

@@ -165,7 +165,8 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
         let itemsPerRow: CGFloat = 3
         let totalSpacing = (itemsPerRow - 1) * spacing
         let itemWidth = (view.bounds.width - totalSpacing) / itemsPerRow
-        layout.itemSize = CGSize(width: itemWidth, height: itemWidth) // Делаем ячейки квадратными
+        let itemHeight = itemWidth * (16 / 9.0) // Используем 9.0 для деления с плавающей точкой
+        layout.itemSize = CGSize(width: itemWidth, height: itemHeight) // Устанавливаем новый размер
         layout.minimumInteritemSpacing = spacing
         layout.minimumLineSpacing = spacing
         layout.scrollDirection = .vertical
@@ -502,7 +503,23 @@ extension UserProfileFeedViewController {
 extension UserProfileFeedViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let selectedPost = viewModel.userPosts[indexPath.item]
-        print("Selected post with ID: \(selectedPost.id ?? "N/A")")
-        // TODO: Реализовать переход к детальному экрану поста?
+        print("UserProfileFeedViewController: Выбран пост с ID: \(selectedPost.id ?? "N/A"), индекс: \(indexPath.item)")
+        print("UserProfileFeedViewController: Всего постов: \(viewModel.userPosts.count)")
+        
+        // Проверяем содержимое массива
+        for (index, post) in viewModel.userPosts.enumerated() {
+            print("UserProfileFeedViewController: Пост #\(index): ID=\(post.id ?? "nil"), URL=\(post.imageURL)")
+        }
+        
+        // Вызываем метод координатора для показа постов в полноэкранном просмотре
+        // Пытаемся привести делегата к нужному типу координатора
+        if let coordinator = delegate as? CurrentUserProfileCoordinator {
+            print("UserProfileFeedViewController: Вызываем coordinator.showUserPostScroll")
+            coordinator.showUserPostScroll(posts: viewModel.userPosts, startIndex: indexPath.item)
+        } else {
+            // В будущем, если делегатом будет другой объект или его не будет,
+            // нужно будет использовать другой способ навигации.
+            print("UserProfileFeedViewController: ОШИБКА - не удалось привести делегата к типу CurrentUserProfileCoordinator")
+        }
     }
 } 
