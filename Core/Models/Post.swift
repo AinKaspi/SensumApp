@@ -14,6 +14,9 @@ struct Post: Codable, Identifiable {
     var likeCount: Int = 0
     var commentCount: Int = 0
     
+    // Статус лайка (вычисляется на клиенте, не хранится в Firestore)
+    var isLiked: Bool = false
+    
     // Денормализованные данные автора (для эффективности ленты)
     var authorUsername: String? 
     var authorAvatarURL: String?
@@ -24,15 +27,67 @@ struct Post: Codable, Identifiable {
     // Опционально: ссылка на связанное упражнение/тренировку?
     // var relatedExerciseID: String?
     
-    /*
+    // Определяем ключи для кодирования/декодирования, исключая isLiked
     enum CodingKeys: String, CodingKey {
-        case id
-        case userID = "user_id"
-        case imageURL = "image_url"
+        case id // @DocumentID обрабатывается автоматически
+        case userID
+        case imageURL
         case caption
-        case createdAt = "created_at"
-        case likeCount = "like_count"
-        case commentCount = "comment_count"
+        case createdAt
+        case likeCount
+        case commentCount
+        case authorUsername
+        case authorAvatarURL
+        // isLiked не включаем сюда
     }
-    */
+    
+    // Ручная реализация декодера
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // Декодируем @DocumentID (может быть nil до сохранения)
+        // Пытаемся декодировать id, если не получается - оставляем nil
+        self.id = try? container.decodeIfPresent(String.self, forKey: .id)
+        
+        self.userID = try container.decode(String.self, forKey: .userID)
+        self.imageURL = try container.decode(String.self, forKey: .imageURL)
+        self.caption = try container.decodeIfPresent(String.self, forKey: .caption)
+        self.createdAt = try container.decode(Timestamp.self, forKey: .createdAt)
+        self.likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount) ?? 0 // Значение по умолчанию
+        self.commentCount = try container.decodeIfPresent(Int.self, forKey: .commentCount) ?? 0 // Значение по умолчанию
+        self.authorUsername = try container.decodeIfPresent(String.self, forKey: .authorUsername)
+        self.authorAvatarURL = try container.decodeIfPresent(String.self, forKey: .authorAvatarURL)
+        
+        // isLiked инициализируется значением по умолчанию false и не декодируется
+        self.isLiked = false
+    }
+    
+    // Ручная реализация кодера
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        // @DocumentID id не кодируется вручную
+        try container.encode(self.userID, forKey: .userID)
+        try container.encode(self.imageURL, forKey: .imageURL)
+        try container.encodeIfPresent(self.caption, forKey: .caption)
+        try container.encode(self.createdAt, forKey: .createdAt)
+        try container.encode(self.likeCount, forKey: .likeCount)
+        try container.encode(self.commentCount, forKey: .commentCount)
+        try container.encodeIfPresent(self.authorUsername, forKey: .authorUsername)
+        try container.encodeIfPresent(self.authorAvatarURL, forKey: .authorAvatarURL)
+        // isLiked не кодируем
+    }
+    
+    // Оставляем пустой init для возможности создания объекта без декодирования
+    // (например, при создании нового поста на клиенте до отправки)
+    init(id: String? = nil, userID: String, imageURL: String, caption: String?, createdAt: Timestamp, likeCount: Int = 0, commentCount: Int = 0, isLiked: Bool = false, authorUsername: String?, authorAvatarURL: String?) {
+        self.id = id
+        self.userID = userID
+        self.imageURL = imageURL
+        self.caption = caption
+        self.createdAt = createdAt
+        self.likeCount = likeCount
+        self.commentCount = commentCount
+        self.isLiked = isLiked
+        self.authorUsername = authorUsername
+        self.authorAvatarURL = authorAvatarURL
+    }
 } 

@@ -95,6 +95,14 @@
 ## Ongoing / TODOs
 
 -   [x] Analyze project structure, logic, and architecture (Completed)
+-   [x] Implement dynamic aspect ratio and layout for `FullPostCell` (Completed)
+-   [ ] **Post Interactions (`FullPostCell`/`UserPostScroll`):**
+    -   [ ] Add Like button (UI & basic logic)
+    -   [ ] Add Comment button (UI & navigation to comments)
+    -   [ ] Add Share button (UI & basic sharing logic)
+    -   [ ] Add Bookmark/Save button (UI & basic logic)
+    -   [ ] Display comment preview/count (UI & data)
+    -   [ ] Implement caption truncation & "Read More" functionality
 -   [ ] Исследовать и исправить баги компиляции Xcode 16 beta (`contentInsetAdjustmentBehavior`, `isTranslucent`).
 -   [ ] Добавить проверку прав доступа к галерее.
 -   [ ] Решить, как будет работать навигация на Настройки (из `UserProfile` или `CurrentUserProfile`).

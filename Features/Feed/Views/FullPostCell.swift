@@ -1,25 +1,32 @@
 import UIKit
 import Kingfisher
 
-// Протокол для обработки нажатия на имя пользователя в ячейке
+// ОБНОВЛЯЕМ ДЕЛЕГАТ: Добавляем методы для Follow и Comments
 protocol FullPostCellDelegate: AnyObject {
     func didTapUsername(in cell: FullPostCell)
-}
-
-// НОВЫЙ ПРОТОКОЛ ДЕЛЕГАТА
-protocol FullPostCellLayoutDelegate: AnyObject {
-    func fullPostCell(_ cell: FullPostCell, didCalculateAspectRatio ratio: CGFloat, at indexPath: IndexPath)
+    func didTapFollowButton(in cell: FullPostCell)
+    func didTapLikeButton(in cell: FullPostCell)
+    func didTapCommentButton(in cell: FullPostCell)
+    func didTapShareButton(in cell: FullPostCell)
+    // func didTapBookmarkButton(in cell: FullPostCell) // Удалено
+    func didTapViewAllComments(in cell: FullPostCell)
+    func fullPostCellDidToggleCaption(_ cell: FullPostCell, at indexPath: IndexPath)
 }
 
 class FullPostCell: UICollectionViewCell {
 
     static let identifier = "FullPostCell"
     weak var delegate: FullPostCellDelegate?
-    weak var layoutDelegate: FullPostCellLayoutDelegate?
     var indexPath: IndexPath?
+    
+    // НОВОЕ: Замыкание для запроса обновления layout С ПЕРЕДАЧЕЙ ASPECT RATIO
+    var needsLayoutUpdateAction: ((IndexPath, CGFloat) -> Void)?
 
-    // ВОЗВРАЩАЕМ свойство для хранения констрейнта
-    private var imageAspectRatioConstraint: NSLayoutConstraint?
+    // ОБНОВЛЕНИЕ: Добавляем новые свойства
+    private var isCaptionExpanded: Bool = false
+    private var truncatedCaption: String? // Храним усеченный текст
+    private var fullCaption: String? // Храним полный текст
+    static let captionMaxLinesCollapsed = 3 // Сколько строк показывать в свернутом виде (СДЕЛАНО STATIC INTERNAL)
 
     // MARK: - UI Elements
 
@@ -36,13 +43,63 @@ class FullPostCell: UICollectionViewCell {
         return imageView
     }()
 
-    private lazy var authorUsernameButton: UIButton = { // Используем кнопку для легкого нажатия
+    private lazy var usernameAndFollowStackView: UIStackView = { // Стек для имени и кнопки Follow
+        let stackView = UIStackView(arrangedSubviews: [authorUsernameButton, followButton])
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .horizontal
+        stackView.spacing = 8
+        stackView.alignment = .center
+        return stackView
+    }()
+
+    private lazy var authorUsernameButton: UIButton = { // Переименовано для ясности
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
         button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
         button.setTitleColor(.white, for: .normal) // Белый текст (Пункт 5)
         button.contentHorizontalAlignment = .left
         button.addTarget(self, action: #selector(usernameTapped), for: .touchUpInside)
+        // Уменьшим сопротивление сжатию, чтобы кнопка Follow не выталкивалась
+        button.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
+        return button
+    }()
+
+    private lazy var followButton: UIButton = { // Новая кнопка
+        // Используем конфигурацию для современных настроек
+        var config = UIButton.Configuration.filled() // Используем filled для синего фона
+        config.title = "Follow"
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = .systemFont(ofSize: 13, weight: .semibold)
+            return outgoing
+        }
+        config.baseForegroundColor = .white
+        config.baseBackgroundColor = .systemBlue
+        config.cornerStyle = .small // Аналог cornerRadius = 4
+        config.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8) // Современный аналог
+        
+        // Конфигурация для состояния .selected ("Following")
+        var selectedConfig = UIButton.Configuration.plain() // Используем plain для рамки
+        selectedConfig.title = "Following"
+        selectedConfig.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = .systemFont(ofSize: 13, weight: .semibold)
+            return outgoing
+        }
+        selectedConfig.baseForegroundColor = .lightGray
+        selectedConfig.background.strokeColor = .lightGray // Цвет рамки
+        selectedConfig.background.strokeWidth = 1
+        selectedConfig.cornerStyle = .small
+        selectedConfig.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8)
+
+        let button = UIButton(configuration: config, primaryAction: nil)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.configurationUpdateHandler = { button in
+            button.configuration = button.isSelected ? selectedConfig : config
+        }
+        
+        button.addTarget(self, action: #selector(followButtonTapped), for: .touchUpInside)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
         return button
     }()
 
@@ -50,12 +107,17 @@ class FullPostCell: UICollectionViewCell {
     private lazy var postImageView: UIImageView = {
         let imageView = UIImageView()
         imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.contentMode = .scaleAspectFit
+        imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
         // Убираем фон
         imageView.backgroundColor = .black 
         return imageView
     }()
+
+    // -- Action Buttons --
+    private lazy var likeButton: UIButton = createActionButton(systemName: "heart")
+    private lazy var commentButton: UIButton = createActionButton(systemName: "message")
+    private lazy var shareButton: UIButton = createActionButton(systemName: "paperplane")
 
     // -- Footer --
     private lazy var likeCountLabel: UILabel = {
@@ -74,13 +136,23 @@ class FullPostCell: UICollectionViewCell {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
         label.font = .systemFont(ofSize: 14)
-        label.textColor = .white // Белый текст (Пункт 5)
-        label.numberOfLines = 0 // Может быть длинным
-        // Убираем фон
-        label.backgroundColor = .clear
-        // Не даем и этому лейблу сжиматься по вертикали
-        label.setContentCompressionResistancePriority(.required, for: .vertical)
+        label.textColor = .white
+        label.numberOfLines = FullPostCell.captionMaxLinesCollapsed // ИСПОЛЬЗУЕМ STATIC
+        label.isUserInteractionEnabled = true
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(captionTapped))
+        label.addGestureRecognizer(tapGesture)
         return label
+    }()
+
+    private lazy var viewAllCommentsButton: UIButton = { // Новая кнопка для комментариев
+       let button = UIButton(type: .system)
+       button.translatesAutoresizingMaskIntoConstraints = false
+       button.setTitle("View all comments", for: .normal)
+       button.titleLabel?.font = .systemFont(ofSize: 14)
+       button.setTitleColor(.lightGray, for: .normal)
+       button.contentHorizontalAlignment = .left
+       button.addTarget(self, action: #selector(viewAllCommentsTapped), for: .touchUpInside)
+       return button
     }()
 
     // MARK: - Init
@@ -101,86 +173,149 @@ class FullPostCell: UICollectionViewCell {
 
     private func setupViews() {
         contentView.addSubview(authorAvatarImageView)
-        contentView.addSubview(authorUsernameButton)
+        // Используем StackView для имени и кнопки Follow
+        contentView.addSubview(usernameAndFollowStackView)
         contentView.addSubview(postImageView)
+        // Добавляем кнопки действий
+        contentView.addSubview(likeButton)
+        contentView.addSubview(commentButton)
+        contentView.addSubview(shareButton)
+        // Добавляем футер
         contentView.addSubview(likeCountLabel)
         contentView.addSubview(captionLabel)
+        // Добавляем кнопку просмотра комментов
+        contentView.addSubview(viewAllCommentsButton)
     }
 
     private func setupConstraints() {
         let padding: CGFloat = 10
         let footerPadding: CGFloat = 8
+        let buttonSize: CGFloat = 28 // Размер кнопок действий
+        let buttonSpacing: CGFloat = 12 // Расстояние между кнопками
         
-        // Создаем дефолтный констрейнт соотношения сторон 1:1
-        // Он будет активирован ниже
-        imageAspectRatioConstraint = postImageView.heightAnchor.constraint(equalTo: postImageView.widthAnchor, multiplier: 1.0)
-        imageAspectRatioConstraint?.priority = .required // Используем required, т.к. он будет основным
+        // Создаем констрейнт соотношения сторон 1:1, но с НИЗКИМ приоритетом
+        let defaultAspectRatioConstraint = postImageView.heightAnchor.constraint(equalTo: postImageView.widthAnchor, multiplier: 1.0)
+        defaultAspectRatioConstraint.priority = .defaultHigh // 750 (ниже чем required 1000)
 
         NSLayoutConstraint.activate([
             // УДАЛЯЕМ КОНСТРЕЙНТ ШИРИНЫ contentView
             // contentView.widthAnchor.constraint(equalToConstant: UIScreen.main.bounds.width),
             
             // Header
-            authorAvatarImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             authorAvatarImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: padding),
-            authorAvatarImageView.widthAnchor.constraint(equalToConstant: 36),
-            authorAvatarImageView.heightAnchor.constraint(equalToConstant: 36),
-
-            authorUsernameButton.leadingAnchor.constraint(equalTo: authorAvatarImageView.trailingAnchor, constant: 8),
-            authorUsernameButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
-            authorUsernameButton.centerYAnchor.constraint(equalTo: authorAvatarImageView.centerYAnchor),
-
+            authorAvatarImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
+            authorAvatarImageView.widthAnchor.constraint(equalToConstant: 30),
+            authorAvatarImageView.heightAnchor.constraint(equalToConstant: 30),
+            
+            // StackView для имени и кнопки Follow
+            usernameAndFollowStackView.leadingAnchor.constraint(equalTo: authorAvatarImageView.trailingAnchor, constant: padding),
+            usernameAndFollowStackView.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -padding), // Не прижимаем к правому краю жестко
+            usernameAndFollowStackView.centerYAnchor.constraint(equalTo: authorAvatarImageView.centerYAnchor),
+            
             // Post Image
             postImageView.topAnchor.constraint(equalTo: authorAvatarImageView.bottomAnchor, constant: padding),
             postImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             postImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            // АКТИВИРУЕМ дефолтный констрейнт соотношения сторон
-            imageAspectRatioConstraint!,
+            // Активируем дефолтный констрейнт с НИЗКИМ приоритетом
+            defaultAspectRatioConstraint,
 
-            // Footer
-            likeCountLabel.topAnchor.constraint(equalTo: postImageView.bottomAnchor, constant: footerPadding),
+            // Action Buttons (Под картинкой)
+            likeButton.topAnchor.constraint(equalTo: postImageView.bottomAnchor, constant: buttonSpacing),
+            likeButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
+            likeButton.widthAnchor.constraint(equalToConstant: buttonSize),
+            likeButton.heightAnchor.constraint(equalToConstant: buttonSize),
+
+            commentButton.leadingAnchor.constraint(equalTo: likeButton.trailingAnchor, constant: buttonSpacing),
+            commentButton.centerYAnchor.constraint(equalTo: likeButton.centerYAnchor),
+            commentButton.widthAnchor.constraint(equalToConstant: buttonSize),
+            commentButton.heightAnchor.constraint(equalToConstant: buttonSize),
+
+            shareButton.leadingAnchor.constraint(equalTo: commentButton.trailingAnchor, constant: buttonSpacing),
+            shareButton.centerYAnchor.constraint(equalTo: likeButton.centerYAnchor),
+            shareButton.widthAnchor.constraint(equalToConstant: buttonSize),
+            shareButton.heightAnchor.constraint(equalToConstant: buttonSize),
+            
+            // Footer (Теперь под кнопками действий)
+            likeCountLabel.topAnchor.constraint(equalTo: likeButton.bottomAnchor, constant: footerPadding),
             likeCountLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             likeCountLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
 
             captionLabel.topAnchor.constraint(equalTo: likeCountLabel.bottomAnchor, constant: footerPadding),
             captionLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             captionLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
-            captionLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -padding)
+            // Низ captionLabel НЕ привязан жестко к низу, чтобы кнопка комментов могла встать под ним
+            
+            // View All Comments Button
+            viewAllCommentsButton.topAnchor.constraint(equalTo: captionLabel.bottomAnchor, constant: 4), // Маленький отступ от подписи
+            viewAllCommentsButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
+            viewAllCommentsButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
+            viewAllCommentsButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -padding) // Низ кнопки привязан к низу ячейки
         ])
         
-        print("FullPostCell: setupConstraints (с ДЕФОЛТНЫМ соотношением 1:1) выполнен")
+        print("FullPostCell: setupConstraints (с НИЗКИМ приоритетом ratio 1:1) выполнен")
     }
 
     override func prepareForReuse() {
         super.prepareForReuse()
+        
+        print("Preparing cell for reuse")
+        isCaptionExpanded = false
+        
+        // Исправление: проверяем наличие indexPath
+        if let currentPath = indexPath {
+            updateCaptionDisplay(indexPath: currentPath)
+        }
+        
+        // Сбрасываем содержимое
         postImageView.kf.cancelDownloadTask()
         postImageView.image = nil
         // Сбрасываем делегатов и indexPath
         delegate = nil
-        layoutDelegate = nil
         indexPath = nil
         authorAvatarImageView.kf.cancelDownloadTask()
         authorAvatarImageView.image = UIImage(systemName: "person.circle.fill")?.withTintColor(.lightGray)
         authorUsernameButton.setTitle(nil, for: .normal)
         likeCountLabel.text = nil
         captionLabel.attributedText = nil
-        // Сбрасываем констрейнт к дефолтному значению 1:1 при переиспользовании
-        updateImageAspectRatioConstraint(multiplier: 1.0)
-        postImageView.image = nil // Убедимся, что картинки нет
+        truncatedCaption = nil
+        fullCaption = nil
+        // Обнуляем замыкание
+        needsLayoutUpdateAction = nil 
     }
 
     // MARK: - Configuration
 
-    func configure(with post: Post, indexPath: IndexPath) {
-        print("FullPostCell: Начало конфигурации с постом ID=\(post.id ?? "nil"), indexPath: \(indexPath)")
+    func configure(with post: Post, indexPath: IndexPath, needsLayoutUpdateAction: ((IndexPath, CGFloat) -> Void)?) {
         self.indexPath = indexPath
+        self.needsLayoutUpdateAction = needsLayoutUpdateAction
+        print("FullPostCell: Начало конфигурации с постом ID=\(post.id ?? "nil"), indexPath: \(indexPath)")
 
+        // Сброс перед конфигурацией
         postImageView.image = nil
+        isCaptionExpanded = false
+        truncatedCaption = nil
+        fullCaption = post.caption ?? ""
         
-        // Автор
+        // Устанавливаем полный текст и начальное кол-во строк
+        captionLabel.text = fullCaption
+        captionLabel.numberOfLines = FullPostCell.captionMaxLinesCollapsed // ИСПОЛЬЗУЕМ STATIC
+        
+        // Вызываем обновленный updateCaptionDisplay С ПЕРЕДАЧЕЙ indexPath
+        updateCaptionDisplay(indexPath: indexPath)
+
+        // Автор и кнопка Follow
         authorUsernameButton.setTitle(post.authorUsername ?? "Unknown User", for: .normal)
-        print("FullPostCell: Установлено имя автора: \(post.authorUsername ?? "Unknown User")")
-        
+        // Используем реальное поле isFollowed (если оно будет добавлено в модель/логику)
+        // let isFollowed = post.isFollowedByCurrentUser ?? false 
+        let isFollowed = false // Пока оставляем заглушку
+        followButton.isSelected = isFollowed
+        // Меняем вид кнопки Follow
+        followButton.backgroundColor = isFollowed ? .clear : .systemBlue
+        followButton.layer.borderWidth = isFollowed ? 1 : 0
+        followButton.layer.borderColor = isFollowed ? UIColor.lightGray.cgColor : UIColor.clear.cgColor
+        // Скрываем кнопку Follow для своего поста?
+        // followButton.isHidden = post.userID == CurrentUserService.shared.currentUser?.id 
+
         if let avatarUrlString = post.authorAvatarURL, let url = URL(string: avatarUrlString) {
             print("FullPostCell: Загрузка аватара из URL: \(avatarUrlString)")
             authorAvatarImageView.kf.indicatorType = .activity
@@ -194,80 +329,72 @@ class FullPostCell: UICollectionViewCell {
         if let url = URL(string: post.imageURL) {
             print("FullPostCell: Загрузка изображения поста из URL: \(post.imageURL)")
             postImageView.kf.indicatorType = .activity
+            // Определяем плейсхолдер
+            let placeholderImage = UIImage(systemName: "photo")?.withTintColor(.darkGray)
             postImageView.kf.setImage(
                 with: url,
+                placeholder: placeholderImage, // Добавлен плейсхолдер
                 options: [.transition(.fade(0.2))],
-                completionHandler: { [weak self] result in
-                    guard let self = self, let currentIndexPath = self.indexPath else { return }
+                completionHandler: { [weak self] result in // Исправлен синтаксис completionHandler
+                    // Используем слабую ссылку на замыкание тоже
+                    guard let self = self, let currentIndexPath = self.indexPath, let updateAction = self.needsLayoutUpdateAction else { return }
+                    var finalAspectRatio: CGFloat = 1.0 // Дефолтное значение
+                    
                     switch result {
                     case .success(let value):
                         print("FullPostCell: Изображение поста успешно загружено для indexPath \(currentIndexPath), размер: \(value.image.size)")
-                        guard value.image.size.width > 0 else { return } // Проверка ширины
-                        let actualAspectRatio = value.image.size.height / value.image.size.width
-                        // 1. Обновляем МНОЖИТЕЛЬ констрейнта и вызываем layoutIfNeeded
-                        self.updateImageAspectRatioConstraint(multiplier: actualAspectRatio)
-                        self.layoutIfNeeded() // Заставляем ячейку перерисоваться немедленно
-                        // 2. Сообщаем контроллеру
-                        self.layoutDelegate?.fullPostCell(self, didCalculateAspectRatio: actualAspectRatio, at: currentIndexPath)
+                        if value.image.size.width > 0 {
+                            finalAspectRatio = value.image.size.height / value.image.size.width
+                        }
                     case .failure(let error):
-                        print("FullPostCell: ОШИБКА загрузки изображения поста для indexPath \(currentIndexPath): \(error.localizedDescription)")
-                        // При ошибке можно оставить ratio 1:1 или установить другой
-                        self.updateImageAspectRatioConstraint(multiplier: 1.0)
-                        self.layoutIfNeeded()
+                         print("FullPostCell: ОШИБКА загрузки изображения поста для indexPath \(currentIndexPath): \(error.localizedDescription)")
+                         // Используем дефолтное ratio 1.0
                     }
+                    // Вызываем замыкание для обновления размера с ФИНАЛЬНЫМ aspect ratio
+                    updateAction(currentIndexPath, finalAspectRatio) // Передаем aspect ratio
                 }
             )
         } else {
              print("FullPostCell: ОШИБКА - URL изображения поста пустой или некорректный: \(post.imageURL)")
-             // Ставим дефолтный ratio 1:1
-             updateImageAspectRatioConstraint(multiplier: 1.0)
-             self.layoutIfNeeded()
+             // Вызываем замыкание для обновления с дефолтным ratio 1.0
+             // Исправлено: используем self.indexPath и self.needsLayoutUpdateAction
+             if let currentPath = self.indexPath, let updateAction = self.needsLayoutUpdateAction {
+                updateAction(currentPath, 1.0) // Передаем дефолтный aspect ratio
+             }
         }
 
-        // Лайки (Пункт 3)
-        // TODO: Правильное склонение "like/likes"?
-        let likeText = post.likeCount == 1 ? "like" : "likes"
-        likeCountLabel.text = "\(post.likeCount) \(likeText)"
-        print("FullPostCell: Установлен счетчик лайков: \(post.likeCount)")
+        // Лайки
+        likeButton.isSelected = post.isLiked
+        // TODO: Сделать текст "Liked by..." или просто "X likes"
+        likeCountLabel.text = "\(post.likeCount) likes"
 
-        // Подпись (Пункт 4 - часть 1)
-        let attributedCaption = NSMutableAttributedString()
-        if let username = post.authorUsername {
-             // Имя автора - жирным
-             attributedCaption.append(NSAttributedString(string: username, attributes: [.font: UIFont.systemFont(ofSize: 14, weight: .semibold), .foregroundColor: UIColor.white]))
-             attributedCaption.append(NSAttributedString(string: " ", attributes: [.font: UIFont.systemFont(ofSize: 14), .foregroundColor: UIColor.white])) // Пробел
+        // Комментарии
+        if post.commentCount > 0 {
+            viewAllCommentsButton.setTitle("View all \(post.commentCount) comments", for: .normal)
+            viewAllCommentsButton.isHidden = false
+        } else {
+            viewAllCommentsButton.isHidden = true // Скрываем, если комментов нет
         }
-        // Текст подписи - обычным
-        attributedCaption.append(NSAttributedString(string: post.caption ?? "", attributes: [.font: UIFont.systemFont(ofSize: 14), .foregroundColor: UIColor.white]))
-        captionLabel.attributedText = attributedCaption
-        print("FullPostCell: Установлена подпись: \(post.caption ?? "")")
         
         print("FullPostCell: Конфигурация завершена для indexPath \(indexPath)")
     }
 
-    // Обновленный метод - меняет multiplier существующего констрейнта
-    private func updateImageAspectRatioConstraint(multiplier: CGFloat) {
-        guard let constraint = imageAspectRatioConstraint else { return }
-        
-        // Проверяем, изменился ли множитель, чтобы избежать лишней работы
-        if constraint.multiplier != multiplier {
-            // Деактивируем старый
-            constraint.isActive = false
-            // Создаем новый с тем же firstItem, attribute, relatedBy, secondItem, attribute
-            // но новым multiplier
-            imageAspectRatioConstraint = NSLayoutConstraint(item: constraint.firstItem as Any,
-                                                          attribute: constraint.firstAttribute,
-                                                          relatedBy: constraint.relation,
-                                                          toItem: constraint.secondItem,
-                                                          attribute: constraint.secondAttribute,
-                                                          multiplier: multiplier, // Новый множитель
-                                                          constant: constraint.constant)
-            imageAspectRatioConstraint?.priority = .required
-            // Активируем новый
-            imageAspectRatioConstraint?.isActive = true
-            print("FullPostCell: Обновлен multiplier aspect ratio constraint: \(multiplier)")
+    // Метод теперь принимает indexPath
+    private func updateCaptionDisplay(indexPath: IndexPath) {
+        // Сначала проверяем, нужно ли вообще усечение
+        if needsTruncation(label: captionLabel, maxLines: FullPostCell.captionMaxLinesCollapsed) { // ИСПОЛЬЗУЕМ STATIC
+             // Используем переданный indexPath для лога
+             print("FullPostCell [\(indexPath.item)]: Caption needs truncation AFTER aspect ratio update.")
+             truncatedCaption = truncateText(label: captionLabel, maxLines: FullPostCell.captionMaxLinesCollapsed) + " ... more" // ИСПОЛЬЗУЕМ STATIC
+             captionLabel.text = isCaptionExpanded ? fullCaption : truncatedCaption
+             captionLabel.numberOfLines = isCaptionExpanded ? 0 : FullPostCell.captionMaxLinesCollapsed // ИСПОЛЬЗУЕМ STATIC
         } else {
-             print("FullPostCell: Multiplier aspect ratio constraint уже равен \(multiplier), обновление не требуется.")
+            // Используем переданный indexPath для лога
+            print("FullPostCell [\(indexPath.item)]: Caption fits AFTER aspect ratio update.")
+            truncatedCaption = nil
+            captionLabel.text = fullCaption
+            captionLabel.numberOfLines = 0
+            isCaptionExpanded = true // Считаем развернутым
         }
     }
 
@@ -275,5 +402,114 @@ class FullPostCell: UICollectionViewCell {
 
     @objc private func usernameTapped() {
         delegate?.didTapUsername(in: self)
+    }
+
+    @objc private func followButtonTapped() {
+        delegate?.didTapFollowButton(in: self)
+    }
+
+    // Вспомогательный метод для создания кнопок (добавляем таргеты)
+    private func createActionButton(systemName: String) -> UIButton {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        let config = UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
+        button.setImage(UIImage(systemName: systemName, withConfiguration: config), for: .normal)
+        button.setImage(UIImage(systemName: systemName + ".fill", withConfiguration: config), for: .selected) // Для Like/Bookmark
+        button.tintColor = .white
+        
+        // Определяем селектор в зависимости от systemName (можно сделать элегантнее)
+        let selector: Selector
+        switch systemName {
+            case "heart": selector = #selector(likeButtonTapped)
+            case "message": selector = #selector(commentButtonTapped)
+            case "paperplane": selector = #selector(shareButtonTapped)
+            default: selector = #selector(actionButtonTapped) // Общий обработчик по умолчанию
+        }
+        button.addTarget(self, action: selector, for: .touchUpInside)
+        return button
+    }
+
+    // НОВЫЕ ОБРАБОТЧИКИ ДЛЯ КНОПОК
+    @objc private func likeButtonTapped() {
+        // Меняем состояние локально для быстрого отклика
+        likeButton.isSelected.toggle()
+        // Уведомляем делегата
+        delegate?.didTapLikeButton(in: self)
+    }
+    
+    @objc private func commentButtonTapped() {
+        delegate?.didTapCommentButton(in: self)
+    }
+    
+    @objc private func shareButtonTapped() {
+        delegate?.didTapShareButton(in: self)
+    }
+    
+    @objc private func viewAllCommentsTapped() {
+        delegate?.didTapViewAllComments(in: self)
+    }
+    
+    // Заглушка, если селектор не найден
+    @objc private func actionButtonTapped() {
+        print("Action button tapped - selector not specified")
+    }
+
+    @objc private func captionTapped(_ sender: UITapGestureRecognizer) {
+        guard let indexPath = indexPath else {
+            print("IndexPath is nil in captionTapped")
+            return
+        }
+        
+        isCaptionExpanded.toggle()
+        
+        updateCaptionDisplay(indexPath: indexPath)
+        
+        // Уведомляем делегата об изменении размера ячейки
+        delegate?.fullPostCellDidToggleCaption(self, at: indexPath)
+    }
+    
+    // MARK: - Helpers
+    
+    // Проверяет, действительно ли текст обрезается
+    private func needsTruncation(label: UILabel, maxLines: Int) -> Bool {
+        guard let text = label.text, !text.isEmpty else { return false }
+        
+        // Создаем временный лейбл с 0 строк, чтобы измерить полную высоту
+        let tempLabel = UILabel()
+        tempLabel.font = label.font
+        tempLabel.text = text
+        tempLabel.numberOfLines = 0
+        tempLabel.frame.size.width = label.bounds.width // Важно: используем текущую ширину
+        let fullSize = tempLabel.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
+        
+        // Создаем временный лейбл с N строками
+        tempLabel.numberOfLines = maxLines
+        let truncatedSize = tempLabel.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
+
+        // Если полная высота больше усеченной (с небольшой погрешностью)
+        return fullSize.height > truncatedSize.height + 1 
+    }
+    
+    // Генерирует усеченный текст (упрощенно)
+    private func truncateText(label: UILabel, maxLines: Int) -> String {
+        // Эта реализация очень упрощенная, не всегда точно обрезает
+        // В идеале нужно использовать CTFramesetter для точного расчета
+        guard let text = label.text else { return "" }
+        
+        var lines = 0
+        var truncatedText = ""
+        text.enumerateLines { line, stop in
+            lines += 1
+            if lines <= maxLines {
+                truncatedText += line + (lines == maxLines ? "" : "\n") 
+            } else {
+                stop = true
+            }
+        }
+        // Удаляем последний символ, если это перенос строки, перед добавлением "..."
+        if truncatedText.last == "\n" {
+            truncatedText.removeLast()
+        }
+        return truncatedText
     }
 } 
