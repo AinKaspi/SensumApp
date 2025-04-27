@@ -31,8 +31,10 @@ class UserProfileCoordinator: Coordinator {
         // Создаем контейнер и передаем зависимости
         let vc = UserProfileContainerViewController()
         vc.coordinator = self
-        // Передаем userID и ProgressService
-        vc.configure(with: userID, progressService: progressService) 
+        // Передаем userID, progressService и userProfileService
+        vc.configure(with: userID, 
+                     progressService: progressService, 
+                     userProfileService: userProfileService) 
         navigationController.pushViewController(vc, animated: true)
     }
     

@@ -29,6 +29,14 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
 
     // MARK: - UI Elements
     
+    // Добавляем contentWrapperView
+    private let contentWrapperView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        // view.backgroundColor = .orange // Для отладки
+        return view
+    }()
+    
     // --- Шапка Профиля ---
     private lazy var profileHeaderView: UIView = {
         let view = UIView()
@@ -265,21 +273,18 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
     // MARK: - Setup UI
 
     private func setupViews() {
-        // Добавляем основные компоненты
-        view.addSubview(profileHeaderView)
-        view.addSubview(usernameLabel)
-        view.addSubview(statusLabel)
-        // Добавляем стек с кнопками действия
-        view.addSubview(actionButtonsStackView)
-        // Добавляем кнопку выхода
-        view.addSubview(signOutButton)
-        view.addSubview(postsCollectionView) // Добавляем CollectionView
-        // Добавляем Segmented Control
-        view.addSubview(contentSegmentedControl)
-        // Добавляем Placeholder для программ
-        view.addSubview(programsPlaceholderView)
+        // Добавляем сначала wrapper
+        view.addSubview(contentWrapperView)
+        // Добавляем все остальные элементы ВНУТРЬ wrapper
+        contentWrapperView.addSubview(profileHeaderView)
+        contentWrapperView.addSubview(usernameLabel)
+        contentWrapperView.addSubview(statusLabel)
+        contentWrapperView.addSubview(actionButtonsStackView)
+        contentWrapperView.addSubview(contentSegmentedControl)
+        contentWrapperView.addSubview(postsCollectionView) 
+        contentWrapperView.addSubview(programsPlaceholderView)
+        contentWrapperView.addSubview(signOutButton)
         
-        // Добавляем элементы в шапку
         profileHeaderView.addSubview(avatarImageView)
         profileHeaderView.addSubview(statsStackView)
         
@@ -291,50 +296,57 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
 
     private func setupConstraints() {
         let padding: CGFloat = 15
+        let containerWidthMultiplier: CGFloat = 0.86
         
         NSLayoutConstraint.activate([
-            // Шапка
-            profileHeaderView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            profileHeaderView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            profileHeaderView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            profileHeaderView.heightAnchor.constraint(equalToConstant: 100), // Примерная высота шапки
+            // Констрейнты для contentWrapperView (86% ширины, центрирован, прижат к safe area)
+            contentWrapperView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            contentWrapperView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            contentWrapperView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: containerWidthMultiplier),
+            contentWrapperView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+
+            // --- Констрейнты ВНУТРИ contentWrapperView --- 
             
-            // Аватар в шапке (слева)
+            // Шапка (прижата к верху wrapper, ширина = ширине wrapper)
+            profileHeaderView.topAnchor.constraint(equalTo: contentWrapperView.topAnchor),
+            profileHeaderView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor),
+            profileHeaderView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor),
+            profileHeaderView.heightAnchor.constraint(equalToConstant: 100),
+            
+            // Аватар и Статы внутри шапки (без изменений, они уже привязаны к profileHeaderView)
             avatarImageView.leadingAnchor.constraint(equalTo: profileHeaderView.leadingAnchor, constant: padding),
             avatarImageView.centerYAnchor.constraint(equalTo: profileHeaderView.centerYAnchor),
             avatarImageView.widthAnchor.constraint(equalToConstant: 80),
             avatarImageView.heightAnchor.constraint(equalToConstant: 80),
-            
-            // Статы в шапке (справа от аватара)
             statsStackView.leadingAnchor.constraint(equalTo: avatarImageView.trailingAnchor, constant: padding),
             statsStackView.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding),
             statsStackView.centerYAnchor.constraint(equalTo: profileHeaderView.centerYAnchor),
             
-            // Имя пользователя (под шапкой)
+            // Имя пользователя (под шапкой, отступы внутри wrapper)
             usernameLabel.topAnchor.constraint(equalTo: profileHeaderView.bottomAnchor, constant: 10),
-            usernameLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
-            usernameLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
+            usernameLabel.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: padding),
+            usernameLabel.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -padding),
             
-            // Статус (под именем)
+            // Статус (под именем, отступы внутри wrapper)
             statusLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 4),
             statusLabel.leadingAnchor.constraint(equalTo: usernameLabel.leadingAnchor),
             statusLabel.trailingAnchor.constraint(equalTo: usernameLabel.trailingAnchor),
             
-            // Стек кнопок Edit/Follow/Message (под статусом)
+            // Стек кнопок (под статусом, отступы внутри wrapper)
             actionButtonsStackView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 10),
-            actionButtonsStackView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
-            actionButtonsStackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
+            actionButtonsStackView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: padding),
+            actionButtonsStackView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -padding),
             actionButtonsStackView.heightAnchor.constraint(equalToConstant: 30),
             
-            // Segmented Control (под кнопками)
+            // Segmented Control (под кнопками, отступы внутри wrapper)
             contentSegmentedControl.topAnchor.constraint(equalTo: actionButtonsStackView.bottomAnchor, constant: padding),
-            contentSegmentedControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
-            contentSegmentedControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
+            contentSegmentedControl.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: padding),
+            contentSegmentedControl.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -padding),
             
-            // Сетка постов (под Segmented Control)
+            // Сетка постов (под Segmented Control, до кнопки выхода, ширина = ширине wrapper)
             postsCollectionView.topAnchor.constraint(equalTo: contentSegmentedControl.bottomAnchor, constant: padding),
-            postsCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            postsCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            postsCollectionView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor),
+            postsCollectionView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor),
             postsCollectionView.bottomAnchor.constraint(equalTo: signOutButton.topAnchor, constant: -padding),
             
             // Placeholder для программ (там же, где и сетка)
@@ -343,10 +355,10 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
             programsPlaceholderView.trailingAnchor.constraint(equalTo: postsCollectionView.trailingAnchor),
             programsPlaceholderView.bottomAnchor.constraint(equalTo: postsCollectionView.bottomAnchor),
 
-            // Кнопка Выхода (внизу)
-            signOutButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
-            signOutButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
-            signOutButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -10),
+            // Кнопка Выхода (внизу wrapper)
+            signOutButton.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: padding),
+            signOutButton.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -padding),
+            signOutButton.bottomAnchor.constraint(equalTo: contentWrapperView.bottomAnchor, constant: -10),
             signOutButton.heightAnchor.constraint(equalToConstant: 44)
         ])
     }

@@ -140,8 +140,8 @@
 - [x] `[P2.UPO.1]` Реализация `UserProfileContainerViewController` (управляет Card/Person/Stats). Навигация из `[P1.FED.6]`. *(Реализован, но с TODO. Навигация из P1.FED.6 отсутствует)*.
 - [x] `[P2.UPO.2]` Настройка Top Navigation Bar в `UserProfileContainerViewController` (Назад, Меню Card/Person/Stats, Настройки/Опции). *(Реализовано через TopMenuView)*.
 - [x] `[P2.UPO.3]` Реализация `UserProfileCardViewController` ("Card" таб): Фон, Аватар, Имя, Follow кнопка, Статус/Био, Уровень, XP бар. Зависит от `UserProfileService`, `ProgressService`, `FollowService`. *(UI реализован. VM требует адаптации. Зависимости от сервисов есть)*.
-- [x] `[P2.UPO.4]` Реализация `UserProfileFeedViewController` ("Person" таб): Заголовок (Аватар, Counts, Имя, @id, кнопки Follow, Message[UI], Program[UI]), Контент (Табы, Сетка постов). Зависит от `UserProfileService`, `FollowService`, `PostService`. *(Заголовок, сетка, кнопки Follow/Message реализованы. Кнопка Program отсутствует. Зависимости есть)*.
-- [x] `[P2.UPO.5]` Реализация `UserProfileStatsViewController` ("Stats" таб): Радар-Чарт (`Charts` `[P2.FND.3]`), Инфо-блок (Имя, Ранг `[P1.RPG.1]`, Аттрибуты), Уровень, XP. Зависит от `UserProfileService`, `ProgressService`. *(Реализовано)*.
+- [x] `[P2.UPO.4]` Реализация `UserProfileFeedViewController` ("Person" таб): Заголовок (Аватар, Counts, Имя, @id, кнопки Follow, Message[UI], Program[UI]), Контент (Табы, Сетка постов). Зависит от `UserProfileService`, `FollowService`, `PostService`. *(Заголовок, сетка, кнопки Follow/Message реализованы. Кнопка Program отсутствует. Контент ограничен 86% ширины)*.
+- [x] `[P2.UPO.5]` Реализация `UserProfileStatsViewController` ("Stats" таб): Радар-Чарт (`Charts` `[P2.FND.3]`), Инфо-блок (Имя, Ранг `[P1.RPG.1]`, Аттрибуты), Уровень, XP. Зависит от `UserProfileService`, `ProgressService`. *(Реализовано, включая список атрибутов и ограничение ширины 86%)*.
 - [x] `[P2.UPO.6]` Реализация ViewModel'ов для UPO экранов. *(UserProfileFeedViewModel и UserProfileStatsViewModel реализованы. Для Card требуют доработки/создания)*.
 
 ### Тема: Уведомления (Notifications - Базовые) [NOT]

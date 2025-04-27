@@ -7,6 +7,7 @@ class UserProfileContainerViewController: UIViewController {
     // Добавляем свойства для зависимостей
     private var userID: String!
     private var progressService: ProgressServiceProtocol!
+    private var userProfileService: UserProfileServiceProtocol!
 
     // MARK: - Child View Controllers
     private lazy var cardVC: UserProfileCardViewController = {
@@ -18,16 +19,14 @@ class UserProfileContainerViewController: UIViewController {
     
     private lazy var personFeedVC: UserProfileFeedViewController = {
         let vc = UserProfileFeedViewController()
-        // Создаем ViewModel здесь (или передаем из координатора?)
-        // Пока создаем здесь для простоты
         let viewModel = UserProfileFeedViewModel(
             userID: self.userID,
-            isCurrentUser: false, // Предполагаем, что это чужой профиль 
-            // Явно передаем все сервисы
-            userProfileService: UserProfileService(), // Или self.userProfileService, если он есть в контейнере
-            postService: PostService(),             // Или self.postService
-            followService: FollowService(),           // Или self.followService
-            progressService: self.progressService // Передаем progressService из контейнера
+            isCurrentUser: false, 
+            // Передаем userProfileService
+            userProfileService: self.userProfileService,
+            postService: PostService(),
+            followService: FollowService(),
+            progressService: self.progressService
         )
         vc.viewModel = viewModel
         // vc.delegate = coordinator // Делегат UserProfileFeedViewControllerDelegate нужен координатору
@@ -36,10 +35,11 @@ class UserProfileContainerViewController: UIViewController {
     
     private lazy var statsVC: UserProfileStatsViewController = {
         let vc = UserProfileStatsViewController()
-        // Создаем ViewModel здесь и передаем зависимости
         let viewModel = UserProfileStatsViewModel(
             userID: self.userID,
-            progressService: self.progressService
+            progressService: self.progressService,
+            // Передаем userProfileService
+            userProfileService: self.userProfileService 
         )
         vc.viewModel = viewModel
         return vc
@@ -58,11 +58,11 @@ class UserProfileContainerViewController: UIViewController {
     }()
     
     // MARK: - Configuration
-    func configure(with userID: String, progressService: ProgressServiceProtocol) {
+    func configure(with userID: String, progressService: ProgressServiceProtocol, userProfileService: UserProfileServiceProtocol) {
         self.userID = userID
         self.progressService = progressService
+        self.userProfileService = userProfileService
         print("UserProfileContainerViewController configured for userID: \(userID)")
-        // Показываем Card по умолчанию
         displayChildViewController(cardVC)
     }
 
@@ -95,12 +95,16 @@ class UserProfileContainerViewController: UIViewController {
 
     // Восстанавливаем метод setupConstraints
     private func setupConstraints() {
+        let topBarHeight: CGFloat = 80 // Новая высота
+        let topBarTopPadding: CGFloat = 70 // Новый верхний отступ
+        let containerWidthMultiplier: CGFloat = 0.86 // 86% ширины
+        
         NSLayoutConstraint.activate([
-            // Верхнее меню
-            topMenuView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            topMenuView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            topMenuView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            topMenuView.heightAnchor.constraint(equalToConstant: 50),
+            // Верхнее меню (86% ширины, центрировано, с отступом сверху)
+            topMenuView.topAnchor.constraint(equalTo: view.topAnchor, constant: topBarTopPadding),
+            topMenuView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            topMenuView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: containerWidthMultiplier),
+            topMenuView.heightAnchor.constraint(equalToConstant: topBarHeight),
         ])
     }
     
