@@ -5,7 +5,8 @@ import UIKit
 
 // Добавляем соответствие UserProfileFeedViewControllerDelegate и EditProfileViewControllerDelegate
 // Добавляем EditProfileViewModelDelegate
-class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerDelegate, EditProfileViewControllerDelegate, EditProfileViewModelDelegate/*, UserPostScrollViewControllerDelegate*/ {
+// Раскомментируем UserPostScrollViewControllerDelegate
+class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerDelegate, EditProfileViewControllerDelegate, EditProfileViewModelDelegate, UserPostScrollViewControllerDelegate {
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
     
@@ -25,8 +26,7 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
          postService: PostServiceProtocol = PostService(),
          followService: FollowServiceProtocol = FollowService(),
          storageService: StorageServiceProtocol = StorageService(),
-         progressService: ProgressServiceProtocol = ProgressService() // Добавляем ProgressService
-         ) {
+         progressService: ProgressServiceProtocol) {
         self.navigationController = navigationController
         self.authService = authService
         self.userProfileService = userProfileService
@@ -129,29 +129,35 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
     func showUserPostScroll(posts: [Post], startIndex: Int) {
         print("CurrentUserProfileCoordinator: showUserPostScroll вызван с \(posts.count) постами, индекс: \(startIndex)")
         
-        // Проверка, что массив не пуст
         guard !posts.isEmpty else {
             print("CurrentUserProfileCoordinator: ОШИБКА - массив постов пуст!")
             return
         }
         
-        // Проверка, что индекс в пределах массива
         guard startIndex >= 0 && startIndex < posts.count else {
             print("CurrentUserProfileCoordinator: ОШИБКА - индекс \(startIndex) вне границ массива (0...\(posts.count-1))")
             return
         }
         
-        // Перед показом следующего экрана делаем Navigation Bar видимым
         navigationController.isNavigationBarHidden = false
         
-        // TODO: Раскомментировать и реализовать UserPostScrollViewController
-        /*
-        let userPostScrollVC = UserPostScrollViewController(posts: posts, startIndex: startIndex)
+        // Создаем ViewModel для UserPostScroll
+        // TODO: Передать lastDocumentSnapshot, если он доступен после загрузки сетки?
+        // Пока передаем nil, пагинация начнется с начала при необходимости.
+        let userPostScrollViewModel = UserPostScrollViewModel(
+            userID: posts[0].userID, // Берем userID из первого поста (они все от одного юзера)
+            initialPosts: posts,
+            initialSnapshot: nil, // TODO: Передать?
+            postService: postService, // Передаем сервисы
+            authService: authService
+        )
+        
+        // Создаем и показываем ViewController
+        let userPostScrollVC = UserPostScrollViewController(viewModel: userPostScrollViewModel, startIndex: startIndex)
         userPostScrollVC.delegate = self // Устанавливаем себя в качестве делегата
         print("CurrentUserProfileCoordinator: Переход на UserPostScrollViewController")
         navigationController.pushViewController(userPostScrollVC, animated: true)
-        */
-        print("CurrentUserProfileCoordinator: Навигация на UserPostScrollViewController закомментирована.")
+        // print("CurrentUserProfileCoordinator: Навигация на UserPostScrollViewController закомментирована.") // Удаляем
     }
     
     // MARK: - EditProfileViewControllerDelegate
@@ -169,10 +175,12 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
     
     // MARK: - UserPostScrollViewControllerDelegate (Закомментировано)
     // Раскомментируем делегат и его методы
-    /* // Убираем начало комментария
+    // Восстанавливаем объявление соответствия UserPostScrollViewControllerDelegate
+    // Убираем комментарии
     func didTapUsername(userID: String) {
         print("CurrentUserProfileCoordinator: User profile requested for userID: \(userID)")
-        // TODO: Реализовать навигацию на профиль пользователя
+        // TODO: Реализовать навигацию на профиль пользователя (возможно, через AppCoordinator?)
+        // showUserProfile(userID: userID) // Рекурсия!
     }
     
     @MainActor // Добавляем MainActor для инициализации CommentsViewModel
@@ -180,10 +188,8 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
         print("CurrentUserProfileCoordinator: Comments requested for post ID: \(postID)")
         // Раскомментируем создание CommentsViewModel и CommentsViewController
         let viewModel = CommentsViewModel(postId: postID, postService: postService) // Используем имеющийся PostService
-        let commentsVC = CommentsViewController(postId: postID, viewModel: viewModel)
+        let commentsVC = CommentsViewController(postId: postID, viewModel: viewModel) 
         commentsVC.hidesBottomBarWhenPushed = true
         navigationController.pushViewController(commentsVC, animated: true)
-        // print("CurrentUserProfileCoordinator: Навигация на CommentsViewController закомментирована.") // Удаляем лог
     }
-    */ // Убираем конец комментария
 }

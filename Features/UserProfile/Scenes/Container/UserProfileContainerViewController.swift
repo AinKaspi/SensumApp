@@ -4,24 +4,44 @@ class UserProfileContainerViewController: UIViewController {
 
     // MARK: - Dependencies
     var coordinator: UserProfileCoordinator?
+    // Добавляем свойства для зависимостей
+    private var userID: String!
+    private var progressService: ProgressServiceProtocol!
 
     // MARK: - Child View Controllers
-    // Обновляем типы и имена переменных
     private lazy var cardVC: UserProfileCardViewController = {
         let vc = UserProfileCardViewController()
-        // TODO: Configure with ViewModel using self.userID
+        // TODO: Configure with ViewModel using self.userID & progressService?
+        // Пока оставляем без VM, т.к. PersonViewModel устарел
         return vc
     }()
     
     private lazy var personFeedVC: UserProfileFeedViewController = {
         let vc = UserProfileFeedViewController()
-        // TODO: Configure with ViewModel using self.userID
+        // Создаем ViewModel здесь (или передаем из координатора?)
+        // Пока создаем здесь для простоты
+        let viewModel = UserProfileFeedViewModel(
+            userID: self.userID,
+            isCurrentUser: false, // Предполагаем, что это чужой профиль 
+            // Явно передаем все сервисы
+            userProfileService: UserProfileService(), // Или self.userProfileService, если он есть в контейнере
+            postService: PostService(),             // Или self.postService
+            followService: FollowService(),           // Или self.followService
+            progressService: self.progressService // Передаем progressService из контейнера
+        )
+        vc.viewModel = viewModel
+        // vc.delegate = coordinator // Делегат UserProfileFeedViewControllerDelegate нужен координатору
         return vc
     }()
     
     private lazy var statsVC: UserProfileStatsViewController = {
         let vc = UserProfileStatsViewController()
-        // TODO: Configure with ViewModel using self.userID
+        // Создаем ViewModel здесь и передаем зависимости
+        let viewModel = UserProfileStatsViewModel(
+            userID: self.userID,
+            progressService: self.progressService
+        )
+        vc.viewModel = viewModel
         return vc
     }()
     
@@ -38,17 +58,12 @@ class UserProfileContainerViewController: UIViewController {
     }()
     
     // MARK: - Configuration
-    private var userID: String? 
-    
-    func configure(with userID: String) {
+    func configure(with userID: String, progressService: ProgressServiceProtocol) {
         self.userID = userID
-        // TODO: Передать userID во ViewModel-и дочерних VC при их создании
-        // Важно: Нужно убедиться, что ViewModel создается/обновляется ЗДЕСЬ 
-        // перед первым вызовом displayChildViewController, или при каждом вызове.
+        self.progressService = progressService
         print("UserProfileContainerViewController configured for userID: \(userID)")
-        // После конфигурации можно показать начальный экран
-        // TODO: Определить, какой экран показывать первым (Card? Person?)
-        displayChildViewController(cardVC) // Показываем Card по умолчанию
+        // Показываем Card по умолчанию
+        displayChildViewController(cardVC)
     }
 
     // MARK: - Lifecycle
@@ -91,21 +106,27 @@ class UserProfileContainerViewController: UIViewController {
     
     // MARK: - Child VC Management
     private func displayChildViewController(_ childVC: UIViewController) {
-       // ... (логика удаления старого и добавления нового - без изменений) ...
+        // Удаляем предыдущий дочерний контроллер
+        if let currentChild = currentChildVC {
+            currentChild.willMove(toParent: nil)
+            currentChild.view.removeFromSuperview()
+            currentChild.removeFromParent()
+        }
         
+        // Добавляем новый дочерний контроллер
         addChild(childVC)
         view.addSubview(childVC.view)
         childVC.view.translatesAutoresizingMaskIntoConstraints = false
-        // Снова комментируем из-за необъяснимой ошибки компиляции
-        // (childVC as UIViewController).contentInsetAdjustmentBehavior = .never
         
+        // Устанавливаем констрейнты
         NSLayoutConstraint.activate([
-            childVC.view.topAnchor.constraint(equalTo: view.topAnchor),
+            childVC.view.topAnchor.constraint(equalTo: view.topAnchor), // Растягиваем на весь экран
             childVC.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             childVC.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             childVC.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         
+        // Помещаем topMenuView поверх дочернего контроллера
         view.bringSubviewToFront(topMenuView)
         
         childVC.didMove(toParent: self)
@@ -115,7 +136,7 @@ class UserProfileContainerViewController: UIViewController {
 
 // MARK: - TopMenuViewDelegate
 extension UserProfileContainerViewController: TopMenuViewDelegate {
-    // Обновляем логику в соответствии с новыми сегментами (Card, Person, Stats)
+    // Обновляем логику создания/передачи ViewModel
     func topMenuViewDidSelect(segment: TopMenuView.Segment) {
         print("--- UserProfileContainerVC: Selected segment: \(segment) ---")
         
@@ -125,21 +146,22 @@ extension UserProfileContainerViewController: TopMenuViewDelegate {
         }
         
         switch segment {
-        case .card: // Теперь это .card
+        case .card: 
              if currentChildVC is UserProfileCardViewController { return }
-             // TODO: Передать userID в cardVC.viewModel 
+             // TODO: Передать/обновить ViewModel для cardVC?
              displayChildViewController(cardVC)
              
-        case .person: // Теперь это .person
+        case .person: 
              if currentChildVC is UserProfileFeedViewController { return }
-             // TODO: Передать userID в personFeedVC.viewModel
+             // ViewModel уже создан при инициализации lazy var
+             // Можно добавить обновление данных, если нужно: personFeedVC.viewModel.fetchAllUserData()
              displayChildViewController(personFeedVC)
              
-        case .stats: // Теперь это .stats
+        case .stats: 
              if currentChildVC is UserProfileStatsViewController { return }
-             // TODO: Передать userID в statsVC.viewModel
+             // ViewModel уже создан при инициализации lazy var
+             // Можно добавить обновление данных: statsVC.viewModel.fetchProgressData()
              displayChildViewController(statsVC)
-        // default убран, т.к. Segment - CaseIterable и мы должны обработать все кейсы
         }
     }
     
@@ -150,7 +172,5 @@ extension UserProfileContainerViewController: TopMenuViewDelegate {
     
     func topMenuViewDidTapSettings() {
         print("--- UserProfileContainerVC: Settings tapped --- ")
-        // Убираем вызов, т.к. показ настроек для другого пользователя нелогичен
-        // coordinator?.showSettings()
     }
 } 

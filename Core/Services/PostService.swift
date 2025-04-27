@@ -37,7 +37,7 @@ struct CommentDTO: Codable {
 // Протокол для PostService
 protocol PostServiceProtocol {
     func createPost(imageURL: String, caption: String?, completion: @escaping (Error?) -> Void)
-    func fetchPosts(forUserID userID: String, completion: @escaping (Result<[Post], Error>) -> Void)
+    func fetchPosts(forUserID userID: String, limit: Int, startingAfter lastDocumentSnapshot: DocumentSnapshot?, completion: @escaping (Result<(posts: [Post], lastSnapshot: DocumentSnapshot?), Error>) -> Void)
     func fetchFeedPosts(limit: Int, startingAfter lastDocumentSnapshot: DocumentSnapshot?, completion: @escaping (Result<(posts: [Post], lastSnapshot: DocumentSnapshot?), Error>) -> Void)
     func likePost(postID: String, completion: @escaping (Error?) -> Void)
     func unlikePost(postID: String, completion: @escaping (Error?) -> Void)
@@ -110,28 +110,35 @@ class PostService: PostServiceProtocol {
         }
     }
     
-    // Загружает посты для конкретного пользователя
-    func fetchPosts(forUserID userID: String, completion: @escaping (Result<[Post], Error>) -> Void) {
-        postsCollection
+    // Обновляем fetchPosts для пагинации
+    func fetchPosts(forUserID userID: String, limit: Int = 15, startingAfter lastDocumentSnapshot: DocumentSnapshot?, completion: @escaping (Result<(posts: [Post], lastSnapshot: DocumentSnapshot?), Error>) -> Void) {
+        var query: Query = postsCollection
             .whereField("userID", isEqualTo: userID)
             .order(by: "createdAt", descending: true)
-            // TODO: Добавить пагинацию (limit, startAfterDocument)
-            .getDocuments { snapshot, error in
-                if let error = error {
-                    print("PostService Error (Fetch User Posts): \(error.localizedDescription)")
-                    completion(.failure(error))
-                    return
-                }
-                
-                guard let documents = snapshot?.documents else {
-                    completion(.success([])) // Нет документов
-                    return
-                }
-                
-                // Декодируем документы в массив [Post]
-                let posts = documents.compactMap { try? $0.data(as: Post.self) }
-                completion(.success(posts))
+            .limit(to: limit)
+
+        if let lastSnapshot = lastDocumentSnapshot {
+            query = query.start(afterDocument: lastSnapshot)
+        }
+
+        query.getDocuments { snapshot, error in
+            if let error = error {
+                print("PostService Error (Fetch User Posts w/ Paging): \(error.localizedDescription)")
+                completion(.failure(error))
+                return
             }
+
+            guard let documents = snapshot?.documents else {
+                completion(.success((posts: [], lastSnapshot: nil)))
+                return
+            }
+
+            let posts = documents.compactMap { try? $0.data(as: Post.self) }
+            let newLastSnapshot = documents.last
+            
+            print("PostService: Fetched \(posts.count) posts for user \(userID). Last snapshot: \(newLastSnapshot?.documentID ?? "None")")
+            completion(.success((posts: posts, lastSnapshot: newLastSnapshot)))
+        }
     }
     
     // Загружает посты для ленты (пока просто последние N постов)

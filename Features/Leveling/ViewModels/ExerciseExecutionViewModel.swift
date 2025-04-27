@@ -87,7 +87,7 @@ class ExerciseExecutionViewModel: NSObject {
          poseLandmarkerHelper: PoseLandmarkerHelper?,
          authService: AuthServiceProtocol = AuthService(),
          userProfileService: UserProfileServiceProtocol = UserProfileService(),
-         progressService: ProgressServiceProtocol = ProgressService(),
+         progressService: ProgressServiceProtocol,
          viewDelegate: ExerciseExecutionViewModelViewDelegate?) {
         self.exercise = exercise
         self.authService = authService

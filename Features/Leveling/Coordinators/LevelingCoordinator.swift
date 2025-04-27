@@ -6,13 +6,21 @@ class LevelingCoordinator: Coordinator, ExerciseSelectionViewModelCoordinatorDel
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
     
+    // Добавляем зависимости
+    private let authService: AuthServiceProtocol
+    private let progressService: ProgressServiceProtocol
+    
     // Создаем и храним PoseLandmarkerHelper на уровне координатора
     // (Как было в старом коде SceneDelegate)
     private var poseLandmarkerHelper: PoseLandmarkerHelper?
     private let sessionQueue = DispatchQueue(label: "com.sensum.leveling.poseHelperQueue", qos: .userInitiated)
     
-    init(navigationController: UINavigationController) { 
+    init(navigationController: UINavigationController,
+         authService: AuthServiceProtocol, 
+         progressService: ProgressServiceProtocol) {
         self.navigationController = navigationController
+        self.authService = authService
+        self.progressService = progressService
         // Запускаем инициализацию хелпера в фоне при создании координатора
         setupPoseLandmarkerHelperInBackground()
         // TODO: Настроить стиль Navigation Bar для Leveling?
@@ -41,12 +49,14 @@ class LevelingCoordinator: Coordinator, ExerciseSelectionViewModelCoordinatorDel
         
         // Создаем и показываем экран выполнения
         let executionVC = ExerciseExecutionViewController()
-        // Создаем ViewModel, передавая упражнение, ГОТОВЫЙ хелпер и делегата VC
-        // Убедимся, что ExerciseExecutionViewModel принимает PoseLandmarkerHelper?
-        // и ExerciseExecutionViewController как делегата
-        let executionViewModel = ExerciseExecutionViewModel(exercise: exercise, 
-                                                          poseLandmarkerHelper: helper,
-                                                          viewDelegate: executionVC)
+        // Создаем ViewModel, передавая все зависимости
+        let executionViewModel = ExerciseExecutionViewModel(
+            exercise: exercise, 
+            poseLandmarkerHelper: helper,
+            authService: authService, // Передаем
+            progressService: progressService, // Передаем
+            viewDelegate: executionVC
+        )
         executionVC.viewModel = executionViewModel 
         executionVC.title = exercise.name
         // Прячем TabBar при пуше на экран выполнения

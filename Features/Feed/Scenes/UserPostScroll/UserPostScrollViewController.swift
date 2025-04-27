@@ -9,22 +9,20 @@ protocol UserPostScrollViewControllerDelegate: AnyObject {
 }
 
 // Меняем базовый класс и протоколы
-// Убираем избыточное объявление UICollectionViewDataSource здесь
-class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFlowLayout {
+// Убираем избыточное объявление UICollectionViewDataSource здесь еще раз
+class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFlowLayout, FullPostCellDelegate {
 
     // MARK: - Dependencies
-    // var viewModel: UserPostScrollViewModel! // Добавим позже
+    var viewModel: UserPostScrollViewModel! // Раскомментируем
     weak var delegate: UserPostScrollViewControllerDelegate?
 
     // MARK: - Properties
-    private var posts: [Post] // Теперь это источник данных
+    // private var posts: [Post] // Теперь данные приходят из ViewModel
     private let startIndex: Int
     private var cancellables = Set<AnyCancellable>()
-    // Флаг, чтобы избежать прокрутки при обновлении данных
     private var hasScrolledToInitial = false
 
     // MARK: - UI Elements
-    // Заменяем UITableView на UICollectionView
     private lazy var collectionView: UICollectionView = {
         // Создаем layout: одна ячейка на всю ширину экрана
         let layout = UICollectionViewFlowLayout()
@@ -41,19 +39,30 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFl
         collectionView.delegate = self
         collectionView.isPagingEnabled = true // Включаем постраничную прокрутку (одна ячейка за раз)
         collectionView.showsVerticalScrollIndicator = false
-        // collectionView.refreshControl = refreshControl // Нужен ли рефреш?
-        // TODO: Добавить футер для пагинации?
+        // Добавляем футер для индикатора пагинации
+        collectionView.register(PaginationIndicatorFooterView.self, 
+                              forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter, 
+                              withReuseIdentifier: PaginationIndicatorFooterView.identifier)
         return collectionView
     }()
     
-    // TODO: Добавить индикаторы
+    // Индикатор для начальной загрузки (если нужен)
+    private lazy var activityIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .large)
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.color = .white
+        indicator.hidesWhenStopped = true
+        return indicator
+    }()
 
     // MARK: - Initialization
-    init(posts: [Post], startIndex: Int) {
-        self.posts = posts
+    // Обновляем init, принимаем ViewModel
+    init(viewModel: UserPostScrollViewModel, startIndex: Int) {
+        // self.posts = posts // Удаляем
+        self.viewModel = viewModel
         self.startIndex = startIndex
         super.init(nibName: nil, bundle: nil)
-        print("UserPostScrollVC: Init with \(posts.count) posts, startIndex: \(startIndex)")
+        print("UserPostScrollVC: Init with startIndex: \(startIndex)")
     }
 
     required init?(coder: NSCoder) {
@@ -63,10 +72,12 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFl
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        assert(viewModel != nil, "ViewModel not injected")
         view.backgroundColor = .black
         setupUI()
         setupConstraints()
-        // setupBindings() // Добавим позже
+        // Раскомментируем биндинги
+        setupBindings() 
         title = "Посты" 
     }
     
@@ -89,6 +100,7 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFl
     private func setupUI() {
         // Добавляем collectionView
         view.addSubview(collectionView)
+        view.addSubview(activityIndicator)
     }
 
     private func setupConstraints() {
@@ -98,13 +110,18 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFl
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             // Привязываем низ к safe area, чтобы не заезжать под TabBar (если он есть)
-            collectionView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+            collectionView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            
+            // Индикатор по центру
+            activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
     }
     
     private func scrollToInitialPost() {
-        guard startIndex >= 0 && startIndex < posts.count else {
-            print("UserPostScrollVC Error: Invalid startIndex \(startIndex) for posts count \(posts.count)")
+        // Используем viewModel.posts
+        guard startIndex >= 0 && startIndex < viewModel.posts.count else {
+            print("UserPostScrollVC Error: Invalid startIndex \(startIndex) for posts count \(viewModel.posts.count)")
             return
         }
         // Прокручиваем UICollectionView
@@ -113,16 +130,54 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFl
         // Используем .centeredVertically, чтобы пост был по центру
         collectionView.scrollToItem(at: indexPath, at: .top, animated: false)
         print("UserPostScrollVC: Scrolled to initial post at index \(self.startIndex)")
-        // Устанавливаем флаг после первой прокрутки
-        // hasScrolledToInitial = true // Перенесено в viewDidLayoutSubviews
     }
 
     // MARK: - Bindings
-    /*
     private func setupBindings() {
-        // Подписки на viewModel.$posts, viewModel.$isLoading и т.д.
+        // Подписка на посты
+        viewModel.$posts
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.collectionView.reloadData()
+                // Перепрокручиваем, если нужно и еще не сделали этого
+                 if !(self?.hasScrolledToInitial ?? true) {
+                     self?.scrollToInitialPost()
+                     self?.hasScrolledToInitial = true
+                 }
+            }
+            .store(in: &cancellables)
+            
+        // Подписка на состояние загрузки (первой)
+        viewModel.$isLoading
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isLoading in
+                if isLoading {
+                    self?.activityIndicator.startAnimating()
+                } else {
+                    self?.activityIndicator.stopAnimating()
+                }
+            }
+            .store(in: &cancellables)
+            
+        // Подписка на состояние пагинации
+        viewModel.$isFetchingMore
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isFetching in
+                // Обновляем футер (он сам себя покажет/скроет)
+                self?.collectionView.collectionViewLayout.invalidateLayout() // Чтобы футер обновился
+            }
+            .store(in: &cancellables)
+            
+        // Подписка на ошибки
+        viewModel.$errorMessage
+            .receive(on: DispatchQueue.main)
+            .compactMap { $0 }
+            .sink { [weak self] message in
+                // TODO: Показать alert
+                print("*** UserPostScrollVC Error: \(message) ***")
+            }
+            .store(in: &cancellables)
     }
-     */
 
 }
 
@@ -130,18 +185,37 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFl
 extension UserPostScrollViewController: UICollectionViewDataSource {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return posts.count // Пока используем начальный массив
+        return viewModel.posts.count // Используем ViewModel
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: FullPostCell.identifier, for: indexPath) as? FullPostCell else {
             fatalError("Unable to dequeue FullPostCell")
         }
-        let post = posts[indexPath.item] // Используем item для CollectionView
-        // TODO: Настроить configure в FullPostCell для передачи замыкания обновления layout
+        let post = viewModel.posts[indexPath.item]
+        // TODO: Передать замыкание для обновления layout?
         cell.configure(with: post, indexPath: indexPath, needsLayoutUpdateAction: nil) 
-        // cell.delegate = self // Когда будет делегат для FullPostCell
+        cell.delegate = self // Устанавливаем делегата
         return cell
+    }
+    
+    // Метод для отображения футера пагинации
+    func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
+        if kind == UICollectionView.elementKindSectionFooter {
+            guard let footer = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: PaginationIndicatorFooterView.identifier, for: indexPath) as? PaginationIndicatorFooterView else {
+                fatalError("Cannot dequeue PaginationIndicatorFooterView")
+            }
+            // Управляем анимацией индикатора в футере
+            if viewModel.isFetchingMore {
+                footer.startAnimating()
+            } else {
+                footer.stopAnimating()
+            }
+            return footer
+        } else {
+            // Для других типов supplementary views (например, header)
+            fatalError("Unexpected supplementary view kind: \(kind)")
+        }
     }
 }
 
@@ -154,11 +228,106 @@ extension UserPostScrollViewController {
         let safeAreaHeight = collectionView.bounds.height - view.safeAreaInsets.top - view.safeAreaInsets.bottom
         return CGSize(width: collectionView.bounds.width, height: safeAreaHeight)
     }
+    
+    // Метод для установки размера футера
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForFooterInSection section: Int) -> CGSize {
+        // Показываем футер только если есть еще что грузить
+        return viewModel.canLoadMore ? CGSize(width: collectionView.bounds.width, height: 50) : .zero
+    }
 }
 
 // MARK: - UICollectionViewDelegate
-// Пока не нужен, но оставляем для будущих действий (пагинация и т.д.)
-// extension UserPostScrollViewController: UICollectionViewDelegate {}
+extension UserPostScrollViewController: UICollectionViewDelegate {
+    // Метод для пагинации
+    func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        // Загружаем следующую страницу, когда приближаемся к концу списка
+        // Например, за 3 элемента до конца
+        if indexPath.item == viewModel.posts.count - 3 {
+            viewModel.fetchMorePosts()
+        }
+    }
+}
 
-// TODO: Добавить реализацию делегата для FullPostCell (аналогично PostCellDelegate)
-// TODO: Реализовать пагинацию в willDisplay
+// MARK: - FullPostCellDelegate
+extension UserPostScrollViewController {
+    func didTapUsername(in cell: FullPostCell) {
+        guard let indexPath = collectionView.indexPath(for: cell) else { return }
+        let authorID = viewModel.posts[indexPath.item].userID
+        delegate?.didTapUsername(userID: authorID)
+    }
+    
+    func didTapFollowButton(in cell: FullPostCell) {
+        // Логика подписки должна быть в ViewModel Профиля, а не здесь
+        print("UserPostScrollVC: Follow button tapped (delegate TBD)")
+    }
+    
+    func didTapLikeButton(in cell: FullPostCell) {
+        guard let indexPath = collectionView.indexPath(for: cell),
+              let postID = viewModel.posts[safe: indexPath.item]?.id // Безопасное извлечение ID
+        else { return }
+        viewModel.toggleLike(for: postID)
+    }
+    
+    func didTapCommentButton(in cell: FullPostCell) {
+        guard let indexPath = collectionView.indexPath(for: cell),
+              let postID = viewModel.posts[safe: indexPath.item]?.id
+        else { return }
+        delegate?.didTapCommentsButton(forPostID: postID)
+    }
+    
+    func didTapShareButton(in cell: FullPostCell) {
+        print("UserPostScrollVC: Share button tapped (TBD)")
+        // TODO: Реализовать Share
+    }
+    
+    func didTapViewAllComments(in cell: FullPostCell) {
+        guard let indexPath = collectionView.indexPath(for: cell),
+              let postID = viewModel.posts[safe: indexPath.item]?.id
+        else { return }
+        delegate?.didTapCommentsButton(forPostID: postID)
+    }
+    
+    func fullPostCellDidToggleCaption(_ cell: FullPostCell, at indexPath: IndexPath) {
+        // Обновляем layout collectionView, чтобы пересчитать высоту ячейки
+        collectionView.collectionViewLayout.invalidateLayout()
+        // Можно добавить анимацию
+        // UIView.animate(withDuration: 0.2) {
+        //     self.collectionView.layoutIfNeeded()
+        // }
+    }
+}
+
+// MARK: - Pagination Footer View
+// (Можно вынести в отдельный файл Views)
+class PaginationIndicatorFooterView: UICollectionReusableView {
+    static let identifier = "PaginationIndicatorFooterView"
+
+    private let activityIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.color = .white
+        indicator.hidesWhenStopped = true
+        return indicator
+    }()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        addSubview(activityIndicator)
+        NSLayoutConstraint.activate([
+            activityIndicator.centerXAnchor.constraint(equalTo: centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func startAnimating() {
+        activityIndicator.startAnimating()
+    }
+
+    func stopAnimating() {
+        activityIndicator.stopAnimating()
+    }
+}

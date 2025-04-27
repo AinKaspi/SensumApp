@@ -13,10 +13,16 @@ class AuthCoordinator: Coordinator, LoginViewControllerDelegate, LoginViewModelC
     var childCoordinators: [Coordinator] = []
     weak var delegate: AuthCoordinatorDelegate?
     private let authService: AuthServiceProtocol
+    // Добавляем ProgressService как зависимость
+    private let progressService: ProgressServiceProtocol
     
-    init(navigationController: UINavigationController, authService: AuthServiceProtocol) {
+    // Обновляем init, добавляем progressService
+    init(navigationController: UINavigationController, 
+         authService: AuthServiceProtocol,
+         progressService: ProgressServiceProtocol) {
         self.navigationController = navigationController
         self.authService = authService
+        self.progressService = progressService // Сохраняем
     }
 
     func start() {
@@ -35,11 +41,11 @@ class AuthCoordinator: Coordinator, LoginViewControllerDelegate, LoginViewModelC
     
     // Показывает экран регистрации
     func showRegisterScreen() {
-        let vm = RegisterViewModel(authService: authService)
-        // Делегат координатора для VM не нужен
+        // Используем инжектированный progressService
+        let vm = RegisterViewModel(authService: authService, progressService: self.progressService)
         let vc = RegisterViewController()
         vc.delegate = self
-        vc.viewModel = vm // <-- Передаем ViewModel
+        vc.viewModel = vm
         navigationController.pushViewController(vc, animated: true)
     }
     

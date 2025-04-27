@@ -17,7 +17,13 @@
 		B117CBDA2DB6DFD200A696B9 /* StorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBD42DB6DFD200A696B9 /* StorageService.swift */; };
 		B134D8152DBA62160014DB02 /* ProgressData.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D8142DBA62160014DB02 /* ProgressData.swift */; };
 		B134D8192DBA62AC0014DB02 /* Comment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D8182DBA62AC0014DB02 /* Comment.swift */; };
-		B134D81D2DBA68370014DB02 /* ProgressService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D81C2DBA68370014DB02 /* ProgressService.swift */; };
+		B134D81D2DBA68370014DB02 /* ProgramService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D81C2DBA68370014DB02 /* ProgramService.swift */; };
+		B134D8352DBE48D30014DB02 /* TrainingProgram.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D8342DBE48D30014DB02 /* TrainingProgram.swift */; };
+		B134D8372DBE4A370014DB02 /* AppNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D8362DBE4A370014DB02 /* AppNotification.swift */; };
+		B134D8392DBE4A520014DB02 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D8382DBE4A520014DB02 /* NotificationService.swift */; };
+		B134D83B2DBE4AAD0014DB02 /* Chat.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D83A2DBE4AAD0014DB02 /* Chat.swift */; };
+		B134D83D2DBE4AC60014DB02 /* MessagingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D83C2DBE4AC60014DB02 /* MessagingService.swift */; };
+		B134D8422DBE52EE0014DB02 /* ProgressService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D8412DBE52EE0014DB02 /* ProgressService.swift */; };
 		B16E96222DBA6121005893D5 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBD12DB6DFD200A696B9 /* AuthService.swift */; };
 		B1A4835E2DB6CD0000755E25 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = B1A4835D2DB6CD0000755E25 /* FirebaseAnalyticsOnDeviceConversion */; };
 		B1A483602DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */ = {isa = PBXBuildFile; productRef = B1A4835F2DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport */; };
@@ -58,7 +64,13 @@
 		B117CBD52DB6DFD200A696B9 /* UserProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileService.swift; sourceTree = "<group>"; };
 		B134D8142DBA62160014DB02 /* ProgressData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressData.swift; sourceTree = "<group>"; };
 		B134D8182DBA62AC0014DB02 /* Comment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Comment.swift; sourceTree = "<group>"; };
-		B134D81C2DBA68370014DB02 /* ProgressService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressService.swift; sourceTree = "<group>"; };
+		B134D81C2DBA68370014DB02 /* ProgramService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramService.swift; sourceTree = "<group>"; };
+		B134D8342DBE48D30014DB02 /* TrainingProgram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingProgram.swift; sourceTree = "<group>"; };
+		B134D8362DBE4A370014DB02 /* AppNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNotification.swift; sourceTree = "<group>"; };
+		B134D8382DBE4A520014DB02 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		B134D83A2DBE4AAD0014DB02 /* Chat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Chat.swift; sourceTree = "<group>"; };
+		B134D83C2DBE4AC60014DB02 /* MessagingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagingService.swift; sourceTree = "<group>"; };
+		B134D8412DBE52EE0014DB02 /* ProgressService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressService.swift; sourceTree = "<group>"; };
 		B14866692DA4351800C4A753 /* SensumApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SensumApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1A6E6E92DA7F0F500E9E9EB /* ROADMAP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ROADMAP.md; sourceTree = "<group>"; };
 		B1AE8A622DB8E4F90089728F /* UITextView+Combine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UITextView+Combine.swift"; sourceTree = "<group>"; };
@@ -78,6 +90,11 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		B134D83E2DBE50630014DB02 /* DI */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DI;
+			sourceTree = "<group>";
+		};
 		B148666B2DA4351800C4A753 /* SensumApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -146,6 +163,9 @@
 				B134D8142DBA62160014DB02 /* ProgressData.swift */,
 				B117CBCC2DB6DFA100A696B9 /* Post.swift */,
 				B117CBCD2DB6DFA100A696B9 /* User.swift */,
+				B134D8342DBE48D30014DB02 /* TrainingProgram.swift */,
+				B134D8362DBE4A370014DB02 /* AppNotification.swift */,
+				B134D83A2DBE4AAD0014DB02 /* Chat.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -158,7 +178,10 @@
 				B117CBD32DB6DFD200A696B9 /* PostService.swift */,
 				B117CBD42DB6DFD200A696B9 /* StorageService.swift */,
 				B117CBD52DB6DFD200A696B9 /* UserProfileService.swift */,
-				B134D81C2DBA68370014DB02 /* ProgressService.swift */,
+				B134D81C2DBA68370014DB02 /* ProgramService.swift */,
+				B134D8382DBE4A520014DB02 /* NotificationService.swift */,
+				B134D83C2DBE4AC60014DB02 /* MessagingService.swift */,
+				B134D8412DBE52EE0014DB02 /* ProgressService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -190,6 +213,7 @@
 		B190B3022DB6CF86007376B9 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				B134D83E2DBE50630014DB02 /* DI */,
 				B117CBD62DB6DFD200A696B9 /* Services */,
 				B117CBCE2DB6DFA100A696B9 /* Models */,
 			);
@@ -252,6 +276,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				B134D83E2DBE50630014DB02 /* DI */,
 				B148666B2DA4351800C4A753 /* SensumApp */,
 				B148669E2DA43B8000C4A753 /* Features */,
 			);
@@ -342,7 +367,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B134D81D2DBA68370014DB02 /* ProgressService.swift in Sources */,
+				B134D81D2DBA68370014DB02 /* ProgramService.swift in Sources */,
 				B117CBCF2DB6DFA100A696B9 /* User.swift in Sources */,
 				B134D8152DBA62160014DB02 /* ProgressData.swift in Sources */,
 				B117CBD02DB6DFA100A696B9 /* Post.swift in Sources */,
@@ -351,7 +376,13 @@
 				B117CBD92DB6DFD200A696B9 /* UserProfileService.swift in Sources */,
 				B117CBDA2DB6DFD200A696B9 /* StorageService.swift in Sources */,
 				B134D8192DBA62AC0014DB02 /* Comment.swift in Sources */,
+				B134D8392DBE4A520014DB02 /* NotificationService.swift in Sources */,
+				B134D8352DBE48D30014DB02 /* TrainingProgram.swift in Sources */,
+				B134D8372DBE4A370014DB02 /* AppNotification.swift in Sources */,
+				B134D83B2DBE4AAD0014DB02 /* Chat.swift in Sources */,
+				B134D8422DBE52EE0014DB02 /* ProgressService.swift in Sources */,
 				B1AE8A652DB8E4F90089728F /* UITextView+Combine.swift in Sources */,
+				B134D83D2DBE4AC60014DB02 /* MessagingService.swift in Sources */,
 				B16E96222DBA6121005893D5 /* AuthService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

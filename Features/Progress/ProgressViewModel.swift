@@ -16,7 +16,7 @@ class ProgressViewModel {
 
     // MARK: - Initialization
     init(authService: AuthServiceProtocol = AuthService(),
-         progressService: ProgressServiceProtocol = ProgressService()) {
+         progressService: ProgressServiceProtocol) {
         self.authService = authService
         self.progressService = progressService
         fetchProgressData()

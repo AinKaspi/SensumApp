@@ -78,11 +78,10 @@ final class CommentsViewController: UIViewController {
     
     // MARK: - Lifecycle
     
-    // Проверяем и исправляем init
+    // Возвращаем корректный init
     init(postId: String, viewModel: CommentsViewModel) {
         self.postId = postId
-        // Инициализируем viewModel ПЕРЕД super.init()
-        self.viewModel = viewModel 
+        self.viewModel = viewModel
         super.init(nibName: nil, bundle: nil)
     }
     
@@ -155,7 +154,6 @@ final class CommentsViewController: UIViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.tableView.reloadData()
-                // Убираем force unwrap
                 if let viewModel = self?.viewModel, !viewModel.comments.isEmpty {
                     self?.scrollToBottom(animated: true)
                 }
@@ -175,7 +173,7 @@ final class CommentsViewController: UIViewController {
         
         viewModel.$errorMessage
             .receive(on: DispatchQueue.main)
-            .compactMap { $0 } // Пропускаем nil значения
+            .compactMap { $0 }
             .sink { [weak self] message in
                 self?.showErrorAlert(message: message)
             }

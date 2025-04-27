@@ -37,7 +37,7 @@ class RegisterViewModel {
     
     init(authService: AuthServiceProtocol, 
          userProfileService: UserProfileServiceProtocol = UserProfileService(),
-         progressService: ProgressServiceProtocol = ProgressService()) { // Добавляем progressService
+         progressService: ProgressServiceProtocol) { // Убрали = ProgressService()
         self.authService = authService
         self.userProfileService = userProfileService
         self.progressService = progressService // Сохраняем зависимость

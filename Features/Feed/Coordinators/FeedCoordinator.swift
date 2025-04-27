@@ -37,17 +37,12 @@ class FeedCoordinator: Coordinator {
     // НОВЫЙ МЕТОД: Показ экрана комментариев
     @MainActor // Добавляем аннотацию для вызова MainActor-изолированного init
     func showComments(for postId: String) {
-        print("FeedCoordinator: Show comments for post ID: \(postId) - NAVIGATION DISABLED")
-        // ВРЕМЕННО: Полностью комментируем реализацию для исправления ошибок сборки
-        /*
-        // ВРЕМЕННО: Комментируем ViewModel для проверки инициализации VC
-        // let viewModel = CommentsViewModel(postId: postId, postService: postService) 
-        // Убедимся, что CommentsViewController инициализируется правильно
-        // let vc = CommentsViewController(postId: postId, viewModel: viewModel) 
-        let vc = CommentsViewController(postId: postId /*, viewModel: viewModel */) // Вызываем init только с postId
+        print("FeedCoordinator: Show comments for post ID: \(postId)")
+        // Раскомментируем создание ViewModel и ViewController
+        let viewModel = CommentsViewModel(postId: postId, postService: postService) // Передаем зависимости
+        let vc = CommentsViewController(postId: postId, viewModel: viewModel) 
         vc.hidesBottomBarWhenPushed = true // Скрываем TabBar
         navigationController.pushViewController(vc, animated: true)
-        */
     }
     
     // Метод для показа сообщений

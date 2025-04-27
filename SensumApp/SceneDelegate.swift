@@ -7,35 +7,26 @@
 
 import UIKit
 import MediaPipeTasksVision
-import Combine // Добавляем Combine
+import Combine
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
-    var appCoordinator: AppCoordinator? // Добавляем свойство для главного координатора
+    let container = DIContainer()
+    var appCoordinator: AppCoordinator?
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         
-        
-        // Первое, получаем "сцену" - это как бы экран, на котором всё будет происходить.
         guard let windowScene = (scene as? UIWindowScene) else { 
             return 
         }
         
-        // Создаем самое ГЛАВНОЕ ОКНО для нашего приложения.
         let window = UIWindow(windowScene: windowScene)
         
-        // Создаем главный координатор и запускаем его
-        appCoordinator = AppCoordinator(window: window)
+        appCoordinator = AppCoordinator(window: window, container: container)
         appCoordinator?.start()
 
-        // Устанавливаем фон окна в желтый для отладки
-        window.backgroundColor = .systemYellow 
-
-        // Сохраняем ссылку на это окно, чтобы оно не пропало.
         self.window = window
-
-        // Делаем окно видимым на экране телефона.
         window.makeKeyAndVisible()
     }
 
@@ -70,39 +61,39 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 }
 
 // ----- Главный Координатор Приложения -----
-// Добавляем соответствие AuthCoordinatorDelegate
 class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
     
     var window: UIWindow
-    var navigationController: UINavigationController // Не используется для TabBar
+    var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
     
-    // Добавляем AuthService
-    private let authService: AuthServiceProtocol = AuthService()
+    private let container: DIContainer
+    private var authService: AuthServiceProtocol { container.authService }
+    private var userProfileService: UserProfileServiceProtocol { container.userProfileService }
+    private var postService: PostServiceProtocol { container.postService }
+    private var followService: FollowServiceProtocol { container.followService }
+    private var storageService: StorageServiceProtocol { container.storageService }
+    private var progressService: ProgressServiceProtocol { container.progressService }
     
-    // Храним ссылку на AuthCoordinator, если он активен
     private var authCoordinator: AuthCoordinator?
-    private var cancellables = Set<AnyCancellable>() // Для подписки
+    private var cancellables = Set<AnyCancellable>()
 
-    init(window: UIWindow) {
+    init(window: UIWindow, container: DIContainer) {
         self.window = window
-        self.navigationController = UINavigationController() // Заглушка для протокола
-        setupAuthenticationSubscription() // Подписываемся СРАЗУ
+        self.container = container
+        self.navigationController = UINavigationController()
+        setupAuthenticationSubscription()
     }
 
     func start() {
-        // Просто вызываем проверку начального состояния
-        // Подписка сама решит, какой flow показать
         authService.checkAuthenticationState()
         window.makeKeyAndVisible()
         window.backgroundColor = .black 
     }
     
-    // Настраиваем подписку на состояние аутентификации
     private func setupAuthenticationSubscription() {
         authService.authenticationState
-            .receive(on: DispatchQueue.main) // Переключаем на главный поток для UI
-            // Убираем дублирующиеся значения (чтобы не переключать флоу лишний раз)
+            .receive(on: DispatchQueue.main)
             .removeDuplicates()
             .sink { [weak self] state in
                 guard let self = self else { return }
@@ -111,8 +102,6 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
                 case .signedIn:
                     self.showMainAppFlow()
                 case .signedOut, .unknown:
-                    // Показываем флоу аутентификации, только если он еще не показан
-                    // (чтобы избежать зацикливания при выходе)
                     if self.authCoordinator == nil {
                         self.showAuthenticationFlow()
                     }
@@ -121,28 +110,24 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
             .store(in: &cancellables)
     }
     
-    // Показывает основной TabBar интерфейс
     private func showMainAppFlow() {
-        // Убираем AuthCoordinator, если он был
         if let authCoordinator = authCoordinator {
             removeChild(authCoordinator)
             self.authCoordinator = nil
             print("AppCoordinator: Removed AuthCoordinator")
         }
         
-        // Проверяем, не показываем ли мы уже TabBar
         if window.rootViewController is UITabBarController {
             print("AppCoordinator: Main flow (TabBar) already presented.")
             return
         }
         
         print("AppCoordinator: Setting up Main flow (TabBar)...")
-        // --- Код создания TabBarController ---
         let tabBarController = UITabBarController()
         
         // 1. Feed Coordinator
         let feedNavController = UINavigationController()
-        let feedCoordinator = FeedCoordinator(navigationController: feedNavController, postService: PostService())
+        let feedCoordinator = FeedCoordinator(navigationController: feedNavController, postService: postService)
         addChild(feedCoordinator)
         feedCoordinator.start()
         feedNavController.tabBarItem = UITabBarItem(title: "Feed", image: UIImage(systemName: "flame.fill"), tag: 0)
@@ -152,11 +137,11 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
         let currentUserProfileCoordinator = CurrentUserProfileCoordinator(
             navigationController: profileNavController,
             authService: authService,
-            userProfileService: UserProfileService(),
-            postService: PostService(),
-            followService: FollowService(),
-            storageService: StorageService(),
-            progressService: ProgressService()
+            userProfileService: userProfileService,
+            postService: postService,
+            followService: followService,
+            storageService: storageService,
+            progressService: progressService
         )
         addChild(currentUserProfileCoordinator)
         currentUserProfileCoordinator.start()
@@ -164,7 +149,11 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
         
         // 3. Leveling Coordinator
         let levelingNavController = UINavigationController()
-        let levelingCoordinator = LevelingCoordinator(navigationController: levelingNavController)
+        let levelingCoordinator = LevelingCoordinator(
+            navigationController: levelingNavController,
+            authService: authService,
+            progressService: progressService
+        )
         addChild(levelingCoordinator)
         levelingCoordinator.start()
         levelingNavController.tabBarItem = UITabBarItem(title: "Leveling", image: UIImage(systemName: "figure.walk"), tag: 2)
@@ -174,7 +163,7 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
         let progressCoordinator = ProgressCoordinator(
             navigationController: progressNavController,
             authService: authService,
-            progressService: ProgressService()
+            progressService: progressService
         )
         addChild(progressCoordinator)
         progressCoordinator.start()
@@ -195,7 +184,6 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
             storeNavController
         ]
         
-        // Настройка внешнего вида TabBar (оставляем)
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = .black
@@ -211,28 +199,27 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
         if #available(iOS 15.0, *) {
             tabBarController.tabBar.scrollEdgeAppearance = appearance
         }
-        // --- Конец кода создания TabBarController ---
 
-        // Устанавливаем TabBarController как корневой
         window.rootViewController = tabBarController
-        window.makeKeyAndVisible() // Делаем видимым
+        window.makeKeyAndVisible()
         window.backgroundColor = .black
     }
     
-    // Показывает флоу аутентификации
     private func showAuthenticationFlow() {
-        // Проверяем, не показываем ли мы уже Auth флоу
         if authCoordinator != nil, window.rootViewController === authCoordinator?.navigationController {
              print("AppCoordinator: Auth flow already presented.")
             return
         }
         
         print("AppCoordinator: Setting up Auth flow...")
-        // Убираем старые дочерние координаторы таббара
         childCoordinators.removeAll()
         
         let authNavController = UINavigationController()
-        authCoordinator = AuthCoordinator(navigationController: authNavController, authService: authService)
+        authCoordinator = AuthCoordinator(
+            navigationController: authNavController,
+            authService: authService,
+            progressService: progressService
+        )
         authCoordinator?.delegate = self
         addChild(authCoordinator!)
         authCoordinator?.start()
@@ -245,9 +232,6 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
     // Вызывается, когда AuthCoordinator завершает работу (пользователь вошел)
     func didFinishAuthentication(coordinator: AuthCoordinator) {
         print("AppCoordinator: Auth flow finished notification received.")
-        // AuthService уже должен был переключить состояние на .signedIn,
-        // подписка в setupAuthenticationSubscription должна вызвать showMainAppFlow()
-        // Не нужно вызывать showMainAppFlow() прямо отсюда, чтобы избежать двойного вызова.
     }
 }
 

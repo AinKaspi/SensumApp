@@ -30,7 +30,7 @@ class UserProfileFeedViewModel {
          userProfileService: UserProfileServiceProtocol = UserProfileService(), 
          postService: PostServiceProtocol = PostService(),
          followService: FollowServiceProtocol = FollowService(),
-         progressService: ProgressServiceProtocol = ProgressService()) {
+         progressService: ProgressServiceProtocol) {
         
         self.userID = userID
         self.isCurrentUser = isCurrentUser
@@ -94,12 +94,12 @@ class UserProfileFeedViewModel {
         
         // --- Загрузка Постов --- 
         group.enter()
-        postService.fetchPosts(forUserID: userID) { [weak self] result in
+        postService.fetchPosts(forUserID: userID, limit: 18, startingAfter: nil) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isLoadingPosts = false
                 switch result {
-                case .success(let posts):
-                    self?.userPosts = posts
+                case .success(let resultData):
+                    self?.userPosts = resultData.posts
                 case .failure(let error):
                      print("UserProfileFeedVM Error (Fetch Posts): \(error.localizedDescription)")
                     if fetchError == nil { fetchError = error }
