@@ -1,5 +1,6 @@
 import UIKit
 // Импортируем CommentsViewModel
+import FirebaseFirestore
 
 class FeedCoordinator: Coordinator {
     var navigationController: UINavigationController
@@ -9,13 +10,22 @@ class FeedCoordinator: Coordinator {
 
     // Добавляем зависимости для VM
     private let postService: PostServiceProtocol
+    private let userProfileService: UserProfileServiceProtocol
+    private let followService: FollowServiceProtocol
+    private let progressService: ProgressServiceProtocol
     
     init(navigationController: UINavigationController, 
          postService: PostServiceProtocol = PostService(),
-         appCoordinator: AppCoordinator?) { // Добавляем appCoordinator
+         userProfileService: UserProfileServiceProtocol = UserProfileService(),
+         followService: FollowServiceProtocol = FollowService(),
+         progressService: ProgressServiceProtocol,
+         appCoordinator: AppCoordinator?) {
         self.navigationController = navigationController
         self.postService = postService
-        self.appCoordinator = appCoordinator // Сохраняем ссылку
+        self.userProfileService = userProfileService
+        self.followService = followService
+        self.progressService = progressService
+        self.appCoordinator = appCoordinator
         // TODO: Настроить внешний вид Navigation Bar для ленты? Или он будет скрыт?
     }
 
@@ -31,19 +41,23 @@ class FeedCoordinator: Coordinator {
     
     // Метод для показа профиля другого пользователя
     func showUserProfile(userID: String) {
-        // TODO: Реализовать создание UserProfileCoordinator
         print("FeedCoordinator: Show user profile for ID: \(userID)")
-        // let userProfileCoordinator = UserProfileCoordinator(navigationController: self.navigationController, userID: userID) // Или модально?
-        // addChild(userProfileCoordinator)
-        // userProfileCoordinator.start() // Start должен инициировать представление (modal/push)
+        let userProfileCoordinator = UserProfileCoordinator(
+            navigationController: self.navigationController,
+            userID: userID,
+            userProfileService: userProfileService,
+            postService: postService,
+            followService: followService,
+            progressService: progressService
+        )
+        userProfileCoordinator.start()
     }
     
     // НОВЫЙ МЕТОД: Показ экрана комментариев
     @MainActor // Добавляем аннотацию для вызова MainActor-изолированного init
     func showComments(for postId: String) {
         print("FeedCoordinator: Show comments for post ID: \(postId)")
-        // Раскомментируем создание ViewModel и ViewController
-        let viewModel = CommentsViewModel(postId: postId, postService: postService) // Передаем зависимости
+        let viewModel = CommentsViewModel(postId: postId, postService: postService)
         let vc = CommentsViewController(postId: postId, viewModel: viewModel) 
         vc.hidesBottomBarWhenPushed = true // Скрываем TabBar
         navigationController.pushViewController(vc, animated: true)

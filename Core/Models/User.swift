@@ -10,9 +10,9 @@ struct User: Codable, Identifiable {
     var avatarURL: String? // URL аватара в Firebase Storage
     var status: String?
     
-    // Статистика профиля
-    var followerCount: Int = 0
-    var followingCount: Int = 0
+    // Статистика профиля - Делаем опциональными
+    var followerCount: Int? 
+    var followingCount: Int?
     
     // УДАЛЯЕМ ПОЛЯ УРОВНЕЙ/XP - они теперь в ProgressData
     // var level: Int = 1
@@ -25,16 +25,27 @@ struct User: Codable, Identifiable {
     // Можно добавить другие поля: дата рождения, пол, настройки приватности и т.д.
     
     // Пример CodingKeys, если имена полей в Firestore отличаются от Swift
-    // Обновляем CodingKeys, чтобы они не включали удаленные поля
+    // Обновляем CodingKeys, чтобы они соответствовали Firestore
     enum CodingKeys: String, CodingKey {
         case id // @DocumentID не кодируется вручную
         case username
         case email
-        case avatarURL = "avatar_url" // Пример, если имя в Firestore другое
+        case avatarURL // Исправлено
         case status
-        case followerCount = "follower_count"
-        case followingCount = "following_count"
-        // level, currentXP, xpToNextLevel удалены
-        case createdAt = "created_at"
+        case followerCount // Исправлено
+        case followingCount // Исправлено
+        case createdAt // Исправлено
+    }
+    
+    // Обновляем init, чтобы соответствовать опциональным полям
+    init(id: String? = nil, username: String, email: String, avatarURL: String? = nil, status: String? = nil, followerCount: Int? = 0, followingCount: Int? = 0, createdAt: Timestamp) {
+        self.id = id
+        self.username = username
+        self.email = email
+        self.avatarURL = avatarURL
+        self.status = status
+        self.followerCount = followerCount
+        self.followingCount = followingCount
+        self.createdAt = createdAt
     }
 } 

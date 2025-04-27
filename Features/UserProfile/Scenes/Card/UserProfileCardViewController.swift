@@ -1,4 +1,6 @@
 import UIKit
+import Kingfisher // Добавляем для аватаров
+import Combine // Добавляем для биндингов
 // Удаляем import DGCharts
 // import DGCharts 
 
@@ -33,8 +35,9 @@ struct FeedEvent { // TODO: Вынести в Models
 class UserProfileCardViewController: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate, UIGestureRecognizerDelegate {
 
     // MARK: - Dependencies
-    // ViewModel нужно будет адаптировать или заменить
-    var viewModel: PersonViewModel! // Оставим пока старый
+    // Меняем тип ViewModel
+    var viewModel: UserProfileCardViewModel! 
+    private var cancellables = Set<AnyCancellable>()
     // Координатор тут не нужен, управляет контейнер
     // var coordinator: PersonCoordinator?
 
@@ -88,9 +91,8 @@ class UserProfileCardViewController: UIViewController, UIImagePickerControllerDe
     private lazy var followButton: UIButton = {
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
+        // Стиль будет обновляться в setupBindings
         button.setTitle("Follow", for: .normal)
-        button.setTitleColor(.black, for: .normal)
-        button.backgroundColor = .white
         button.layer.cornerRadius = 15
         button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
         button.addTarget(self, action: #selector(followButtonTapped), for: .touchUpInside)
@@ -137,19 +139,27 @@ class UserProfileCardViewController: UIViewController, UIImagePickerControllerDe
         return progressView
     }()
 
+    // Индикатор загрузки
+    private lazy var activityIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .large)
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.color = .white // На случай, если фон темный
+        indicator.hidesWhenStopped = true
+        return indicator
+    }()
+
     // --- Жизненный цикл и настройка ---
     override func viewDidLoad() {
         super.viewDidLoad()
-        guard viewModel != nil else {
-             fatalError("ViewModel not injected into UserProfileCardViewController")
-        }
+        assert(viewModel != nil, "ViewModel not injected into UserProfileCardViewController")
 
         view.backgroundColor = .black // Оставим черный фон
         setupViews()
         setupConstraints()
+        // Вызываем setupBindings
+        setupBindings()
         // Убираем обработку тапа по аватару, это не для экрана Card
         // setupAvatarTapGesture(for: backgroundImageView) 
-        updateProfileDisplayFromViewModel() 
         // TODO: Убрать ненужную логику делегата TopMenuView из этого VC
     }
 
@@ -171,6 +181,7 @@ class UserProfileCardViewController: UIViewController, UIImagePickerControllerDe
     private func setupViews() {
         view.addSubview(backgroundImageView)
         view.addSubview(bottomInfoContainerView)
+        view.addSubview(activityIndicator) // Добавляем индикатор
 
         bottomInfoContainerView.addSubview(miniAvatarImageView)
         bottomInfoContainerView.addSubview(usernameLabel)
@@ -237,53 +248,125 @@ class UserProfileCardViewController: UIViewController, UIImagePickerControllerDe
             // XP Лейбл
             xpLabel.centerYAnchor.constraint(equalTo: levelLabel.centerYAnchor),
             xpLabel.trailingAnchor.constraint(equalTo: bottomInfoContainerView.trailingAnchor, constant: -padding),
-            xpLabel.leadingAnchor.constraint(greaterThanOrEqualTo: levelLabel.trailingAnchor, constant: smallPadding)
+            xpLabel.leadingAnchor.constraint(greaterThanOrEqualTo: levelLabel.trailingAnchor, constant: smallPadding),
+            
+            // Констрейнты для индикатора
+            activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
     }
 
-    // MARK: - Data Handling
-    private func updateProfileDisplayFromViewModel() {
-        // Логика остается, будет получать данные из адаптированной ViewModel
-        usernameLabel.text = viewModel.usernameText
-        statusLabel.text = viewModel.statusText
-        levelLabel.text = viewModel.levelText
-        xpLabel.text = viewModel.xpText
-        xpProgressBar.setProgress(viewModel.xpProgress, animated: view.window != nil)
+    // MARK: - Bindings
+    private func setupBindings() {
+        guard let viewModel = viewModel else { return }
         
-        if let avatar = viewModel.avatarImage {
-            backgroundImageView.image = avatar
-            backgroundImageView.contentMode = .scaleAspectFill
-            miniAvatarImageView.image = avatar
+        // Подписка на данные пользователя
+        viewModel.$userProfile
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] user in
+                self?.usernameLabel.text = user?.username ?? "-"
+                self?.statusLabel.text = user?.status ?? ""
+                self?.updateAvatar(url: user?.avatarURL)
+            }
+            .store(in: &cancellables)
+            
+        // Подписка на данные прогресса
+        viewModel.$progressData
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] progressData in
+                guard let data = progressData else { return }
+                self?.levelLabel.text = "Level \(data.level)"
+                self?.xpLabel.text = "\(data.currentXP)/\(data.xpToNextLevel) XP"
+                let progress = data.xpToNextLevel > 0 ? Float(data.currentXP) / Float(data.xpToNextLevel) : 0
+                self?.xpProgressBar.setProgress(max(0.0, min(1.0, progress)), animated: self?.view.window != nil)
+            }
+            .store(in: &cancellables)
+            
+        // Подписка на статус подписки
+        viewModel.$isFollowing
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isFollowing in
+                self?.configureFollowButton(isFollowing: isFollowing)
+            }
+            .store(in: &cancellables)
+            
+        // Подписка на состояние загрузки
+        viewModel.$isLoading
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isLoading in
+                self?.activityIndicator.isHidden = !isLoading
+                if isLoading {
+                    self?.activityIndicator.startAnimating()
+                    self?.bottomInfoContainerView.isHidden = true // Скрываем инфо во время загрузки
+                } else {
+                    self?.activityIndicator.stopAnimating()
+                    self?.bottomInfoContainerView.isHidden = false
+                }
+            }
+            .store(in: &cancellables)
+            
+        // Подписка на ошибки
+        viewModel.$errorMessage
+            .receive(on: DispatchQueue.main)
+            .compactMap { $0 }
+            .sink { [weak self] message in
+                // TODO: Показать Alert?
+                print("*** UserProfileCardVC Error: \(message) ***")
+            }
+            .store(in: &cancellables)
+    }
+
+    // MARK: - UI Update Helpers
+    
+    private func updateAvatar(url avatarURL: String?) {
+        let placeholder = UIImage(systemName: "person.crop.circle.fill")?.withTintColor(.darkGray)
+        let miniPlaceholder = UIImage(systemName: "person.circle.fill")?.withTintColor(.lightGray)
+        
+        if let urlString = avatarURL, let url = URL(string: urlString) {
+            // Загружаем фон
+            backgroundImageView.kf.indicatorType = .activity
+            backgroundImageView.kf.setImage(with: url, placeholder: placeholder, options: [.transition(.fade(0.2))]) { result in
+                if case .failure = result { self.backgroundImageView.image = placeholder }
+            }
+            // Загружаем мини-аватар
+            miniAvatarImageView.kf.setImage(with: url, placeholder: miniPlaceholder, options: [.transition(.fade(0.2))]) { result in
+                 if case .failure = result { self.miniAvatarImageView.image = miniPlaceholder }
+            }
         } else {
-            // Плейсхолдеры
-            backgroundImageView.image = UIImage(systemName: "person.crop.circle.fill")
+            backgroundImageView.image = placeholder
             backgroundImageView.tintColor = .darkGray
             backgroundImageView.contentMode = .scaleAspectFit 
             backgroundImageView.backgroundColor = UIColor(white: 0.1, alpha: 1.0) 
-            miniAvatarImageView.image = UIImage(systemName: "person.crop.circle.fill")
+            miniAvatarImageView.image = miniPlaceholder
             miniAvatarImageView.tintColor = .lightGray
             miniAvatarImageView.backgroundColor = .darkGray
         }
     }
+    
+    private func configureFollowButton(isFollowing: Bool) {
+        // Скрываем кнопку, если это профиль текущего пользователя
+        followButton.isHidden = viewModel.isCurrentUser 
+        if viewModel.isCurrentUser { return }
+        
+        if isFollowing {
+            followButton.setTitle("Following", for: .normal)
+            followButton.backgroundColor = .clear
+            followButton.setTitleColor(.lightGray, for: .normal)
+            followButton.layer.borderWidth = 1
+            followButton.layer.borderColor = UIColor.lightGray.cgColor
+        } else {
+            followButton.setTitle("Follow", for: .normal)
+            followButton.backgroundColor = .white
+            followButton.setTitleColor(.black, for: .normal)
+            followButton.layer.borderWidth = 0
+        }
+    }
 
-    // Убираем все, что связано с редактированием аватара и статуса
-    // MARK: - Avatar Handling
-    /*
-    private func setupAvatarTapGesture(for imageView: UIImageView) { ... }
-    @objc private func avatarTapped(_ sender: UITapGestureRecognizer) { ... }
-    */
-    
-    // MARK: - Status Handling
-    /*
-    private func setupStatusLabelTapGesture() { ... }
-    @objc private func statusLabelTapped() { ... }
-    */
-    
     // MARK: - Actions
     @objc private func followButtonTapped() {
-        print("Follow button tapped - Action Placeholder - Should be handled by Container/ViewModel?")
+        print("Follow button tapped")
+        viewModel.followButtonTapped() // Вызываем ViewModel
     }
-    
 }
 
 // Убираем ненужные расширения

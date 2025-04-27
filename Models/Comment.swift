@@ -2,7 +2,7 @@ import Foundation
 import FirebaseFirestore // Добавляем импорт для Timestamp
 
 struct Comment: Identifiable, Codable, Equatable {
-    let id: String // ID комментария (обычно совпадает с ID документа в Firestore)
+    @DocumentID var id: String?
     let postId: String // ID поста, к которому относится комментарий
     let authorUid: String // ID пользователя, оставившего комментарий
     let authorUsername: String // Имя пользователя

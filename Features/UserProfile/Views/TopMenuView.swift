@@ -73,6 +73,8 @@ class TopMenuView: UIView {
         stackView.axis = .horizontal
         stackView.distribution = .fillEqually
         stackView.spacing = 15
+        // Понижаем сопротивление сжатию для стека
+        stackView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return stackView
     }()
     

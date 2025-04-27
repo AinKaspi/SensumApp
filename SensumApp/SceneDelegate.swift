@@ -130,7 +130,10 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
         let feedCoordinator = FeedCoordinator(
             navigationController: feedNavController,
             postService: postService,
-            appCoordinator: self
+            userProfileService: userProfileService,
+            followService: followService,
+            progressService: progressService,
+            appCoordinator: self 
         )
         addChild(feedCoordinator)
         feedCoordinator.start()

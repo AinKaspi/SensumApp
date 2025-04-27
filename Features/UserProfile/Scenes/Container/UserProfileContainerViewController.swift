@@ -12,8 +12,15 @@ class UserProfileContainerViewController: UIViewController {
     // MARK: - Child View Controllers
     private lazy var cardVC: UserProfileCardViewController = {
         let vc = UserProfileCardViewController()
-        // TODO: Configure with ViewModel using self.userID & progressService?
-        // Пока оставляем без VM, т.к. PersonViewModel устарел
+        // Создаем и инжектируем UserProfileCardViewModel
+        let viewModel = UserProfileCardViewModel(
+            userID: self.userID, 
+            isCurrentUser: false, // Предполагаем, что контейнер используется для чужих профилей
+            userProfileService: self.userProfileService, 
+            progressService: self.progressService,
+            followService: FollowService() // Создаем или передаем self.followService если он есть
+        )
+        vc.viewModel = viewModel
         return vc
     }()
     
