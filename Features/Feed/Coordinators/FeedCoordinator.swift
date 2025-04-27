@@ -4,14 +4,18 @@ import UIKit
 class FeedCoordinator: Coordinator {
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
+    // Добавляем ссылку на AppCoordinator
+    weak var appCoordinator: AppCoordinator?
 
     // Добавляем зависимости для VM
     private let postService: PostServiceProtocol
     
     init(navigationController: UINavigationController, 
-         postService: PostServiceProtocol = PostService()) {
+         postService: PostServiceProtocol = PostService(),
+         appCoordinator: AppCoordinator?) { // Добавляем appCoordinator
         self.navigationController = navigationController
         self.postService = postService
+        self.appCoordinator = appCoordinator // Сохраняем ссылку
         // TODO: Настроить внешний вид Navigation Bar для ленты? Или он будет скрыт?
     }
 
@@ -27,7 +31,7 @@ class FeedCoordinator: Coordinator {
     
     // Метод для показа профиля другого пользователя
     func showUserProfile(userID: String) {
-        // TODO: Реализовать представление UserProfileCoordinator
+        // TODO: Реализовать создание UserProfileCoordinator
         print("FeedCoordinator: Show user profile for ID: \(userID)")
         // let userProfileCoordinator = UserProfileCoordinator(navigationController: self.navigationController, userID: userID) // Или модально?
         // addChild(userProfileCoordinator)
@@ -47,7 +51,12 @@ class FeedCoordinator: Coordinator {
     
     // Метод для показа сообщений
     func showMessages() {
-        print("FeedCoordinator: Show messages")
-        // TODO: Запустить MessagingCoordinator?
+        print("FeedCoordinator: Requesting AppCoordinator to show messages")
+        // TODO: Вызвать appCoordinator?.showMessages()
+    }
+    
+    func showNotifications() {
+        print("FeedCoordinator: Requesting AppCoordinator to show notifications")
+        appCoordinator?.showNotifications()
     }
 } 

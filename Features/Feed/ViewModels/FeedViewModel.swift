@@ -20,6 +20,8 @@ class FeedViewModel {
     // Новые состояния для пагинации
     @Published var isFetchingMore: Bool = false
     @Published var canLoadMore: Bool = true // Флаг, что есть еще посты для загрузки
+    // Добавляем Published свойство для пользователей в сторис
+    @Published private(set) var storyUsers: [User] = []
     
     // Состояние пагинации
     private var lastDocumentSnapshot: DocumentSnapshot? = nil
@@ -31,6 +33,8 @@ class FeedViewModel {
         self.postService = postService
         // Загружаем первую страницу при инициализации
         fetchPosts(refresh: true)
+        // Загружаем пользователей для сторис
+        fetchStoryUsers()
         
         // ---> Подписываемся на уведомление о создании нового поста <---
         NotificationCenter.default.addObserver(
@@ -123,6 +127,20 @@ class FeedViewModel {
     func refreshFeed() {
         print("FeedViewModel: Refreshing feed (Pull-to-Refresh)...")
         fetchPosts(refresh: true)
+        // Также обновляем сторис при Pull-to-Refresh
+        fetchStoryUsers()
+    }
+    
+    // Новый метод для загрузки пользователей сторис
+    func fetchStoryUsers() {
+        print("FeedViewModel: Fetching story users... (Placeholder)")
+        // TODO: Реализовать загрузку списка пользователей для сторис
+        // Например, загрузить список ID подписок, потом загрузить User объекты
+        // Временно используем моковые данные
+        let mockUsers = (1...15).map { i in
+            User(id: "user_\(i)", username: "user_\(i)", email: "user\(i)@mail.com", avatarURL: nil, status: nil, createdAt: Timestamp())
+        }
+        self.storyUsers = mockUsers
     }
     
     // TODO: Добавить методы для пагинации (загрузка старых постов)
@@ -153,6 +171,9 @@ class FeedViewModel {
         let completion: (Error?) -> Void = { [weak self] error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
+                // Проверяем, что индекс все еще валиден
+                guard self.feedPosts.indices.contains(index) else { return }
+                
                 if let error = error {
                     print("FeedViewModel Error (Toggle Like): \(error.localizedDescription)")
                     // Откатываем изменения при ошибке

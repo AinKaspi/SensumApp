@@ -8,6 +8,8 @@ protocol PostCellDelegate: AnyObject {
     func postCellDidTapLikeButton(_ cell: PostCell, currentLikeState: Bool)
     // Добавляем метод для кнопки комментариев
     func postCellDidTapCommentButton(_ cell: PostCell)
+    // Добавляем метод для разворачивания/сворачивания текста
+    func postCellDidToggleCaption(_ cell: PostCell)
 }
 
 class PostCell: UITableViewCell {
@@ -21,6 +23,10 @@ class PostCell: UITableViewCell {
     // Добавляем хранение текущего состояния лайка и ID поста
     private var currentPostID: String?
     private var isCurrentlyLiked: Bool = false
+    // Состояния для текста
+    private var isCaptionExpanded: Bool = false
+    private var fullCaption: String?
+    private var canExpandCaption: Bool = false // Флаг, нужно ли показывать кнопку "more"
     
     // MARK: - UI Elements
     
@@ -55,6 +61,8 @@ class PostCell: UITableViewCell {
         imageView.contentMode = .scaleAspectFill // Или .scaleAspectFit?
         imageView.clipsToBounds = true
         imageView.backgroundColor = .secondarySystemBackground
+        imageView.layer.cornerRadius = 25 // Оставляем скругление
+        imageView.clipsToBounds = true
         return imageView
     }()
     
@@ -115,11 +123,25 @@ class PostCell: UITableViewCell {
         label.translatesAutoresizingMaskIntoConstraints = false
         label.font = .systemFont(ofSize: 14)
         label.textColor = .white
-        label.numberOfLines = 2 // Ограничим пока двумя строками
+        // Изначально 0 строк, чтобы можно было измерить полную высоту
+        label.numberOfLines = 0 
+        // Добавляем обработчик нажатия на сам текст
+        label.isUserInteractionEnabled = true
         return label
     }()
     
-    // TODO: Добавить кнопки Like, Comment, Share
+    // Кнопка "more..."
+    private let moreButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setTitle("еще", for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
+        button.setTitleColor(.lightGray, for: .normal)
+        button.addTarget(self, action: #selector(toggleCaptionExpansion), for: .touchUpInside)
+        button.isHidden = true // Скрыта по умолчанию
+        button.contentHorizontalAlignment = .left // Прижимаем текст к левому краю
+        return button
+    }()
     
     // MARK: - Init
     
@@ -131,6 +153,9 @@ class PostCell: UITableViewCell {
         setupConstraints()
         // Добавляем распознаватели нажатий
         setupTapGestures()
+        // Добавляем обработчик нажатия на captionLabel
+        let captionTap = UITapGestureRecognizer(target: self, action: #selector(toggleCaptionExpansion))
+        captionLabel.addGestureRecognizer(captionTap)
     }
     
     required init?(coder: NSCoder) {
@@ -152,6 +177,12 @@ class PostCell: UITableViewCell {
         updateLikeButtonAppearance() // Обновляем вид кнопки
         likesLabel.text = "0 likes" // Сбрасываем счетчик
         delegate = nil // Сбрасываем делегата
+        // Сбрасываем состояние текста
+        isCaptionExpanded = false 
+        canExpandCaption = false
+        fullCaption = nil
+        moreButton.isHidden = true
+        captionLabel.numberOfLines = 0 // Возвращаем 0 строк
     }
     
     // MARK: - Setup
@@ -164,6 +195,8 @@ class PostCell: UITableViewCell {
         contentView.addSubview(actionButtonsStackView)
         contentView.addSubview(likesLabel)
         contentView.addSubview(captionLabel)
+        // Добавляем кнопку "more"
+        contentView.addSubview(moreButton)
     }
     
     private func setupConstraints() {
@@ -198,7 +231,13 @@ class PostCell: UITableViewCell {
             captionLabel.topAnchor.constraint(equalTo: likesLabel.bottomAnchor, constant: smallPadding),
             captionLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             captionLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
-            captionLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -padding)
+            captionLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -padding),
+            
+            // Кнопка "more" под captionLabel
+            moreButton.topAnchor.constraint(equalTo: captionLabel.bottomAnchor, constant: 0),
+            moreButton.leadingAnchor.constraint(equalTo: captionLabel.leadingAnchor),
+            // Привязываем низ кнопки к низу contentView
+            moreButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -padding)
         ])
     }
     
@@ -209,6 +248,10 @@ class PostCell: UITableViewCell {
         
         let usernameTap = UITapGestureRecognizer(target: self, action: #selector(handleAuthorTap))
         usernameLabel.addGestureRecognizer(usernameTap)
+        
+        // Добавляем обработчик нажатия на captionLabel
+        let captionTap = UITapGestureRecognizer(target: self, action: #selector(toggleCaptionExpansion))
+        captionLabel.addGestureRecognizer(captionTap)
     }
     
     // MARK: - Actions
@@ -231,6 +274,36 @@ class PostCell: UITableViewCell {
         delegate?.postCellDidTapCommentButton(self)
     }
 
+    // MARK: - Caption Handling
+    
+    // Вызывается при нажатии на captionLabel или moreButton
+    @objc private func toggleCaptionExpansion() {
+        // Ничего не делаем, если текст и так полностью помещается
+        guard canExpandCaption else { return }
+        
+        isCaptionExpanded.toggle()
+        updateCaptionAppearance()
+        
+        // Уведомляем делегата (ViewController), что нужно обновить layout таблицы
+        delegate?.postCellDidToggleCaption(self)
+    }
+    
+    // Обновляет numberOfLines и видимость кнопки "more"
+    private func updateCaptionAppearance() {
+        captionLabel.numberOfLines = isCaptionExpanded ? 0 : 2 // 2 строки в свернутом виде
+        moreButton.isHidden = !canExpandCaption || isCaptionExpanded
+    }
+    
+    // Проверяет, нужно ли показывать кнопку "more"
+    private func checkAndSetupCaptionExpansion() {
+        // Даем UI время отрисоваться и получить реальную ширину captionLabel
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.canExpandCaption = self.captionLabel.isTruncated()
+            self.updateCaptionAppearance()
+        }
+    }
+
     // MARK: - Configuration
     
     func configure(with post: Post) {
@@ -238,6 +311,8 @@ class PostCell: UITableViewCell {
         self.authorUserID = post.userID
         self.currentPostID = post.id // Сохраняем ID поста
         self.isCurrentlyLiked = post.isLiked // Сохраняем состояние лайка
+        self.fullCaption = post.caption
+        self.isCaptionExpanded = false // Сбрасываем состояние при конфигурации
         
         usernameLabel.text = post.authorUsername ?? "Unknown User"
         let placeholder = UIImage(systemName: "person.circle.fill")?.withTintColor(.darkGray, renderingMode: .alwaysOriginal)
@@ -248,7 +323,8 @@ class PostCell: UITableViewCell {
             userAvatarImageView.tintColor = .darkGray
         }
         
-        captionLabel.text = post.caption
+        captionLabel.text = self.fullCaption // Ставим полный текст для расчета
+        captionLabel.numberOfLines = 0 // Сначала ставим 0 строк для расчета
         // Обновляем счетчик лайков
         likesLabel.text = "\(post.likeCount) likes"
         // Обновляем вид кнопки лайка
@@ -258,6 +334,9 @@ class PostCell: UITableViewCell {
             postImageView.kf.indicatorType = .activity
             postImageView.kf.setImage(with: url)
         }
+        
+        // Проверяем необходимость кнопки "more" после установки текста
+        checkAndSetupCaptionExpansion()
     }
     
     // Обновляет вид кнопки лайка
@@ -276,5 +355,30 @@ class PostCell: UITableViewCell {
     // Метод для получения ID поста (если понадобится делегату)
     func getPostID() -> String? {
         return currentPostID
+    }
+    
+    // Новый метод для установки скругления картинки поста
+    func setPostImageCornerRadius(_ radius: CGFloat) {
+        postImageView.layer.cornerRadius = radius
+        postImageView.clipsToBounds = true 
+    }
+}
+
+// Хелпер для определения, обрезан ли текст в UILabel
+// (Можно вынести в Extensions)
+extension UILabel {
+    func isTruncated() -> Bool {
+        guard let labelText = text else {
+            return false
+        }
+        // Рассчитываем реальный размер текста для текущей ширины и неограниченной высоты
+        let labelTextSize = (labelText as NSString).boundingRect(
+            with: CGSize(width: frame.size.width, height: .greatestFiniteMagnitude),
+            options: .usesLineFragmentOrigin,
+            attributes: [.font: font!],
+            context: nil).size
+
+        // Сравниваем с текущей высотой bounds (с небольшой погрешностью)
+        return labelTextSize.height > bounds.size.height + 2 
     }
 } 

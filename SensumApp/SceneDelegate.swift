@@ -127,7 +127,11 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
         
         // 1. Feed Coordinator
         let feedNavController = UINavigationController()
-        let feedCoordinator = FeedCoordinator(navigationController: feedNavController, postService: postService)
+        let feedCoordinator = FeedCoordinator(
+            navigationController: feedNavController,
+            postService: postService,
+            appCoordinator: self
+        )
         addChild(feedCoordinator)
         feedCoordinator.start()
         feedNavController.tabBarItem = UITabBarItem(title: "Feed", image: UIImage(systemName: "flame.fill"), tag: 0)
@@ -232,6 +236,34 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
     // Вызывается, когда AuthCoordinator завершает работу (пользователь вошел)
     func didFinishAuthentication(coordinator: AuthCoordinator) {
         print("AppCoordinator: Auth flow finished notification received.")
+    }
+    
+    // MARK: - Public Navigation Triggers
+    
+    // Метод для показа экрана уведомлений (вызывается из других координаторов)
+    func showNotifications() {
+        print("AppCoordinator: Showing Notifications screen...")
+        // Создаем отдельный Navigation Controller для модального показа
+        let notificationsNavController = UINavigationController()
+        // TODO: Передать зависимости в NotificationsCoordinator, если нужны
+        let notificationsCoordinator = NotificationsCoordinator(navigationController: notificationsNavController)
+        // Добавляем в дочерние, чтобы управлять им?
+        // addChild(notificationsCoordinator) 
+        notificationsCoordinator.start() // Start покажет VC
+        
+        // Показываем модально
+        if let rootVC = window.rootViewController {
+             // Настройка внешнего вида модального окна (опционально)
+             notificationsNavController.modalPresentationStyle = .pageSheet // или .formSheet, .fullScreen
+             if let sheet = notificationsNavController.sheetPresentationController {
+                 // Настройка sheet (iOS 15+)
+                 sheet.detents = [.large()] // Можно добавить .medium()
+                 sheet.prefersGrabberVisible = true
+             }
+             rootVC.present(notificationsNavController, animated: true, completion: nil)
+         } else {
+             print("AppCoordinator Error: RootViewController not found to present notifications.")
+         }
     }
 }
 
