@@ -142,14 +142,22 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
         
         // 1. Feed Coordinator
         let feedNavController = UINavigationController()
-        let feedCoordinator = FeedCoordinator(navigationController: feedNavController)
+        let feedCoordinator = FeedCoordinator(navigationController: feedNavController, postService: PostService())
         addChild(feedCoordinator)
         feedCoordinator.start()
         feedNavController.tabBarItem = UITabBarItem(title: "Feed", image: UIImage(systemName: "flame.fill"), tag: 0)
 
         // 2. Current User Profile Coordinator
         let profileNavController = UINavigationController()
-        let currentUserProfileCoordinator = CurrentUserProfileCoordinator(navigationController: profileNavController, authService: authService /*, другие сервисы если нужны */)
+        let currentUserProfileCoordinator = CurrentUserProfileCoordinator(
+            navigationController: profileNavController,
+            authService: authService,
+            userProfileService: UserProfileService(),
+            postService: PostService(),
+            followService: FollowService(),
+            storageService: StorageService(),
+            progressService: ProgressService()
+        )
         addChild(currentUserProfileCoordinator)
         currentUserProfileCoordinator.start()
         profileNavController.tabBarItem = UITabBarItem(title: "Person", image: UIImage(systemName: "person.fill"), tag: 1)
@@ -163,7 +171,11 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
 
         // 4. Progress Coordinator
         let progressNavController = UINavigationController()
-        let progressCoordinator = ProgressCoordinator(navigationController: progressNavController)
+        let progressCoordinator = ProgressCoordinator(
+            navigationController: progressNavController,
+            authService: authService,
+            progressService: ProgressService()
+        )
         addChild(progressCoordinator)
         progressCoordinator.start()
         progressNavController.tabBarItem = UITabBarItem(title: "Progress", image: UIImage(systemName: "chart.bar.fill"), tag: 3)

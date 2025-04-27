@@ -14,10 +14,10 @@ struct User: Codable, Identifiable {
     var followerCount: Int = 0
     var followingCount: Int = 0
     
-    // Система уровней
-    var level: Int = 1
-    var currentXP: Int = 0
-    var xpToNextLevel: Int = 100 // Начальное значение для 1 уровня
+    // УДАЛЯЕМ ПОЛЯ УРОВНЕЙ/XP - они теперь в ProgressData
+    // var level: Int = 1
+    // var currentXP: Int = 0
+    // var xpToNextLevel: Int = 100 // Начальное значение для 1 уровня
     
     // Метаданные
     let createdAt: Timestamp // Используем Timestamp из Firebase
@@ -25,19 +25,16 @@ struct User: Codable, Identifiable {
     // Можно добавить другие поля: дата рождения, пол, настройки приватности и т.д.
     
     // Пример CodingKeys, если имена полей в Firestore отличаются от Swift
-    /*
+    // Обновляем CodingKeys, чтобы они не включали удаленные поля
     enum CodingKeys: String, CodingKey {
-        case id
+        case id // @DocumentID не кодируется вручную
         case username
         case email
-        case avatarURL = "avatar_url" // Пример
+        case avatarURL = "avatar_url" // Пример, если имя в Firestore другое
         case status
         case followerCount = "follower_count"
         case followingCount = "following_count"
-        case level
-        case currentXP = "current_xp"
-        case xpToNextLevel = "xp_to_next_level"
+        // level, currentXP, xpToNextLevel удалены
         case createdAt = "created_at"
     }
-    */
 } 

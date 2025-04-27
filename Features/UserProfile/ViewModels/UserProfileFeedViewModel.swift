@@ -11,12 +11,15 @@ class UserProfileFeedViewModel {
     private let userProfileService: UserProfileServiceProtocol
     private let postService: PostServiceProtocol
     private let followService: FollowServiceProtocol
+    private let progressService: ProgressServiceProtocol
     
     // Состояния для UI
     @Published var userProfile: User? = nil
     @Published var userPosts: [Post] = []
+    @Published var progressData: ProgressData? = nil
     @Published var isFollowing: Bool = false // Только если !isCurrentUser
     @Published var isLoadingProfile: Bool = false
+    @Published var isLoadingProgress: Bool = false
     @Published var isLoadingPosts: Bool = false
     @Published var errorMessage: String? = nil
     
@@ -26,16 +29,17 @@ class UserProfileFeedViewModel {
          isCurrentUser: Bool,
          userProfileService: UserProfileServiceProtocol = UserProfileService(), 
          postService: PostServiceProtocol = PostService(),
-         followService: FollowServiceProtocol = FollowService()) {
+         followService: FollowServiceProtocol = FollowService(),
+         progressService: ProgressServiceProtocol = ProgressService()) {
         
         self.userID = userID
         self.isCurrentUser = isCurrentUser
         self.userProfileService = userProfileService
         self.postService = postService
         self.followService = followService
+        self.progressService = progressService
         
-        fetchUserProfileData()
-        fetchUserPostsData()
+        fetchAllUserData()
         
         // Проверяем статус подписки, только если это профиль другого пользователя
         if !isCurrentUser {
@@ -45,39 +49,73 @@ class UserProfileFeedViewModel {
     
     // MARK: - Data Fetching
     
-    func fetchUserProfileData() {
+    func fetchAllUserData() {
         isLoadingProfile = true
+        isLoadingProgress = true
+        isLoadingPosts = true
         errorMessage = nil
-        print("Fetching profile for userID: \(userID)")
+        print("UserProfileFeedVM: Fetching all data for userID: \(userID)")
+        
+        let group = DispatchGroup()
+        var fetchError: Error? = nil
+
+        // --- Загрузка Профиля (User) ---
+        group.enter()
         userProfileService.fetchUserProfile(userID: userID) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isLoadingProfile = false
                 switch result {
                 case .success(let user):
-                    print("Profile fetched successfully: \(user)")
                     self?.userProfile = user
                 case .failure(let error):
-                    print("Profile fetch failed: \(error.localizedDescription)")
-                    self?.errorMessage = "Failed to load profile: \(error.localizedDescription)"
+                    print("UserProfileFeedVM Error (Fetch User): \(error.localizedDescription)")
+                    fetchError = error
                 }
+                group.leave()
             }
         }
-    }
-    
-    func fetchUserPostsData() {
-        isLoadingPosts = true
-        // errorMessage = nil // Не перезатираем ошибку профиля
+
+        // --- Загрузка Прогресса (ProgressData) ---
+        group.enter()
+        progressService.fetchProgressData(userID: userID) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.isLoadingProgress = false
+                switch result {
+                case .success(let progress):
+                    self?.progressData = progress
+                case .failure(let error):
+                    print("UserProfileFeedVM Error (Fetch Progress): \(error.localizedDescription)")
+                    // Не перезаписываем ошибку профиля, если она уже есть
+                    if fetchError == nil { fetchError = error }
+                }
+                 group.leave()
+            }
+        }
+        
+        // --- Загрузка Постов --- 
+        group.enter()
         postService.fetchPosts(forUserID: userID) { [weak self] result in
-             DispatchQueue.main.async {
+            DispatchQueue.main.async {
                 self?.isLoadingPosts = false
                 switch result {
                 case .success(let posts):
                     self?.userPosts = posts
                 case .failure(let error):
-                    // Можно показать отдельную ошибку для постов
-                    print("UserProfileFeedViewModel Error (Fetch Posts): \(error.localizedDescription)")
-                    self?.errorMessage = (self?.errorMessage ?? "") + "\nFailed to load posts."
+                     print("UserProfileFeedVM Error (Fetch Posts): \(error.localizedDescription)")
+                    if fetchError == nil { fetchError = error }
                 }
+                group.leave()
+            }
+        }
+        
+        // --- Обработка результатов --- 
+        group.notify(queue: .main) { [weak self] in
+            if let error = fetchError {
+                self?.errorMessage = "Failed to load profile data: \(error.localizedDescription)"
+                
+            } else {
+               
+                self?.errorMessage = nil
             }
         }
     }
@@ -103,26 +141,39 @@ class UserProfileFeedViewModel {
     func followButtonTapped() {
         guard !isCurrentUser else { return }
         
+        // Сохраняем текущее состояние и счетчик для оптимистичного обновления
+        let wasFollowing = isFollowing
+        let currentFollowerCount = userProfile?.followerCount ?? 0
+        let optimisticFollowerCount = wasFollowing ? max(0, currentFollowerCount - 1) : currentFollowerCount + 1
+        
+        // Оптимистично обновляем UI
+        self.isFollowing.toggle()
+        self.userProfile?.followerCount = optimisticFollowerCount // Обновляем локально
+        
         let actionCompletion: (Error?) -> Void = { [weak self] error in
              DispatchQueue.main.async {
                 if let error = error {
                      print("UserProfileFeedViewModel Error (Follow/Unfollow): \(error.localizedDescription)")
-                     // TODO: Показать ошибку пользователю
+                     // Откатываем изменения UI при ошибке
+                     self?.isFollowing = wasFollowing
+                     self?.userProfile?.followerCount = currentFollowerCount
+                     self?.errorMessage = "Failed to update follow status: \(error.localizedDescription)"
                  } else {
-                     // Обновляем локальное состояние и данные профиля (счетчики)
-                     self?.isFollowing.toggle()
-                     // TODO: Оптимистичное обновление счетчиков или перезагрузка профиля?
-                     // self?.fetchUserProfileData()
+                     // Успех. Можно дополнительно перезагрузить счетчики с сервера,
+                     // если логика follow/unfollow на сервере их возвращает или обновляет.
+                     // В данном случае UserProfileService не обновляет User, 
+                     // FollowService обновляет счетчики в двух документах User.
+                     // Поэтому для точности можно перезагрузить профиль.
+                     // self?.fetchUserProfileData() 
+                     print("UserProfileFeedVM: Follow status updated successfully.")
                  }
              }
         }
         
-        if isFollowing {
-            // Выполнить отписку
+        if wasFollowing {
             print("Attempting to unfollow user: \(userID)")
             followService.unfollow(userIDToUnfollow: userID, completion: actionCompletion)
         } else {
-            // Выполнить подписку
             print("Attempting to follow user: \(userID)")
             followService.follow(userIDToFollow: userID, completion: actionCompletion)
         }

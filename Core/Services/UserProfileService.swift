@@ -5,6 +5,8 @@ import FirebaseFirestore
 protocol UserProfileServiceProtocol {
     func createUserProfile(user: User, completion: @escaping (Error?) -> Void)
     func fetchUserProfile(userID: String, completion: @escaping (Result<User, Error>) -> Void)
+    // Добавляем метод для обновления
+    func updateUserProfile(userID: String, data: [String: Any], completion: @escaping (Error?) -> Void)
     // TODO: Добавить методы для обновления профиля (update), получения нескольких профилей и т.д.
 }
 
@@ -60,6 +62,25 @@ class UserProfileService: UserProfileServiceProtocol {
                 print("UserProfileService Error (Fetch): \(fetchError.localizedDescription)")
                 completion(.failure(fetchError))
             }
+        }
+    }
+    
+    // Реализация метода для обновления
+    func updateUserProfile(userID: String, data: [String: Any], completion: @escaping (Error?) -> Void) {
+        // Проверяем, что данные для обновления не пустые
+        guard !data.isEmpty else {
+            print("UserProfileService: No data provided for update.")
+            completion(nil) // Нет данных = нет ошибки
+            return
+        }
+        
+        usersCollection.document(userID).updateData(data) { error in
+            if let error = error {
+                print("UserProfileService Error (Update): \(error.localizedDescription)")
+            } else {
+                print("UserProfileService: Profile updated successfully for user \(userID).")
+            }
+            completion(error)
         }
     }
     

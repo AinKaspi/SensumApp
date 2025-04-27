@@ -4,6 +4,7 @@ import MediaPipeTasksVision
 import UIKit // Для UIImage
 import simd // Для KalmanFilter3D
 import CoreMotion // Для MotionManager
+import Combine // Для @Published
 
 // MARK: - ExerciseExecutionViewModelViewDelegate
 protocol ExerciseExecutionViewModelViewDelegate: AnyObject {
@@ -16,11 +17,11 @@ protocol ExerciseExecutionViewModelViewDelegate: AnyObject {
     func viewModelDidUpdateDebugRepCount(_ count: Int)
     func viewModelDidUpdateDebugVisibility(visibilities: [Float]?)
     func viewModelDidUpdateDebugStdDev(positionStdDev: simd_float3)
-    // Добавляем методы для подготовки
     func viewModelDidStartPreparation(initialValue: Int)
     func viewModelDidUpdateCountdown(value: Int)
     func viewModelDidFinishPreparation()
-    // TODO: Добавить методы для Level Up, Error
+    func viewModelDidEncounterError(message: String)
+    func viewModelDidLevelUp(newLevel: Int, newRank: String)
 }
 
 // MARK: - ExerciseExecutionViewModel
@@ -28,7 +29,10 @@ class ExerciseExecutionViewModel: NSObject {
 
     // MARK: - Dependencies
     private let exercise: Exercise
-    private var userProfile: UserProfile?
+    private let userProfileService: UserProfileServiceProtocol
+    private let progressService: ProgressServiceProtocol
+    private let authService: AuthServiceProtocol
+    
     private var analyzer: ExerciseAnalyzer?
     private var poseLandmarkerHelper: PoseLandmarkerHelper?
     private let sessionQueue = DispatchQueue(label: "com.sensum.sessionQueue.execVM")
@@ -45,15 +49,19 @@ class ExerciseExecutionViewModel: NSObject {
     private let lowVisibilityThresholdForVelocityReset: Float = 0.4
     private let kalmanInitialUncertainty: Double = 10.0
     private let kalmanProcessNoise: Double = 0.01
-    private let kalmanMeasurementNoise: Double = 0.2 // Базовый шум (для visibility = 1.0)
-
-    // --- Параметры MediaPipe --- 
-    // Пробуем lite-модель для ускорения инициализации
-    private let modelPath = "pose_landmarker_lite.task" 
+    private let kalmanMeasurementNoise: Double = 0.2
+    private let modelPath = "pose_landmarker_lite.task"
     private let numPoses = 1
     private let minPoseDetectionConfidence: Float = 0.5
-    
-    // MARK: - State
+
+    // MARK: - Published State (для будущих расширений, пока не используются напрямую)
+    @Published private var currentUser: User? = nil
+    @Published private var currentProgressData: ProgressData? = nil
+    @Published private var isLoading: Bool = false
+    @Published private var errorMessage: String? = nil
+    private var cancellables = Set<AnyCancellable>()
+
+    // MARK: - Internal State
     private var sessionStartDate: Date?
     private var sessionTimer: Timer?
     private var visibilityLogTimer: Timer?
@@ -63,11 +71,11 @@ class ExerciseExecutionViewModel: NSObject {
     private var countdownValue: Int = 3
     private var progressiveSquatGoal: Int = 5
     private var squatsTowardsProgressiveGoal: Int = 0
+    private var sessionRepCount: Int = 0
     private var currentFrameSize: CGSize = .zero
     private var kalmanFilters: [KalmanFilter3D?] = Array(repeating: nil, count: 33)
     private var lastFrameTimestamp: TimeInterval? = nil
     private var lastUpdateTime: [TimeInterval?] = Array(repeating: nil, count: 33)
-    // Таймер и интервал для логгирования углов
     private var angleLogTimer: Timer?
     private let angleLogIntervalSecs: TimeInterval = 1.0
 
@@ -75,42 +83,109 @@ class ExerciseExecutionViewModel: NSObject {
     weak var viewDelegate: ExerciseExecutionViewModelViewDelegate?
 
     // MARK: - Initialization
-    init(exercise: Exercise, poseLandmarkerHelper: PoseLandmarkerHelper?, viewDelegate: ExerciseExecutionViewModelViewDelegate?) {
+    init(exercise: Exercise, 
+         poseLandmarkerHelper: PoseLandmarkerHelper?,
+         authService: AuthServiceProtocol = AuthService(),
+         userProfileService: UserProfileServiceProtocol = UserProfileService(),
+         progressService: ProgressServiceProtocol = ProgressService(),
+         viewDelegate: ExerciseExecutionViewModelViewDelegate?) {
         self.exercise = exercise
-        self.userProfile = DataManager.shared.getCurrentUserProfile()
+        self.authService = authService
+        self.userProfileService = userProfileService
+        self.progressService = progressService
         self.viewDelegate = viewDelegate
         self.poseLandmarkerHelper = poseLandmarkerHelper
+        
         super.init()
-        setupAnalyzer(for: exercise)
+        
+        self.setupAnalyzer(for: exercise)
         self.analyzer?.delegate = self
-        self.poseLandmarkerHelper?.liveStreamDelegate = self // Назначаем себя делегатом ПОСЛЕ super.init()
-        // Устанавливаем начальную цель (можно из профиля или упражнения)
-        self.progressiveSquatGoal = 5 // Пока хардкод
+        self.poseLandmarkerHelper?.liveStreamDelegate = self
+        self.progressiveSquatGoal = 5
+        
+        fetchInitialData()
     }
 
     // MARK: - Lifecycle Methods
     func viewDidLoad() {
-        updateInitialUI()
     }
     
     func viewDidAppear() {
         startPreparationTimer()
-        // Запускаем отслеживание ориентации
         motionManager.startUpdates()
     }
     
     func viewWillDisappear() {
         stopTimer()
         stopPreparationTimer()
-        // Останавливаем отслеживание ориентации
         motionManager.stopUpdates()
+    }
+    
+    // MARK: - Data Fetching
+    private func fetchInitialData() {
+        guard let userID = authService.currentUserID else {
+            print("ExerciseExecutionVM Error: Cannot get current user ID.")
+            self.errorMessage = "User not authenticated."
+            viewDelegate?.viewModelDidEncounterError(message: "User not authenticated.")
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        let group = DispatchGroup()
+        var fetchedUser: User? = nil
+        var fetchedProgress: ProgressData? = nil
+        var fetchError: Error? = nil
+        
+        group.enter()
+        userProfileService.fetchUserProfile(userID: userID) { result in
+            switch result {
+            case .success(let user): fetchedUser = user
+            case .failure(let error): fetchError = error
+            }
+            group.leave()
+        }
+        
+        group.enter()
+        progressService.fetchProgressData(userID: userID) { result in
+            switch result {
+            case .success(let progress): fetchedProgress = progress
+            case .failure(let error): fetchError = error
+            }
+            group.leave()
+        }
+        
+        group.notify(queue: .main) { [weak self] in
+            guard let self = self else { return }
+            self.isLoading = false
+            if let error = fetchError {
+                let message = "Failed to load user data: \(error.localizedDescription)"
+                self.errorMessage = message
+                print("ExerciseExecutionVM Error: \(message)")
+                self.viewDelegate?.viewModelDidEncounterError(message: message)
+            } else if let user = fetchedUser, let progress = fetchedProgress {
+                self.currentUser = user
+                self.currentProgressData = progress
+                print("ExerciseExecutionVM: Initial data loaded successfully.")
+                self.updateInitialUI()
+            } else {
+                let message = "Failed to load user data (unknown error)."
+                self.errorMessage = message
+                print("ExerciseExecutionVM Error: \(message)")
+                self.viewDelegate?.viewModelDidEncounterError(message: message)
+            }
+        }
     }
     
     // MARK: - Initial UI Update
     private func updateInitialUI() {
-        if let profile = userProfile {
-            viewDelegate?.viewModelDidUpdateProgress(currentXP: profile.currentXP, xpToNextLevel: profile.xpToNextLevel)
-            viewDelegate?.viewModelDidUpdateDebugRepCount(profile.totalSquats)
+        if let progress = currentProgressData {
+            viewDelegate?.viewModelDidUpdateProgress(currentXP: progress.currentXP, xpToNextLevel: progress.xpToNextLevel)
+            viewDelegate?.viewModelDidUpdateDebugRepCount(0)
+        } else {
+            viewDelegate?.viewModelDidUpdateProgress(currentXP: 0, xpToNextLevel: 100)
+            viewDelegate?.viewModelDidUpdateDebugRepCount(0)
         }
         viewDelegate?.viewModelDidUpdateGoal(current: squatsTowardsProgressiveGoal, target: progressiveSquatGoal)
         viewDelegate?.viewModelDidUpdateTimer(timeString: "00:00")
@@ -120,26 +195,11 @@ class ExerciseExecutionViewModel: NSObject {
     }
     
     // MARK: - MediaPipe Handling
-    // setupPoseLandmarker убран, т.к. helper передается извне
-
-    // MARK: - Analyzer Setup
-    private func setupAnalyzer(for exercise: Exercise) {
-        switch exercise.id {
-        case "squats":
-            self.analyzer = SquatAnalyzer3D(delegate: self)
-        default:
-            print("--- ExerciseExecutionVM ВНИМАНИЕ: Анализатор для '\(exercise.id)' не найден. ---")
-            self.analyzer = nil
-        }
-    }
-
-    // MARK: - Frame Processing
     func processVideoFrame(pixelBuffer: CVPixelBuffer, orientation: UIImage.Orientation, timeStamps: Int, frameSize: CGSize) {
         self.currentFrameSize = frameSize
-        // Передаем в хелпер; результат придет в метод делегата poseLandmarkerHelper
         poseLandmarkerHelper?.detectAsync(
             pixelBuffer: pixelBuffer,
-            orientation: orientation, 
+            orientation: orientation,
             timeStamps: timeStamps
         )
     }
@@ -148,9 +208,9 @@ class ExerciseExecutionViewModel: NSObject {
     private func startPreparationTimer() {
         guard !isPreparing else { return }
         isPreparing = true
-        countdownValue = 3 
+        countdownValue = 3
         stopPreparationTimer()
-        viewDelegate?.viewModelDidStartPreparation(initialValue: countdownValue) // Уведомляем View
+        viewDelegate?.viewModelDidStartPreparation(initialValue: countdownValue)
         countdownTimer = Timer.scheduledTimer(timeInterval: 1.0, target: self, selector: #selector(updatePreparationTimer), userInfo: nil, repeats: true)
     }
     
@@ -162,14 +222,14 @@ class ExerciseExecutionViewModel: NSObject {
     @objc private func updatePreparationTimer() {
         countdownValue -= 1
         if countdownValue > 0 {
-            viewDelegate?.viewModelDidUpdateCountdown(value: countdownValue) // Уведомляем View
+            viewDelegate?.viewModelDidUpdateCountdown(value: countdownValue)
         } else {
             stopPreparationTimer()
             isPreparing = false
-            viewDelegate?.viewModelDidFinishPreparation() // Уведомляем View
+            viewDelegate?.viewModelDidFinishPreparation()
             startTimer()
-            analyzer?.reset() 
-            startVisibilityLogTimer() 
+            analyzer?.reset()
+            startVisibilityLogTimer()
         }
     }
     
@@ -179,7 +239,6 @@ class ExerciseExecutionViewModel: NSObject {
         sessionStartDate = Date()
         viewDelegate?.viewModelDidUpdateTimer(timeString: "00:00")
         sessionTimer = Timer.scheduledTimer(timeInterval: timerUpdateInterval, target: self, selector: #selector(updateTimer), userInfo: nil, repeats: true)
-        // Запускаем логгеры вместе с основным таймером
         startVisibilityLogTimer()
         startAngleLogTimer()
     }
@@ -188,7 +247,7 @@ class ExerciseExecutionViewModel: NSObject {
         sessionTimer?.invalidate()
         sessionTimer = nil
         stopVisibilityLogTimer()
-        stopAngleLogTimer() // Останавливаем и таймер углов
+        stopAngleLogTimer()
     }
     
     private func startVisibilityLogTimer() {
@@ -208,13 +267,12 @@ class ExerciseExecutionViewModel: NSObject {
         }
     }
 
-    // --- Таймер логгирования Углов --- 
     private func startAngleLogTimer() {
         stopAngleLogTimer()
         angleLogTimer = Timer.scheduledTimer(timeInterval: angleLogIntervalSecs,
-                                             target: self, 
+                                             target: self,
                                              selector: #selector(logAngles),
-                                             userInfo: nil, 
+                                             userInfo: nil,
                                              repeats: true)
     }
     
@@ -224,13 +282,10 @@ class ExerciseExecutionViewModel: NSObject {
     }
     
     @objc private func logAngles() {
-        // Получаем анализатор и кастуем к типу с углами
         if let squatAnalyzer = analyzer as? SquatAnalyzer3D {
-            print(String(format: "[ANGLES LOG] Knee: %.1f, Hip: %.1f", 
-                         squatAnalyzer.currentSmoothedKneeAngle, 
+            print(String(format: "[ANGLES LOG] Knee: %.1f, Hip: %.1f",
+                         squatAnalyzer.currentSmoothedKneeAngle,
                          squatAnalyzer.currentSmoothedHipAngle))
-        } else {
-            // print("[ANGLES LOG] Analyzer not available or not SquatAnalyzer3D.")
         }
     }
 
@@ -249,18 +304,30 @@ class ExerciseExecutionViewModel: NSObject {
         lastUpdateTime = Array(repeating: nil, count: 33)
     }
     
-    // MARK: - Attribute Gain Logic
-    /// Определяет прирост атрибутов для выполненного повторения
     private func attributeGainsForCurrentRep() -> (str: Int, con: Int, acc: Int, spd: Int, bal: Int, flx: Int) {
-        // TODO: Логика должна зависеть от self.exercise.id
         switch exercise.id {
         case "squats":
             return (str: 2, con: 1, acc: 0, spd: 0, bal: 1, flx: 0)
-        // case "pushups":
-        //    return (str: 3, con: 1, acc: 1, spd: 0, bal: 0, flx: 0)
         default:
             return (str: 0, con: 0, acc: 0, spd: 0, bal: 0, flx: 0)
         }
+    }
+
+    // MARK: - Analyzer Setup (ВОССТАНАВЛИВАЕМ МЕТОД)
+    private func setupAnalyzer(for exercise: Exercise) {
+        switch exercise.id {
+        case "squats":
+            self.analyzer = SquatAnalyzer3D(delegate: self)
+            print("ExerciseExecutionVM: SquatAnalyzer3D initialized.")
+        default:
+            print("--- ExerciseExecutionVM ВНИМАНИЕ: Анализатор для '\(exercise.id)' не найден. ---")
+            // Устанавливаем в nil, если нет подходящего анализатора
+            self.analyzer = nil
+            // Уведомляем об ошибке?
+            // viewDelegate?.viewModelDidEncounterError(message: "Exercise type not supported yet.")
+        }
+        // Убедимся, что делегат установлен (хотя можно и в switch)
+        self.analyzer?.delegate = self 
     }
 }
 
@@ -285,13 +352,8 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
             return
         }
                 
-        // Получаем текущую ориентацию устройства
         guard let deviceAttitude = motionManager.currentAttitude else {
             print("[ViewModel] Warning: No device attitude data available. Skipping coordinate transformation.")
-            // Можно либо пропустить кадр, либо обработать без преобразования
-            // return 
-            // Пока продолжим без преобразования, если ориентация недоступна
-            // TODO: решить, как обрабатывать отсутствие ориентации
             processLandmarks(resultBundle: resultBundle, deviceAttitude: nil, currentTimestamp: Date().timeIntervalSince1970)
             return
         }
@@ -299,7 +361,6 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
         processLandmarks(resultBundle: resultBundle, deviceAttitude: deviceAttitude, currentTimestamp: Date().timeIntervalSince1970)
     }
     
-    // Выносим логику обработки landmarks в отдельный метод
     private func processLandmarks(resultBundle: ResultBundle, deviceAttitude: simd_quatd?, currentTimestamp: TimeInterval) {
         var filteredWorldLandmarks: [Landmark]? = nil
         let deltaTime = (lastFrameTimestamp != nil) ? currentTimestamp - lastFrameTimestamp! : 0.0
@@ -315,31 +376,13 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
             let keyIndices: [PoseConnections.LandmarkIndex] = [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle, .leftShoulder, .rightShoulder]
             let keyIndicesRawValues = Set(keyIndices.map { $0.rawValue })
             
-            // --- Преобразование координат с учетом ориентации устройства --- 
-            // ВРЕМЕННО ОТКЛЮЧАЕМ ПРЕОБРАЗОВАНИЕ ДЛЯ ОТЛАДКИ
-            /*
-            // Получаем обратный кватернион ориентации
-            let inverseDeviceAttitude = deviceAttitude?.inverse
-            */
-            
             for i in 0..<firstPoseWorldLandmarks.count {
                 let measurement = firstPoseWorldLandmarks[i]
                 var measurementVec = simd_float3(measurement.x, measurement.y, measurement.z)
                 
-                // --- Преобразуем координаты в мировую систему --- 
-                // ОТКЛЮЧЕНО
-                /*
-                if let invAttitude = inverseDeviceAttitude {
-                    let rotatedVec = invAttitude.act(simd_double3(measurementVec))
-                    measurementVec = simd_float3(rotatedVec) 
-                } 
-                */
-                // -------------------------------------------------
-                
                 let visibilityValue = measurement.visibility?.floatValue ?? 0.0 
                 let isVisible = visibilityValue > PoseConnections.visibilityThreshold
                 
-                // --- Логика Калмана --- 
                 var needsReset = false
                 if let lastUpdate = lastUpdateTime[i], !isVisible {
                     if currentTimestamp - lastUpdate > maxOcclusionTime {
@@ -363,9 +406,7 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
                     kalmanFilters[i]!.update(measurement: measurementVec, measurementVisibility: visibilityValue)
                     lastUpdateTime[i] = currentTimestamp
                 }
-                // ----------------------
 
-                // --- Сбор видимости ключевых точек --- 
                 if keyIndicesRawValues.contains(i) {
                    if isVisible {
                        visibleKeyPointsCount += 1
@@ -374,12 +415,9 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
                        allKeyPointsVisible = false
                    }
                 }
-                // -----------------------------------
 
-                // --- Формирование отфильтрованной позы --- 
                 if let filter = kalmanFilters[i] {
                     let filteredPosition = filter.filteredPosition
-                    // Создаем Landmark с отфильтрованной мировой позицией
                     let filteredLandmark = Landmark(x: filteredPosition.x,
                                                     y: filteredPosition.y,
                                                     z: filteredPosition.z,
@@ -387,20 +425,17 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
                                                     presence: measurement.presence)
                     poseFiltered.append(filteredLandmark)
                     
-                    // Отладка StdDev для носа
                     if i == PoseConnections.LandmarkIndex.nose.rawValue { 
                          let stdDev = filter.positionStandardDeviation
                          viewDelegate?.viewModelDidUpdateDebugStdDev(positionStdDev: stdDev)
                     }
                 } 
-                // -----------------------------------------
             }
             filteredWorldLandmarks = poseFiltered 
             
             let averageVisibility = (visibleKeyPointsCount > 0) ? totalKeyPointsVisibility / Float(visibleKeyPointsCount) : 0.0
             self.lastVisibilityStatus = (allVisible: allKeyPointsVisible, average: averageVisibility)
             
-            // Передаем отфильтрованные и ПРЕОБРАЗОВАННЫЕ 3D точки в анализатор
             if !isPreparing, let validFilteredPose = filteredWorldLandmarks {
                  analyzer?.analyze(worldLandmarks: validFilteredPose)
             }
@@ -412,7 +447,6 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
         
         lastFrameTimestamp = currentTimestamp
         
-        // Передаем ИСХОДНЫЕ 2D-данные и ВИДИМОСТИ для отрисовки
         let allVisibilities = resultBundle.poseLandmarks?.first?.map { $0.visibility?.floatValue ?? 0.0 }
         viewDelegate?.viewModelDidUpdatePose(landmarks: resultBundle.poseLandmarks, frameSize: self.currentFrameSize)
         viewDelegate?.viewModelDidUpdateDebugVisibility(visibilities: allVisibilities)
@@ -422,52 +456,45 @@ extension ExerciseExecutionViewModel: PoseLandmarkerHelperLiveStreamDelegate {
 // MARK: - ExerciseAnalyzerDelegate
 extension ExerciseExecutionViewModel: ExerciseAnalyzerDelegate {
     func exerciseAnalyzer(_ analyzer: ExerciseAnalyzer, didCountRepetition newTotalCount: Int) {
-        guard var profile = userProfile else {
-            print("ExerciseExecutionVM Ошибка: User profile is nil в exerciseAnalyzer delegate.")
+        self.sessionRepCount = newTotalCount
+        
+        guard let userID = authService.currentUserID else {
+            print("ExerciseExecutionVM Error: User not authenticated in didCountRepetition.")
+            viewDelegate?.viewModelDidEncounterError(message: "User not authenticated.")
             return
         }
-        profile.totalSquats += 1
-        let sessionRepCount = newTotalCount
 
-        // Расчет XP
-        let powerStat = profile.power
-        let baseStatValue = UserProfile.baseStatValue
-        let statDifference = powerStat - baseStatValue
-        let xpMultiplier = 1.0 + (Double(statDifference) / 100.0)
-        let calculatedXP = Int(round(baseXPPerRep * xpMultiplier))
-        let finalXP = max(1, calculatedXP)
-
-        let didLevelUpBasic = profile.addXP(finalXP)
-        if didLevelUpBasic { /* TODO: Notify View Level Up */ }
-
-        // Прирост атрибутов
+        let xpAmount = Int(round(baseXPPerRep))
+        
         let gains = attributeGainsForCurrentRep()
-        profile.gainAttributes(strGain: gains.str, conGain: gains.con, accGain: gains.acc, spdGain: gains.spd, balGain: gains.bal, flxGain: gains.flx)
 
-        // Прогрессивная цель
-        squatsTowardsProgressiveGoal = sessionRepCount % progressiveGoalIncrement 
-        if squatsTowardsProgressiveGoal == 0 && sessionRepCount > 0 {
-             let goalReached = (sessionRepCount / progressiveGoalIncrement) * progressiveGoalIncrement
-             progressiveSquatGoal = goalReached + progressiveGoalIncrement
-             let didLevelUpBonus = profile.addXP(bonusXPForGoal)
-             if didLevelUpBonus { /* TODO: Notify View Level Up (Bonus) */ }
+        progressService.addXP(xpAmount, attributeGains: gains, forUserID: userID) { [weak self] result in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let updatedProgress):
+                    self.currentProgressData = updatedProgress
+                    
+                    self.viewDelegate?.viewModelDidUpdateProgress(currentXP: updatedProgress.currentXP, xpToNextLevel: updatedProgress.xpToNextLevel)
+                    self.viewDelegate?.viewModelDidUpdateDebugRepCount(self.sessionRepCount)
+                    
+                    self.squatsTowardsProgressiveGoal = self.sessionRepCount % self.progressiveGoalIncrement
+                    if self.squatsTowardsProgressiveGoal == 0 && self.sessionRepCount > 0 {
+                        let goalReached = (self.sessionRepCount / self.progressiveGoalIncrement) * self.progressiveGoalIncrement
+                        self.progressiveSquatGoal = goalReached + self.progressiveGoalIncrement
+                        print("Progressive goal updated to: \(self.progressiveSquatGoal)")
+                    }
+                    self.viewDelegate?.viewModelDidUpdateGoal(current: self.squatsTowardsProgressiveGoal, target: self.progressiveSquatGoal)
+                    
+                case .failure(let error):
+                    print("ExerciseExecutionVM Error (addXP callback): \(error.localizedDescription)")
+                    self.viewDelegate?.viewModelDidEncounterError(message: "Failed to update progress: \(error.localizedDescription)")
+                }
+            }
         }
-        viewDelegate?.viewModelDidUpdateGoal(current: squatsTowardsProgressiveGoal, target: progressiveSquatGoal)
-        
-        DataManager.shared.updateUserProfile(profile)
-        self.userProfile = profile 
-        
-        viewDelegate?.viewModelDidUpdateProgress(currentXP: profile.currentXP, xpToNextLevel: profile.xpToNextLevel)
-        viewDelegate?.viewModelDidUpdateDebugRepCount(profile.totalSquats)
     }
     
     func exerciseAnalyzer(_ analyzer: ExerciseAnalyzer, didChangeState newState: String) {
         viewDelegate?.viewModelDidUpdateDebugState(newState)
-        // Убираем передачу углов в View отсюда
-        /*
-        if let squatAnalyzer = analyzer as? SquatAnalyzer3D {
-           viewDelegate?.viewModelDidUpdateDebugAngles(knee: squatAnalyzer.currentSmoothedKneeAngle, hip: squatAnalyzer.currentSmoothedHipAngle)
-        } 
-        */
     }
 }

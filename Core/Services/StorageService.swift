@@ -10,6 +10,9 @@ protocol StorageServiceProtocol {
     // func downloadImage(from url: URL, completion: ...) 
     // TODO: Добавить метод для удаления?
     // func deleteImage(at path: String, completion: ...)
+    func uploadPostImage(_ image: UIImage, completion: @escaping (Result<URL, Error>) -> Void)
+    // Добавляем метод для загрузки аватара
+    func uploadAvatarImage(_ image: UIImage, forUserID userID: String, completion: @escaping (Result<URL, Error>) -> Void)
 }
 
 class StorageService: StorageServiceProtocol {
@@ -64,4 +67,79 @@ class StorageService: StorageServiceProtocol {
         return uploadTask
     }
     
+    // MARK: - Post Images
+    func uploadPostImage(_ image: UIImage, completion: @escaping (Result<URL, Error>) -> Void) {
+        // Генерируем уникальное имя файла
+        let filename = UUID().uuidString + ".jpg"
+        // Указываем путь в Storage (например, папка "post_images")
+        let storageRef = storage.reference().child("post_images").child(filename)
+        
+        // Конвертируем UIImage в Data (с сжатием)
+        guard let imageData = image.jpegData(compressionQuality: 0.75) else {
+            completion(.failure(NSError(domain: "StorageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to JPEG data"])))
+            return
+        }
+        
+        // Загружаем данные
+        storageRef.putData(imageData, metadata: nil) { metadata, error in
+            if let error = error {
+                print("StorageService Error (Upload Post Image): \(error.localizedDescription)")
+                completion(.failure(error))
+                return
+            }
+            
+            // Получаем URL для скачивания
+            storageRef.downloadURL { url, error in
+                if let error = error {
+                    print("StorageService Error (Get Download URL for Post): \(error.localizedDescription)")
+                    completion(.failure(error))
+                } else if let url = url {
+                    print("StorageService: Post image uploaded successfully. URL: \(url)")
+                    completion(.success(url))
+                } else {
+                    completion(.failure(NSError(domain: "StorageService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to get download URL"])))
+                }
+            }
+        }
+    }
+    
+    // MARK: - Avatar Images
+    
+    // Реализация метода для загрузки аватара
+    func uploadAvatarImage(_ image: UIImage, forUserID userID: String, completion: @escaping (Result<URL, Error>) -> Void) {
+        // Используем userID как имя файла для простоты (или можно добавить UUID)
+        let filename = userID + ".jpg" // Или \(userID)_avatar.jpg
+        // Путь к аватарам
+        let storageRef = storage.reference().child("avatars").child(filename)
+        
+        // Конвертируем UIImage в Data (можно использовать PNG или JPEG)
+        // Для аватаров часто лучше PNG без потерь, но размер больше
+        // guard let imageData = image.pngData() else { ... }
+        guard let imageData = image.jpegData(compressionQuality: 0.75) else {
+            completion(.failure(NSError(domain: "StorageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert avatar image to JPEG data"])))
+            return
+        }
+        
+        // Загружаем данные
+        storageRef.putData(imageData, metadata: nil) { metadata, error in
+            if let error = error {
+                print("StorageService Error (Upload Avatar): \(error.localizedDescription)")
+                completion(.failure(error))
+                return
+            }
+            
+            // Получаем URL для скачивания
+            storageRef.downloadURL { url, error in
+                if let error = error {
+                    print("StorageService Error (Get Download URL for Avatar): \(error.localizedDescription)")
+                    completion(.failure(error))
+                } else if let url = url {
+                    print("StorageService: Avatar image uploaded successfully for user \(userID). URL: \(url)")
+                    completion(.success(url))
+                } else {
+                    completion(.failure(NSError(domain: "StorageService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to get download URL for avatar"])))
+                }
+            }
+        }
+    }
 } 

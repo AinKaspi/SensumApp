@@ -16,6 +16,8 @@ class RegisterViewModel {
     let authService: AuthServiceProtocol
     // Добавляем UserProfileService
     let userProfileService: UserProfileServiceProtocol
+    // Добавляем ProgressService для создания записи прогресса
+    let progressService: ProgressServiceProtocol
     
     // Состояния для UI
     @Published var email: String = ""
@@ -33,9 +35,12 @@ class RegisterViewModel {
             .eraseToAnyPublisher()
     }
     
-    init(authService: AuthServiceProtocol, userProfileService: UserProfileServiceProtocol = UserProfileService()) {
+    init(authService: AuthServiceProtocol, 
+         userProfileService: UserProfileServiceProtocol = UserProfileService(),
+         progressService: ProgressServiceProtocol = ProgressService()) { // Добавляем progressService
         self.authService = authService
         self.userProfileService = userProfileService
+        self.progressService = progressService // Сохраняем зависимость
     }
     
     // Вызывается при нажатии кнопки Register
@@ -54,22 +59,20 @@ class RegisterViewModel {
             if let error = error as NSError? { // Приводим к NSError для доступа к userInfo
                 DispatchQueue.main.async {
                     self.isLoading = false
-                    // Логируем больше деталей
                     print("RegisterViewModel Error: Code=\(error.code), Domain=\(error.domain), UserInfo=\(error.userInfo)") 
                     self.errorMessage = "Registration failed: \(error.localizedDescription)"
                 }
             } else {
-                // Успешная регистрация в Auth, теперь создаем профиль в Firestore
-                print("RegisterViewModel: Auth registration successful. Creating Firestore profile...")
-                self.createUserProfileInFirestore()
+                // Успешная регистрация в Auth, теперь создаем профиль и прогресс в Firestore
+                print("RegisterViewModel: Auth registration successful. Creating Firestore profile & progress...")
+                self.createUserDataInFirestore()
             }
         }
     }
     
-    // Создает профиль в Firestore
-    private func createUserProfileInFirestore() {
+    // Переименовываем и обновляем метод
+    private func createUserDataInFirestore() {
         guard let userID = authService.currentUserID else {
-             // Эта ситуация не должна возникать сразу после успешной регистрации, но проверим
              print("RegisterViewModel Error: Cannot get current user ID after registration.")
              DispatchQueue.main.async {
                  self.isLoading = false
@@ -78,32 +81,51 @@ class RegisterViewModel {
             return
         }
         
-        // Создаем объект User
-        let newUser = User(id: userID, // Передаем ID из Auth
+        // Создаем объект User (без level/xp)
+        let newUser = User(id: userID,
                            username: self.username,
                            email: self.email,
-                           avatarURL: nil, // Аватар будет добавлен позже
-                           status: "Hello! Welcome to Sensum.", // Статус по умолчанию
+                           avatarURL: nil,
+                           status: "Hello! Welcome to Sensum.",
                            followerCount: 0,
                            followingCount: 0,
-                           level: 1,
-                           currentXP: 0,
-                           xpToNextLevel: 100,
-                           createdAt: Timestamp()) // Текущее время
+                           createdAt: Timestamp())
         
-        // Вызываем сервис для сохранения
-        userProfileService.createUserProfile(user: newUser) { [weak self] error in
-             DispatchQueue.main.async { // Обновляем UI в главном потоке
-                 self?.isLoading = false // Завершаем загрузку в любом случае
-                 if let error = error {
-                     self?.errorMessage = "Failed to create profile: \(error.localizedDescription)"
-                     // TODO: Возможно, нужно откатить регистрацию в Auth или предложить пользователю повторить?
-                 } else {
-                     // Успех! AuthService уже должен был отправить .signedIn,
-                     // и AuthCoordinator закроет этот флоу.
-                     print("RegisterViewModel: Firestore profile created successfully.")
-                 }
-             }
+        // Создаем объект ProgressData (дефолтный)
+        let newProgress = ProgressData() // Использует значения по умолчанию (level 1, rank E, etc.)
+        
+        // Используем DispatchGroup для параллельного сохранения
+        let group = DispatchGroup()
+        var userProfileError: Error? = nil
+        var progressDataError: Error? = nil
+
+        // 1. Сохраняем User
+        group.enter()
+        userProfileService.createUserProfile(user: newUser) { error in
+            userProfileError = error
+            group.leave()
+        }
+        
+        // 2. Сохраняем ProgressData
+        group.enter()
+        // Используем прямой вызов updateProgressData, т.к. fetch не нужен для нового пользователя
+        progressService.updateProgressData(userID: userID, data: newProgress) { error in
+            progressDataError = error
+            group.leave()
+        }
+        
+        // 3. Обрабатываем результаты после завершения обеих операций
+        group.notify(queue: .main) { [weak self] in
+            self?.isLoading = false // Завершаем загрузку в любом случае
+            if let error = userProfileError ?? progressDataError { // Берем первую возникшую ошибку
+                self?.errorMessage = "Failed to complete registration: \(error.localizedDescription)"
+                print("RegisterViewModel Error (Firestore Save): \(error.localizedDescription)")
+                // TODO: Возможно, нужно откатить регистрацию в Auth или предложить пользователю повторить?
+            } else {
+                // Успех! AuthService уже должен был отправить .signedIn,
+                // и AuthCoordinator закроет этот флоу.
+                print("RegisterViewModel: Firestore user profile and progress data created successfully.")
+            }
         }
     }
     

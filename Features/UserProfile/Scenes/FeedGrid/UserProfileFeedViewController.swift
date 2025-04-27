@@ -11,6 +11,8 @@ protocol UserProfileFeedViewControllerDelegate: AnyObject {
     func didTapFollowButton() // (Будет использоваться, когда isCurrentUser=false)
     func didTapMessageButton() // (Будет использоваться, когда isCurrentUser=false)
     func didRequestSignOut() // Новый метод
+    // Добавляем делегат для новой кнопки
+    func didTapNewProgramButton()
 }
 
 // Добавляем делегат для UIImagePickerController
@@ -49,7 +51,7 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
     }()
     
     // Стеки для статов
-    private func createStatLabel(value: String, label: String) -> UIStackView {
+    private func createStatLabel(value: String = "-", label: String) -> UIStackView {
         let valueLabel = UILabel()
         valueLabel.font = .systemFont(ofSize: 16, weight: .semibold)
         valueLabel.textColor = .white
@@ -68,16 +70,18 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
         return stack
     }
     
-    private lazy var postsStatStack: UIStackView = createStatLabel(value: "-", label: "Posts")
-    private lazy var followersStatStack: UIStackView = createStatLabel(value: "-", label: "Followers")
-    private lazy var followingStatStack: UIStackView = createStatLabel(value: "-", label: "Following")
+    private lazy var postsStatStack: UIStackView = createStatLabel(label: "Posts")
+    private lazy var followersStatStack: UIStackView = createStatLabel(label: "Followers")
+    private lazy var followingStatStack: UIStackView = createStatLabel(label: "Following")
+    private lazy var rankStatStack: UIStackView = createStatLabel(label: "Rank")
+    private lazy var levelStatStack: UIStackView = createStatLabel(label: "Level")
     
     private lazy var statsStackView: UIStackView = {
-        let stack = UIStackView(arrangedSubviews: [postsStatStack, followersStatStack, followingStatStack])
+        let stack = UIStackView(arrangedSubviews: [postsStatStack, followersStatStack, followingStatStack, rankStatStack, levelStatStack])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.axis = .horizontal
         stack.distribution = .fillEqually
-        stack.spacing = 10
+        stack.spacing = 5
         return stack
     }()
     
@@ -141,6 +145,46 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
         return button
     }()
     
+    // Добавляем кнопку New Program
+    private lazy var newProgramButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setTitle("New Program", for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        button.setTitleColor(.white, for: .normal)
+        button.backgroundColor = .systemGreen // Другой цвет
+        button.layer.cornerRadius = 6
+        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+        button.addTarget(self, action: #selector(newProgramButtonTapped), for: .touchUpInside)
+        return button
+    }()
+    
+    // Добавляем кнопки Follow и Message
+    private lazy var followButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setTitle("Follow", for: .normal) // Начальный текст
+        button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        button.layer.cornerRadius = 6
+        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+        button.addTarget(self, action: #selector(followButtonTapped), for: .touchUpInside)
+        // Стиль будет настраиваться в configureFollowButton
+        return button
+    }()
+    
+    private lazy var messageButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setTitle("Message", for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+        button.setTitleColor(.white, for: .normal)
+        button.backgroundColor = .darkGray
+        button.layer.cornerRadius = 6
+        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+        button.addTarget(self, action: #selector(messageButtonTapped), for: .touchUpInside)
+        return button
+    }()
+    
     // Добавляем кнопку Выхода (будет ниже)
     private lazy var signOutButton: UIButton = {
         let button = UIButton(type: .system)
@@ -153,9 +197,19 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
         return button
     }()
     
-    // --- Разделитель и Переключатель ---
-    // TODO: Добавить разделитель
-    // TODO: Добавить переключатель Grid/List
+    // --- Переключатель Контента --- 
+    private lazy var contentSegmentedControl: UISegmentedControl = {
+        let items = ["Posts", "Programs"]
+        let control = UISegmentedControl(items: items)
+        control.translatesAutoresizingMaskIntoConstraints = false
+        control.selectedSegmentIndex = 0 // По умолчанию выбраны посты
+        control.backgroundColor = .darkGray // Цвет фона
+        control.selectedSegmentTintColor = .systemBlue // Цвет выбранного сегмента
+        control.setTitleTextAttributes([.foregroundColor: UIColor.lightGray], for: .normal)
+        control.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
+        control.addTarget(self, action: #selector(segmentedControlChanged), for: .valueChanged)
+        return control
+    }()
     
     // --- Сетка Постов ---
     private lazy var postsCollectionView: UICollectionView = {
@@ -181,6 +235,25 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
         return collectionView
     }()
 
+    // Добавляем Placeholder View для вкладки Programs
+    private lazy var programsPlaceholderView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = .clear // или .black
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.text = "Программы тренировок (скоро)"
+        label.textColor = .lightGray
+        label.textAlignment = .center
+        view.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
+        view.isHidden = true // Скрыт по умолчанию
+        return view
+    }()
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black // Фон как в макете
@@ -201,6 +274,10 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
         // Добавляем кнопку выхода
         view.addSubview(signOutButton)
         view.addSubview(postsCollectionView) // Добавляем CollectionView
+        // Добавляем Segmented Control
+        view.addSubview(contentSegmentedControl)
+        // Добавляем Placeholder для программ
+        view.addSubview(programsPlaceholderView)
         
         // Добавляем элементы в шапку
         profileHeaderView.addSubview(avatarImageView)
@@ -249,11 +326,22 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
             actionButtonsStackView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
             actionButtonsStackView.heightAnchor.constraint(equalToConstant: 30),
             
-            // Сетка постов (под кнопками действия)
-            postsCollectionView.topAnchor.constraint(equalTo: actionButtonsStackView.bottomAnchor, constant: padding),
+            // Segmented Control (под кнопками)
+            contentSegmentedControl.topAnchor.constraint(equalTo: actionButtonsStackView.bottomAnchor, constant: padding),
+            contentSegmentedControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
+            contentSegmentedControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
+            
+            // Сетка постов (под Segmented Control)
+            postsCollectionView.topAnchor.constraint(equalTo: contentSegmentedControl.bottomAnchor, constant: padding),
             postsCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             postsCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            postsCollectionView.bottomAnchor.constraint(equalTo: signOutButton.topAnchor, constant: -padding), // Перед кнопкой Выхода
+            postsCollectionView.bottomAnchor.constraint(equalTo: signOutButton.topAnchor, constant: -padding),
+            
+            // Placeholder для программ (там же, где и сетка)
+            programsPlaceholderView.topAnchor.constraint(equalTo: postsCollectionView.topAnchor),
+            programsPlaceholderView.leadingAnchor.constraint(equalTo: postsCollectionView.leadingAnchor),
+            programsPlaceholderView.trailingAnchor.constraint(equalTo: postsCollectionView.trailingAnchor),
+            programsPlaceholderView.bottomAnchor.constraint(equalTo: postsCollectionView.bottomAnchor),
 
             // Кнопка Выхода (внизу)
             signOutButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
@@ -309,15 +397,39 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
                     self.avatarImageView.image = placeholder
                     self.avatarImageView.tintColor = .darkGray 
                 }
+                
+                // Настраиваем кнопки в зависимости от isCurrentUser
+                self.configureActionButtons(isCurrentUser: self.viewModel.isCurrentUser)
             }
             .store(in: &cancellables)
         
-        // Подписка на состояние загрузки профиля
-        viewModel.$isLoadingProfile
+        // Подписка на прогресс пользователя (ProgressData)
+        viewModel.$progressData
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] isLoading in
-                // TODO: Показать/скрыть индикатор загрузки для шапки
-                print("Profile loading state: \(isLoading)")
+            .sink { [weak self] progress in
+                guard let self = self, let progress = progress else { return }
+                // Обновляем статы из ProgressData
+                self.updateStatStack(self.rankStatStack, value: progress.rank, label: "Rank")
+                self.updateStatStack(self.levelStatStack, value: "\(progress.level)", label: "Level")
+            }
+            .store(in: &cancellables)
+        
+        // Подписка на состояние подписки (для чужого профиля)
+        viewModel.$isFollowing
+             .receive(on: DispatchQueue.main)
+             .sink { [weak self] isFollowing in
+                 guard let self = self, !self.viewModel.isCurrentUser else { return }
+                 self.configureFollowButton(isFollowing: isFollowing)
+             }
+             .store(in: &cancellables)
+        
+        // Подписка на состояние загрузки (можно объединить isLoadingProfile и isLoadingProgress)
+        Publishers.CombineLatest(viewModel.$isLoadingProfile, viewModel.$isLoadingProgress)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isLoadingProfile, isLoadingProgress in
+                let isLoading = isLoadingProfile || isLoadingProgress
+                // TODO: Показать/скрыть общий индикатор загрузки для шапки
+                print("Profile/Progress loading state: \(isLoading)")
             }
             .store(in: &cancellables)
             
@@ -352,13 +464,40 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
                  print("Posts loading state: \(isLoading)")
              }
              .store(in: &cancellables)
-            
-        // Скрываем/показываем кнопки Edit/NewPost/SignOut
-        let isCurrentUser = viewModel.isCurrentUser
-        editProfileButton.isHidden = !isCurrentUser
-        newPostButton.isHidden = !isCurrentUser // New Post тоже только для себя
-        actionButtonsStackView.isHidden = !isCurrentUser // Стек показываем только для себя?
-        signOutButton.isHidden = !isCurrentUser
+    }
+    
+    // MARK: - Button Configuration
+    
+    // Настраивает кнопки в actionButtonsStackView
+    private func configureActionButtons(isCurrentUser: Bool) {
+        // Очищаем стек перед добавлением
+        actionButtonsStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        if isCurrentUser {
+            actionButtonsStackView.addArrangedSubview(editProfileButton)
+            actionButtonsStackView.addArrangedSubview(newPostButton)
+            actionButtonsStackView.addArrangedSubview(newProgramButton)
+            signOutButton.isHidden = false
+        } else {
+            // Для чужого профиля добавляем Follow и Message
+            actionButtonsStackView.addArrangedSubview(followButton)
+            actionButtonsStackView.addArrangedSubview(messageButton)
+            configureFollowButton(isFollowing: viewModel.isFollowing) // Настроить начальный вид кнопки Follow
+            signOutButton.isHidden = true
+        }
+    }
+    
+    // Настраивает внешний вид кнопки Follow
+    private func configureFollowButton(isFollowing: Bool) {
+        if isFollowing {
+            followButton.setTitle("Following", for: .normal)
+            followButton.backgroundColor = .systemGray // Серый фон
+            followButton.setTitleColor(.white, for: .normal)
+        } else {
+            followButton.setTitle("Follow", for: .normal)
+            followButton.backgroundColor = .white // Белый фон
+            followButton.setTitleColor(.black, for: .normal)
+        }
     }
     
     // Вспомогательный метод для обновления стека статов
@@ -387,6 +526,39 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
         print("New Post button tapped")
         // TODO: Проверить права доступа к галерее
         presentImagePicker()
+    }
+    
+    // Добавляем action для New Program
+    @objc private func newProgramButtonTapped() {
+        print("New Program button tapped - Action Placeholder")
+        // Вызываем делегата, когда будет реализована навигация
+         delegate?.didTapNewProgramButton()
+    }
+    
+    // Добавляем actions для Follow/Message
+    @objc private func followButtonTapped() {
+        viewModel.followButtonTapped() // Вызываем метод ViewModel
+    }
+    
+    @objc private func messageButtonTapped() {
+        delegate?.didTapMessageButton() // Уведомляем координатора
+    }
+    
+    // Добавляем action для Segmented Control
+    @objc private func segmentedControlChanged(_ sender: UISegmentedControl) {
+        let selectedIndex = sender.selectedSegmentIndex
+        print("Segmented control changed to index: \(selectedIndex)")
+        
+        // Показываем/скрываем CollectionView или Placeholder
+        if selectedIndex == 0 { // Posts
+            postsCollectionView.isHidden = false
+            programsPlaceholderView.isHidden = true
+            // TODO: Возможно, нужно перезагрузить посты?
+        } else { // Programs
+            postsCollectionView.isHidden = true
+            programsPlaceholderView.isHidden = false
+            // TODO: Загрузить и отобразить программы тренировок
+        }
     }
     
     // MARK: - Image Picker Logic
@@ -451,9 +623,9 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
     func didFinishCreatingPost(_ controller: CreatePostViewController) {
         print("CreatePostViewController finished creating post.")
         controller.dismiss(animated: true) {
-            // Обновляем ленту постов пользователя после успешного создания
-            self.viewModel.fetchUserPostsData()
-            print("CreatePostViewController dismissed. (Finished & Reloading posts)")
+            // Обновляем все данные пользователя после создания поста
+            self.viewModel.fetchAllUserData() 
+            print("CreatePostViewController dismissed. (Finished & Reloading profile data)")
         }
     }
 
@@ -516,10 +688,12 @@ extension UserProfileFeedViewController: UICollectionViewDelegate {
         if let coordinator = delegate as? CurrentUserProfileCoordinator {
             print("UserProfileFeedViewController: Вызываем coordinator.showUserPostScroll")
             coordinator.showUserPostScroll(posts: viewModel.userPosts, startIndex: indexPath.item)
+        } else if let coordinator = self.parent?.parent as? UserProfileCoordinator { // Пытаемся получить координатор из родительского контейнера
+             print("UserProfileFeedViewController: Вызываем coordinator.showUserPostScroll (via parent)")
+            // TODO: Нужен способ передать userID в UserProfileCoordinator
+            // coordinator.showUserPostScroll(forUserID: viewModel.userID, posts: viewModel.userPosts, startIndex: indexPath.item)
         } else {
-            // В будущем, если делегатом будет другой объект или его не будет,
-            // нужно будет использовать другой способ навигации.
-            print("UserProfileFeedViewController: ОШИБКА - не удалось привести делегата к типу CurrentUserProfileCoordinator")
+            print("UserProfileFeedViewController: ОШИБКА - не удалось получить координатора")
         }
     }
 } 

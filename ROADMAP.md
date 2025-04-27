@@ -1,123 +1,274 @@
-# Дорожная карта SensumApp - Социальная Платформа
+# Полный Roadmap Проекта SensumApp (Версия 1.9 - Включая скролл постов в Таб 2 Person)
 
-## Концептуальное Дерево Архитектуры (Планируемое)
+**Дата:** 24 апреля 2025 г.
 
-## Phase 1: Refactoring & Setup (ЗАВЕРШЕНО!)
+**Общее Видение:** Создать уникальное iOS-приложение (Social Fitness RPG) с 5 основными разделами (Feed, Person, Leveling, Progress, Store), отображающее логотип "DOJO", предоставляющее систему уведомлений и обмен сообщениями. Приложение мотивирует пользователей через комбинацию социального взаимодействия (лента рекомендаций, профили), AI-анализа фитнес-упражнений (MediaPipe) и продвинутых RPG-механик (XP, уровни, аттрибуты, ранги, бонусы).
 
-*Цель: Перестроить структуру проекта под новую концепцию, переименовать компоненты, настроить базовые координаторы для всех вкладок.*
+**Использование:** Отмечайте выполненные задачи, заменяя `[ ]` на `[x]`. Используйте `[~]` для частично выполненных задач. Используйте ID задач (`[P1.FND.1]`) при обсуждении с AI.
 
--   [x] **Refactor Feature:** Create `Features/UserProfile` folder structure and move/rename components from old `Features/Person`. (Выполнено)
--   [x] **Rename/Create UserProfile Components (Модальный профиль другого пользователя):**
-    -   [x] Rename `PersonCoordinator` -> `UserProfileCoordinator` (file & class). (Выполнено)
-    -   [x] Rename `PersonContainerViewController` -> `UserProfileContainerViewController` (file & class). (Выполнено)
-    -   [x] Rename `ProfileViewController` -> `UserProfileCardViewController` (file & class, Макет 2). (Выполнено)
-    -   [x] Rename `StatsViewController` -> `UserProfileStatsViewController` (file & class, Макет 4). (Выполнено)
-    -   [x] Create placeholder `UserProfileFeedViewController.swift` (file & class, Макет 3). (Выполнено)
-    -   [x] Update `UserProfileContainerViewController` to manage Card/Person/Stats VCs. (Выполнено)
-    -   [x] Update `TopMenuView.swift` segments: "Card", "Person", "Stats". Add back arrow delegate?. (Выполнено)
--   [x] **Create Feed Components (Tab 1 - Placeholders):**
-    -   [x] Create folder `Features/Feed`. (Выполнено пользователем)
-    -   [x] Create `FeedCoordinator.swift` (file & class). (Выполнено)
-    -   [x] Create `FeedViewController.swift` (file & class). (Выполнено)
--   [x] **Create CurrentUserProfile Components (Tab 2 - Placeholders):**
-    -   [x] Create folder `Features/CurrentUserProfile`. (Выполнено пользователем)
-    -   [x] Create `CurrentUserProfileCoordinator.swift` (file & class). (Выполнено)
-    -   [x] Create placeholder `CurrentUserProfileContainerViewController.swift`? (Or use `UserProfileFeedVC` directly). (Выполнено - пока без контейнера)
--   [x] **Verify/Update Leveling Components (Tab 3):**
-    -   [x] Verify `Features/Leveling` exists. (Выполнено)
-    *   [x] Verify `LevelingCoordinator.swift` exists (update if needed). (Создан)
-    *   [x] Verify `ExerciseSelectionViewController.swift` & `ExerciseExecutionViewController.swift` exist. (Выполнено)
--   [x] **Create Progress Components (Tab 4 - Placeholders):**
-    *   [x] Create folder `Features/Progress`. (Выполнено)
-    *   [x] Create `ProgressCoordinator.swift` (file & class). (Выполнено)
-    *   [x] Create `ProgressViewController.swift` (file & class). (Выполнено)
--   [x] **Verify/Update Store Components (Tab 5 - Placeholders):**
-    *   [x] Verify `Features/Store` exists. (Выполнено)
-    *   [x] Verify `StoreCoordinator.swift` exists (update if needed). (Создан)
-    *   [x] Verify `StoreViewController.swift` exists. (Выполнено)
--   [x] **Update AppCoordinator (`SceneDelegate.swift`):**
-    *   [x] Configure `UITabBarController` with: `FeedCoordinator`, `CurrentUserProfileCoordinator`, `LevelingCoordinator`, `ProgressCoordinator`, `StoreCoordinator`. (Выполнено)
-    *   [x] Ensure all coordinators are initialized and started correctly. (Выполнено)
--   [x] **Update Imports & References:** Systematically fix all broken imports and class/file references project-wide after renames. (Выполнено)
--   [x] **Delete Unused Files/Folders:** Delete `SensumApp/ViewController.swift`, `Features/Person`, `Features/Rank`, `Features/Events`. (Выполнено пользователем)
--   [x] **Build & Test:** Ensure the app compiles and runs with the new structure (mostly placeholders). (Выполнено - Компилируется!)
+**Ключевые Разделы (Табы) и Темы:**
 
-## Phase 2: Backend & Authentication (Завершено - База)
-*Цель: Настроить Firebase, реализовать вход и регистрацию.*
+1.  Feed (Таб 1): Лента рекомендаций, просмотр профилей других.
+2.  **Person (Таб 2): Профиль текущего пользователя (включая просмотр своей ленты постов).**
+3.  Leveling (Таб 3): Выбор/выполнение упражнений, AI-анализ, XP, прокачка аттрибутов.
+4.  Progress (Таб 4): Статистика, отслеживание RPG-элементов, достижения.
+5.  Store (Таб 5): Внутриигровой магазин.
+6.  Просмотр Профиля Другого Пользователя: Функционал и UI (Card, Person, Stats).
+7.  Программы Тренировок: Создание, управление и просмотр программ.
+8.  RPG Механики: Уровни, XP, Ранги, Аттрибуты, Бонусы.
+9.  Общее Ядро (Core): Аутентификация, сервисы, модели.
+10. Техническая Основа и UI: Архитектура, зависимости, производительность, общие элементы UI.
+11. Уведомления (Notifications): Система оповещений.
+12. Обмен Сообщениями (Messaging): Функционал чата.
 
--   [x] Настроить Firebase Project (Auth, Firestore, Storage). (Выполнено)
--   [x] Реализовать `AuthService`. (Выполнено)
--   [x] Создать `AuthCoordinator`. (Выполнено)
--   [x] Реализовать `AppCoordinator` для запуска `AuthCoordinator`. (Выполнено)
--   [x] Создать UI и ViewModel для Login/Register (Email/Password). (Базово выполнено)
--   [ ] Реализовать Google Sign-In.
--   [ ] Реализовать UI биндинги и показ ошибок в Login/Register.
+---
 
-## Phase 3: Core Models & Services (Завершено - База)
-*Цель: Определить структуру данных и сервисы для взаимодействия с бэкендом.*
+## Фаза 1: MVP (Социальный Фитнес RPG - Основа)
 
--   [x] Определить Firestore Модели (`User`, `Post` - фото+текст). (Выполнено)
--   [x] Создать `StorageService`. (Выполнено)
--   [x] Создать `UserProfileService`. (Выполнено)
--   [x] Создать `PostService`. (Выполнено)
--   [x] Создать `FollowService`. (Выполнено)
--   [ ] Определить модель `Follow`?
--   [ ] Создать `FeedService`.
+**Цель Фазы 1:** Запустить базовое приложение: регистрация/вход, выполнение 1 упражнения с AI-анализом + расчет XP/уровня, просмотр простейшей ленты и своего профиля (уровень/XP), базовая навигация с логотипом.
 
-## Phase 4: Feature Implementation - Feed & CurrentUserProfile (В процессе)
-*Цель: Реализовать основные экраны - ленту и профиль текущего пользователя.*
+### Тема: Техническая Основа и UI [FND]
+- [~] `[P1.FND.1]` Настройка структуры проекта, архитектуры (Координаторы, MVVM), зависимостей (CocoaPods: MediaPipe, Charts). *(Структура, MVVM+Coords, MediaPipe есть. Charts не интегрированы)*.
+- [x] `[P1.FND.2]` Настройка Firebase/Google Cloud (`GoogleService-Info.plist`).
+- [x] `[P1.FND.3]` Реализация основной структуры UI: `UITabBarController` (5 табов), `UINavigationController` для каждого таба.
+- [~] `[P1.FND.4]` Реализация базовой `UINavigationBar` с логотипом "DOJO". *(Логотип реализован в кастомном TopMenuView в FeedViewController, не в стандартном UINavigationBar)*.
 
--   [ ] **Feed (Tab 1):** UI ленты, "сторис", ViewModel, загрузка данных, навигация на `UserProfileCoordinator`.
--   [x] **CurrentUserProfile (Tab 2):** Координатор, переиспользование `UserProfileFeedViewController`, отображение данных (аватар, шапка, сетка постов), настройка UI (Edit). (Базово выполнено)
+### Тема: Общее Ядро (Core) [COR]
+- [x] `[P1.COR.1]` Определение базовых Моделей Данных: `User`, `Post`, `Exercise`, `ProgressData` (с полями `level`, `currentXP`, `xpToNextLevel`, `rank`, `attributes: [Attribute]`). *(Модели User, Post, Exercise, ProgressData, Attribute определены)*.
+- [x] `[P1.COR.2]` Реализация базовых Core Services (протоколы + начальная имплементация): `AuthService`, `UserProfileService`, `PostService`, `StorageService`, `ProgressService`. *(Auth, UserProfile, Post, Storage, Progress реализованы. Конфликт с DataManager устранен. `FollowService` из Фазы 2 также реализован)*. 
+- [x] `[P1.COR.3]` Реализация `AuthCoordinator` и сценариев Регистрации / Входа (VC, VM, вызовы `AuthService`).
 
-## Phase 5: Feature Implementation - UserProfile (Modal)
-*Цель: Реализовать показ профиля другого пользователя.*
+### Тема: RPG Механики [RPG]
+- [x] `[P1.RPG.1]` Реализация расчета Ранга в `ProgressService`: `func calculateRank(level: Int) -> String` (логика E-R+). Инициализация ранга при регистрации/загрузке. *(Функция `calculateRank` реализована в ProgressService)*.
 
--   [ ] Реализация `UserProfileContainerViewController` (слайдер Card/Person/Stats).
--   [ ] Реализация `UserProfileCardViewController` (Макет 2).
--   [ ] Реализация `UserProfileFeedViewController` (Макет 3) - переиспользование.
--   [ ] Реализация `UserProfileStatsViewController` (Макет 4).
--   [ ] Настроить представление/переход из `FeedCoordinator`.
+### Тема: Feed (Таб 1) [FED]
+- [x] `[P1.FED.1]` Реализация `FeedCoordinator`.
+- [~] `[P1.FED.2]` Реализация `FeedViewController` (вертикальный список `UICollectionView`/`UITableView`). *(Используется UITableView)*.
+- [x] `[P1.FED.3]` Реализация базовой **бесконечной прокрутки** (пагинации) в `FeedViewController`. *(Реализовано в PostService, FeedViewModel, FeedViewController)*.
+- [x] `[P1.FED.4]` Реализация `FeedViewModel` (загрузка постов через `PostService`). *(Реализована загрузка с пагинацией)*.
+- [x] `[P1.FED.5]` Реализация `PostCell` (отображение фото, мини-аватарки, имени автора). Зависит от `Post`.
+- [x] `[P1.FED.6]` Навигация из `FeedViewController` на **экран-заглушку** Профиля Другого Пользователя (при тапе на авторе). Зависит от `UserProfileCoordinator`. *(Реализована обработка тапа и вызов координатора)*.
 
-## Phase 6: Other Tabs & Features
-*Цель: Реализовать заглушки/базовый функционал остальных вкладок и фич.*
+### Тема: Person (Таб 2 - Свой Профиль) [PSN]
+- [x] `[P1.PSN.1]` Реализация `PersonCoordinator` (или `CurrentUserProfileCoordinator`).
+- [x] `[P1.PSN.2]` Реализация `PersonViewController` (отображение Имени пользователя, Уровня и XP). *(Реализовано в UserProfileFeedVC/UserProfileCardVC)*.
+- [x] `[P1.PSN.3]` Реализация `PersonViewModel` (загрузка данных через `UserProfileService`, `ProgressService`). Зависит от `User`, `ProgressData`. *(Реализовано в UserProfileFeedViewModel с использованием UserProfileService и ProgressService)*.
 
--   [ ] Leveling (Tab 3) - Интеграция существующей логики.
--   [ ] Progress (Tab 4) - Базовый UI.
--   [ ] Store (Tab 5) - Базовый UI.
--   [ ] Create (Центральная кнопка) - Базовый UI/флоу (Заменен на Leveling).
--   [ ] Сообщения (иконка в Feed) - Базовый UI.
--   [ ] Подписки (логика и UI).
--   [ ] Статы/Достижения (логика и UI).
--   [ ] **Comments:** Реализовать UI и логику для просмотра и добавления комментариев к постам.
--   [ ] **Image Slider:** Поддержка нескольких фото в посте, реализация горизонтального свайпа и индикатора в `FullPostCell`.
+### Тема: Leveling (Таб 3 - Тренировки) [LVL]
+- [x] `[P1.LVL.1]` Реализация `LevelingCoordinator`.
+- [x] `[P1.LVL.2]` Реализация `ExerciseSelectionViewController` / `ViewModel` (выбор 1 упражнения, например Приседания). Зависит от `Exercise`. *(Используются моковые данные)*.
+- [x] `[P1.LVL.3]` Реализация `ExerciseExecutionViewController` / `ViewModel`: Интеграция камеры, `PoseLandmarkerHelper` (использует MediaPipe), `PoseOverlayView`.
+- [x] `[P1.LVL.4]` Реализация базового анализатора (`SquatAnalyzer3D`, реализует `ExerciseAnalyzerProtocol`) для подсчета повторений.
+- [x] `[P1.LVL.5]` Расчет базового XP (без бонусов) и вызов `ProgressService.addXP()`, который обновит `level`, `xp`, `rank`. Зависит от `[P1.RPG.1]`. *(Расчет XP и вызов ProgressService.addXP() реализованы в ExerciseExecutionViewModel)*.
 
-## Ongoing / TODOs
+### Тема: Progress (Таб 4 - Статистика) [PRG]
+- [x] `[P1.PRG.1]` Реализация `ProgressCoordinator`.
+- [x] `[P1.PRG.2]` Реализация `ProgressViewController` / `ViewModel` (отображение Уровня, шкалы XP, Ранга). Зависит от `ProgressData`, `[P1.RPG.1]`. *(UI и ViewModel реализованы)*.
 
--   [x] Analyze project structure, logic, and architecture (Completed)
--   [x] Implement dynamic aspect ratio and layout for `FullPostCell` (Completed)
--   [ ] **Post Interactions (`FullPostCell`/`UserPostScroll`):**
-    -   [ ] Add Like button (UI & basic logic)
-    -   [ ] Add Comment button (UI & navigation to comments)
-    -   [ ] Add Share button (UI & basic sharing logic)
-    -   [ ] Add Bookmark/Save button (UI & basic logic)
-    -   [ ] Display comment preview/count (UI & data)
-    -   [ ] Implement caption truncation & "Read More" functionality
--   [ ] Исследовать и исправить баги компиляции Xcode 16 beta (`contentInsetAdjustmentBehavior`, `isTranslucent`).
--   [ ] Добавить проверку прав доступа к галерее.
--   [ ] Решить, как будет работать навигация на Настройки (из `UserProfile` или `CurrentUserProfile`).
--   [x] Implement `FeedViewController` to display posts (basic structure)
--   [x] Implement `PostCell` for displaying individual posts
--   [x] Connect `FeedViewModel` to `FeedViewController`
--   [x] Implement denormalization for author data in posts (`Post` model, `PostService`)
--   [x] Update `PostCell` to use denormalized data
--   [x] Add "New Post" button to `UserProfileFeedViewController`
--   [x] Implement image selection logic in `UserProfileFeedViewController`
--   [x] Create `CreatePostViewController.swift` (UI Structure)
--   [x] Create `CreatePostViewModel.swift` (Logic for sharing)
--   [x] Connect `CreatePostViewController` and `CreatePostViewModel`
--   [x] Update `CurrentUserProfileCoordinator` to show `CreatePostViewController`
--   [x] Implement Post Detail View (Navigate from grid/feed)
--   [x] Create fullscreen post carousel viewer (`UserPostScrollViewController.swift`)
--   [x] Implement fullscreen post cell (`FullPostCell.swift`)
--   [x] Update `CurrentUserProfileCoordinator` to show fullscreen post carousel
+### Тема: Store (Таб 5 - Магазин) [STR]
+- [x] `[P1.STR.1]` Реализация `StoreCoordinator`.
+- [x] `[P1.STR.2]` Реализация `StoreViewController` (UI-заглушка).
+
+### Тема: Создание Контента [CNT]
+- [x] `[P1.CNT.1]` Реализация `CreatePostViewController` / `ViewModel` (создание текстового поста для наполнения ленты). Зависит от `PostService`. *(Реализовано создание поста с изображением)*.
+
+---
+
+## Фаза 2: Расширение и Улучшение (Post-MVP)
+
+**Цель Фазы 2:** Улучшить все MVP-фичи, реализовать полноценный просмотр профиля другого пользователя (Card/Person/Stats), детализировать экран собственного профиля (Таб 2) **включая скролл-ленту постов**, добавить социальные функции (подписки, комменты, лайки), медиа-контент, базовые уведомления, базовый магазин и начать прокачку аттрибутов.
+
+### Тема: Техническая Основа и UI [FND]
+- [ ] `[P2.FND.1]` Оптимизация производительности (загрузка ленты, изображений).
+- [ ] `[P2.FND.2]` Написание Unit-тестов (для Services, ViewModels).
+- [ ] `[P2.FND.3]` Добавление/Настройка библиотеки `Charts` (DGCharts) через CocoaPods/SPM. Зависимость для `[P2.UPO.5]`.
+
+### Тема: Feed (Таб 1) [FED]
+- [~] `[P2.FED.1]` Реализация Верхней Панели (аналог Stories): Горизонтальный `UICollectionView` в `FeedViewController`, загрузка данных пользователей (`UserService`/`PostService`), навигация на профиль `[P2.UPO.1]`. *(Есть UIScrollView-заглушка, логика отсутствует)*.
+- [~] `[P2.FED.2]` Улучшение `PostCell`/`FullPostCell`: Добавить UI для Лайков, Комментариев, Текста поста + кнопка "more". *(UI лайков и счетчик добавлены в PostCell. Остальное отсутствует)*.
+- [x] `[P2.FED.3]` Реализация логики Лайков: UI обновление + вызов `PostService.likePost()`. *(Реализовано в ViewModel/ViewController с оптимистичным обновлением)*.
+- [x] `[P2.FED.4]` Навигация на экран Комментариев `[P2.SOC.2]` при тапе на иконку/счетчик. *(Навигация из FeedVC подключена)*.
+- [ ] `[P2.FED.5]` Обеспечение плавной прокрутки `FeedViewController` (верхняя панель + лента).
+
+### Тема: Person (Таб 2 - Свой Профиль) [PSN]
+- [x] `[P2.PSN.1]` Улучшение `PersonViewController`: Реализация Заголовка (Аватар, Counts, Имя, @id - по аналогии с `[P2.UPO.4]`). *(Реализовано в UserProfileFeedViewController)*.
+- [~] `[P2.PSN.2]` Добавление Кнопок Действий: "New post" (-> `[P1.CNT.1]`), "New program" (UI заглушка -> `[P3.PRG.4]`). *(UI кнопок "New Post" и "New Program" добавлены)*.
+- [~] `[P2.PSN.3]` Добавление Переключателя Контента: Табы "Posts" / "Programs" (UI заглушка -> `[P3.PRG.5]`). *(UISegmentedControl добавлен. Логика для "Programs" отсутствует)*.
+- [x] `[P2.PSN.4]` Отображение Сетки Постов пользователя (при выборе таба "Posts"). *(Реализовано в UserProfileFeedViewController)*.
+    - [x] `- [x]` Реализация обработки нажатия (tap) на пост в сетке.
+    - [x] `- [x]` Навигация на экран `UserPostScrollViewController` `[P2.PSN.7]`, передача UserID (текущего пользователя) и ID нажатого поста. *(Навигация вызывается, сам экран UserPostScrollViewController не реализован)*.
+- [x] `[P2.PSN.5]` Отображение RPG Элементов (Ранг, Уровень, XP). *(Уровень/XP/Ранг отображаются в UserProfileFeedViewController)*.
+- [x] `[P2.PSN.6]` Реализация Экрана Редактирования Профиля (Аватар, Имя, ID, Био). Зависит от `UserProfileService`. *(Реализованы VC, VM, навигация; использует UserProfileService, StorageService)*.
+- [ ] `[P2.PSN.7]` **Реализация `UserPostScrollViewController` (Лента постов пользователя):** *(Есть папка/заглушка в Feed/Scenes)*.
+    - [ ] Использование `UICollectionView` / `UITableView` для вертикальной прокрутки постов.
+    - [ ] Использование ячейки, аналогичной `FullPostCell` из `Feed`, для отображения: Фото, Текст поста (caption), Иконки/счетчики Лайков, Иконки/счетчики Комментариев.
+    - [ ] Реализация "бесконечной" прокрутки вниз для загрузки более старых постов пользователя.
+    - [ ] Начальная позиция скролла должна быть на посте, с которого перешли.
+    - [ ] Подключение логики Лайков (`[P2.FED.3]`).
+    - [ ] Навигация на экран Комментариев (`[P2.SOC.2]`) при нажатии на иконку/счетчик комментариев.
+- [ ] `[P2.PSN.8]` **Реализация `UserPostScrollViewModel`:**
+    - [ ] Загрузка постов для конкретного UserID через `PostService`.
+    - [ ] Обработка пагинации для загрузки старых постов.
+    - [ ] Передача ID начального поста для позиционирования.
+    - [ ] Управление источником данных для `UserPostScrollViewController`.
+
+### Тема: Leveling (Таб 3 - Тренировки) [LVL]
+- [ ] `[P2.LVL.1]` Добавление 2-3 новых упражнений (`Exercise`) и их Анализаторов (`ExerciseAnalyzerProtocol`).
+- [ ] `[P2.LVL.2]` Улучшение Анализаторов (обратная связь по технике).
+- [x] `[P2.LVL.3]` Использование `KalmanFilter3D`, `MotionManager` (если нужно). *(Используются в ExerciseExecutionViewModel)*.
+- [ ] `[P2.LVL.4]` Улучшение `PoseOverlayView`. *(Файл не анализировался)*.
+- [~] `[P2.RPG.1]` **RPG Механика (Аттрибуты - Прокачка):** Определение маппинга "упражнение -> аттрибут(ы)", реализация логики увеличения аттрибутов в `ProgressService` после `[P1.LVL.5]`. *(Маппинг и вызов ProgressService с приростом атрибутов реализованы. Логика бонуса от атрибутов не реализована)*.
+
+### Тема: Progress (Таб 4 - Статистика) [PRG]
+- [ ] `[P2.PRG.1]` Добавление Истории Тренировок (список сессий). Зависит от сохранения данных сессий `Leveling`.
+- [ ] `[P2.PRG.2]` Базовая Визуализация Прогресса (простые графики).
+- [ ] `[P2.PRG.3]` Отображение Персональных Рекордов.
+- [ ] `[P2.PRG.4]` Отображение текущих значений Аттрибутов. Зависит от `ProgressData`. *(Теоретически возможно, ProgressData есть, но ProgressVC - заглушка)*.
+
+### Тема: Store (Таб 5 - Магазин) [STR]
+- [ ] `[P2.STR.1]` Реализация базового UI `StoreViewController`.
+- [ ] `[P2.STR.2]` Интеграция StoreKit: Покупка 1-2 non-consumable IAP.
+
+### Тема: Социальное Ядро и Контент [SOC]
+- [x] `[P2.SOC.1]` Реализация Системы Подписок (`FollowService`, UI в профилях). *(FollowService и логика в VM/VC есть. Кнопка Follow/Following работает)*.
+- [~] `[P2.SOC.2]` Реализация Комментариев: Экран `CommentsViewController`, `CommentsViewModel`, `CommentCell`, `Comment` model, обновление `PostService`. *(Модель, ячейка, VM, VC, сервисы есть. Базовая функциональность работает. UI/UX требует доработки)*.
+- [x] `[P2.SOC.3]` Загрузка Медиа к Постам: Обновление `CreatePostViewController`, использование `StorageService`. *(Реализовано в флоу создания поста)*.
+- [~] `[P2.SOC.4]` Отображение Медиа в `PostCell`, `FullPostCell`, `PostGridCell`. *(В PostCell и PostGridCell реализовано. FullPostCell не проверен)*.
+
+### Тема: Просмотр Профиля Другого Пользователя [UPO]
+- [x] `[P2.UPO.1]` Реализация `UserProfileContainerViewController` (управляет Card/Person/Stats). Навигация из `[P1.FED.6]`. *(Реализован, но с TODO. Навигация из P1.FED.6 отсутствует)*.
+- [x] `[P2.UPO.2]` Настройка Top Navigation Bar в `UserProfileContainerViewController` (Назад, Меню Card/Person/Stats, Настройки/Опции). *(Реализовано через TopMenuView)*.
+- [x] `[P2.UPO.3]` Реализация `UserProfileCardViewController` ("Card" таб): Фон, Аватар, Имя, Follow кнопка, Статус/Био, Уровень, XP бар. Зависит от `UserProfileService`, `ProgressService`, `FollowService`. *(UI реализован. VM требует адаптации. Зависимости от сервисов есть)*.
+- [x] `[P2.UPO.4]` Реализация `UserProfileFeedViewController` ("Person" таб): Заголовок (Аватар, Counts, Имя, @id, кнопки Follow, Message[UI], Program[UI]), Контент (Табы, Сетка постов). Зависит от `UserProfileService`, `FollowService`, `PostService`. *(Заголовок, сетка, кнопки Follow/Message реализованы. Кнопка Program отсутствует. Зависимости есть)*.
+- [ ] `[P2.UPO.5]` Реализация `UserProfileStatsViewController` ("Stats" таб): Радар-Чарт (`Charts` `[P2.FND.3]`), Инфо-блок (Имя, Ранг `[P1.RPG.1]`, Аттрибуты), Уровень, XP. Зависит от `UserProfileService`, `ProgressService`. *(Только заглушка VC)*.
+- [x] `[P2.UPO.6]` Реализация ViewModel'ов для UPO экранов. *(UserProfileFeedViewModel реализован. Для Card/Stats требуют доработки/создания)*.
+
+### Тема: Уведомления (Notifications - Базовые) [NOT]
+- [ ] `[P2.NOT.1]` Бэкенд: Проектирование схемы, реализация генерации уведомлений (комментарий, подписчик, лайк?).
+- [ ] `[P2.NOT.2]` UI: Отображение иконки Уведомлений + счетчика (badge) в Nav Bar (`[P1.FND.4]`). *(Нет)*.
+- [ ] `[P2.NOT.3]` Навигация на экран Уведомлений.
+- [ ] `[P2.NOT.4]` UI: Базовый `NotificationsViewController` (список уведомлений) + логика прочтения.
+
+---
+
+## Фаза 3: Зрелость и Оптимизация
+
+**Цель Фазы 3:** Добавить продвинутые функции (чат, программы тренировок, ачивки, лидерборды), реализовать бонус XP от аттрибутов, push-уведомления, оптимизировать и отполировать приложение.
+
+### Тема: Техническая Основа и UI [FND]
+- [ ] `[P3.FND.1]` Глубокая оптимизация производительности.
+- [ ] `[P3.FND.2]` UI/UX полировка всего приложения.
+- [ ] `[P3.FND.3]` Внедрение системы Аналитики.
+- [ ] `[P3.FND.4]` Расширение покрытия тестами (Unit, UI).
+- [ ] `[P3.FND.5]` Настройка CI/CD.
+
+### Тема: Feed (Таб 1) [FED]
+- [ ] `[P3.FED.1]` Подсветка Кружков в Верхней Панели (Бэкенд + Фронтенд логика seen/unseen).
+- [ ] `[P3.FED.2]` Улучшение алгоритма рекомендаций / добавление вкладки "Подписки".
+- [ ] `[P3.FED.3]` Реализация "Поделиться" (Share).
+
+### Тема: Person (Таб 2 - Свой Профиль) [PSN]
+- [ ] `[P3.PSN.1]` Отображение Достижений/Ачивок (`[P3.PRG.1]`).
+- [ ] `[P3.PSN.2]` Расширенная Кастомизация профиля.
+
+### Тема: Leveling (Таб 3 - Тренировки) [LVL]
+- [ ] `[P3.LVL.1]` Персонализированные планы тренировок (могут использовать `[P3.PRG.x]`).
+- [ ] `[P3.LVL.2]` Продвинутая аналитика упражнений.
+- [ ] `[P3.LVL.3]` (Опционально) Интеграция с HealthKit.
+
+### Тема: Progress (Таб 4 - Статистика) [PRG]
+- [ ] `[P3.PRG.1]` Система Достижений (Achievements/Badges).
+- [ ] `[P3.PRG.2]` Таблицы Лидеров (Leaderboards).
+- [ ] `[P3.PRG.3]` Детальные графики прогресса.
+- [ ] `[P3.PRG.4]` Визуализация влияния аттрибутов на бонус к XP (`[P3.RPG.1]`).
+
+### Тема: Store (Таб 5 - Магазин) [STR]
+- [ ] `[P3.STR.1]` Подписки (Premium-аккаунт?).
+- [ ] `[P3.STR.2]` Расходные материалы.
+- [ ] `[P3.STR.3]` Косметические предметы.
+
+### Тема: Социальное Ядро и Контент [SOC]
+- [ ] `[P3.SOC.1]` Поиск пользователей, хештегов.
+- [ ] `[P3.SOC.2]` @Упоминания в комментариях/постах.
+
+### Тема: Программы Тренировок (User-Created & Viewing) [PRG]
+- [ ] `[P3.PRG.1]` Проектирование Моделей Данных (+ public/private статус).
+- [ ] `[P3.PRG.2]` Реализация UI Создания/Редактирования Программ.
+- [ ] `[P3.PRG.3]` Реализация `ProgramService` (сохранение/загрузка).
+- [ ] `[P3.PRG.4]` Подключение кнопки "New program" `[P2.PSN.2]` к созданию.
+- [ ] `[P3.PRG.5]` Реализация отображения своих программ на Табе 2 (`[P2.PSN.3]`).
+- [ ] `[P3.PRG.6]` Интеграция программ с Табом 3 Leveling (запуск программы).
+- [ ] `[P3.PRG.7]` Реализация Просмотра Чужих Программ: UI экрана + подключение кнопки "Program" `[P2.UPO.4]`.
+- [ ] `[P3.PRG.8]` (Опционально) Копирование/использование чужой программы.
+
+### Тема: RPG Механики [RPG]
+- [ ] `[P3.RPG.1]` Реализация Бонуса к XP от Аттрибутов: Логика расчета в `ProgressService` + применение в `Leveling` `[P1.LVL.5]`. Зависит от `[P2.RPG.1]`. *(Логика в ProgressService не реализована)*.
+- [ ] `[P3.RPG.2]` Балансировка: Настройка кривой опыта, скорости прокачки аттрибутов, формулы бонуса XP.
+- [ ] `[P3.RPG.3]` Возможно, Навыки или бонусы за уровни/ранги.
+- [ ] `[P3.RPG.4]` Награды за достижения уровней/рангов/ачивок `[P3.PRG.1]`.
+
+### Тема: Уведомления (Notifications - Продвинутые) [NOT]
+- [ ] `[P3.NOT.1]` Push-уведомления.
+- [ ] `[P3.NOT.2]` Deep Linking из уведомлений.
+- [ ] `[P3.NOT.3]` Улучшение UI `NotificationsViewController`.
+- [ ] `[P3.NOT.4]` Настройки уведомлений для пользователя.
+
+### Тема: Обмен Сообщениями (Messaging) [MSG]
+- [ ] `[P3.MSG.1]` Бэкенд: Схема БД, Real-time, API.
+- [ ] `[P3.MSG.2]` UI: Экран Списка Бесед, Экран Чата.
+- [~] `[P3.MSG.3]` Интеграция кнопки "Message" `[P2.UPO.4]`. *(Кнопка есть в UI профиля, но навигация не реализована)*.
+- [ ] `[P3.MSG.4]` Уведомления о новых сообщениях (интеграция с `[NOT]`).
+
+---
+
+## Будущие Идеи / Backlog (Post-v1)
+
+- [ ] Режим "Вызовы" (Challenges) / Соревнования.
+- [ ] Группы / Команды.
+- [ ] Live-тренировки.
+- [ ] Интеграция с Apple Watch.
+- [ ] Другие платформы (Android, Web).
+- [ ] Локализация.
+- [ ] Публикация / Обмен Программами Тренировок (продвинутый).
+
+---
+
+## Стратегия Работы с Roadmap в Cursor AI:
+
+* **Используйте ID Задач:** Ссылайтесь на задачи по их ID (например, `[P2.FED.3]`), особенно если обсуждаете что-то, что упоминалось давно.
+* **Предоставляйте Контекст:** Перед тем, как углубиться в конкретную фичу (особенно если начинаете новый чат или давно не обсуждали эту тему), скопируйте и вставьте соответствующую "Контекстную Шпаргалку" (примеры ниже).
+* **Фокусируйтесь на Фазе:** Уточняйте, задачи какой фазы вы сейчас реализуете (MVP, Фаза 2, Фаза 3).
+* **Задавайте Конкретные Вопросы:** Вместо "Напиши код для профиля", спросите "Помоги реализовать UI для `UserProfileCardViewController` [P2.UPO.3], используя данные из `UserProfileService` и `ProgressService`".
+* **Декомпозиция Обсуждения:** Разбейте обсуждение большой фичи на подзадачи по компонентам (VC, VM, Service) или шагам.
+* **Предоставление Фрагментов Кода:** Прикладывайте релевантные фрагменты существующего кода.
+* **Явное Указание Решений:** Озвучивайте принятые архитектурные/технологические решения.
+* **Краткие Итоги:** Периодически подводите итог обсуждения.
+* **Контекст Файловой Структуры:** При необходимости напоминайте ИИ о расположении файлов.
+* **Управление Длиной Диалога:** При необходимости начинайте новый чат со "Шпаргалкой".
+
+## Примеры Контекстных Шпаргалок (для Cursor AI):
+
+**Шпаргалка: Общий Контекст Проекта**
+Контекст: Проект SensumApp (iOS, Swift). Social Fitness RPG. 5 табов: Feed (рекомендации), Person (свой профиль), Leveling (AI-тренировки + XP), Progress (статы, ранг, аттрибуты), Store. Ключевые технологии: UIKit, MVVM+Coordinators, MediaPipe (Pose Estimation), Charts (Radar Chart), CocoaPods. RPG: Уровни, XP, Ранги (E-R+), Аттрибуты (STR, CON и т.д., качаются упражнениями, дают бонус к XP). Также планируются: Уведомления, Чат, Программы тренировок. Текущий Roadmap в формате Markdown с ID задач [Px.XXX.y]. **Архитектура синхронизирована: используются User/ProgressData модели и UserProfile/Progress сервисы для Firestore.**
+
+
+**Шпаргалка: Работа над Табом Feed [FED] (Фаза 2)**
+Контекст: Работаем над Табом 1 "Feed" в Фазе 2 SensumApp. Цель: улучшить MVP. Задачи включают: Верхняя панель аналог Stories [P2.FED.1] (горизонтальный UICollectionView, навигация на профиль [P2.UPO.1]), улучшение PostCell [P2.FED.2] (добавить UI лайков/комментов/текста/more), реализация логики лайков [P2.FED.3] (PostService), навигация на экран комментов [P2.SOC.2]. Используем FeedViewController, FeedViewModel, PostCell. *Текущее состояние: [P1.FED.3] пагинация отсутствует, [P1.FED.6] навигация на профиль отсутствует, [P2.FED.1] заглушка, [P2.FED.2] UI в PostCell отсутствует, [P2.FED.3] логика не интегрирована.*
+
+
+**Шпаргалка: Работа над Просмотром Профиля Другого Пользователя [UPO] (Фаза 2)**
+Контекст: Работаем над экраном Просмотра Профиля Другого Пользователя [UPO] в Фазе 2 SensumApp (навигация из Feed [P1.FED.6]). Используем UserProfileContainerViewController [P2.UPO.1] с сегментным переключателем для Card [P2.UPO.3], Person [P2.UPO.4], Stats [P2.UPO.5]. Зависимости: UserProfileService, PostService, ProgressService, FollowService, Charts. RPG элементы (Ранг, Уровень, XP, Аттрибуты) должны отображаться. Кнопки в Person: Follow, Message[UI->P3.MSG.3], Program[UI->P3.PRG.7]. *Текущее состояние: Container/Card/TopMenu UI [x], Person UI [x] (с кнопками Follow/Message), Stats UI [ ] (заглушка). ViewModel'ы (`UserProfileFeedViewModel`) используют корректные сервисы. Card/Stats VM требуют доработки.*
+
+
+**Шпаргалка: Работа над Табом Person (Свой профиль) [PSN] (Фаза 2)**
+Контекст: Работаем над Табом 2 "Person" (свой профиль) в Фазе 2 SensumApp. Задачи: Заголовок [P2.PSN.1] (Аватар, Counts, Имя, @id), Кнопки [P2.PSN.2] ("New post"->[P1.CNT.1], "New program"->[P3.PRG.4]), Табы контента [P2.PSN.3] ("Posts", "Programs"->[P3.PRG.5]), Сетка постов [P2.PSN.4] + Навигация на скролл-ленту [P2.PSN.7], Отображение RPG (Ранг, Уровень, XP) [P2.PSN.5], Редактирование профиля [P2.PSN.6]. Скролл-лента постов [P2.PSN.7]/[P2.PSN.8] показывает посты текущего пользователя. Зависит от UserProfileService, ProgressService, PostService. *Текущее состояние: Заголовок [x], Сетка [x], Навигация на скролл [x] (сам скролл не готов), Отображение Ранг/Уровень/XP [x]. Кнопка "New post" [x], "New program" [ ], Табы контента [ ], Редактирование [ ]. Используются корректные сервисы UserProfile/Progress.*
+
+
+**Шпаргалка: Работа над RPG Механиками [RPG]**
+Контекст: Обсуждаем RPG Механики SensumApp. Ключевые элементы: Уровень (Level), Опыт (XP, начисляется в Leveling [P1.LVL.5]), Ранг (Rank, E-R+, рассчитывается из уровня [P1.RPG.1]), Аттрибуты (Attributes: STR, CON и т.д., хранятся в User/ProgressData, прокачиваются в Leveling [P2.RPG.1]), Бонус к XP от Аттрибутов (рассчитывается и применяется в Leveling [P3.RPG.1]). Данные управляются через ProgressService. *Текущее состояние: Расчет XP [x] (в ProgressService), Расчет ранга [x] (в ProgressService), Прокачка атрибутов [~] (логика в ProgressService есть, но бонус XP от них [ ]). Данные в Firestore через ProgressService.*
+
+ЗАВЕРШЕНИЕ УСТАНОВКИ КОНТЕКСТА
+
+Пожалуйста, подтверди, что ты обработал всю предоставленную информацию (Обзор, Правила, Roadmap).
+
+Если все готово, дай знать, и мы можем начать с первой задачи или обсудить, с чего лучше начать.

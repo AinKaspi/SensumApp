@@ -142,9 +142,6 @@ class ExerciseExecutionViewController: UIViewController { // ВАЖНО: Имя 
     // Для передачи размера кадра в делегат
     private var lastFrameSize: CGSize?
 
-    // Свойство для хранения текущего профиля пользователя
-    private var userProfile: UserProfile?
-
     // --- Переносим сюда свойства для FPS --- 
     private var frameCount: Int = 0
     private var fpsTimer: Timer?
@@ -654,7 +651,25 @@ extension ExerciseExecutionViewController: ExerciseExecutionViewModelViewDelegat
         }
     }
     
-    // TODO: Реализовать другие методы делегата (level up, error, etc.)
+    // MARK: - Error and Level Up Handlers (Новые заглушки)
+    
+    func viewModelDidEncounterError(message: String) {
+        // TODO: Показать пользователю алерт или другой UI об ошибке
+        print("*** ExerciseExecutionVC Error Received: \(message) ***")
+        // Пример показа алерта:
+        // let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
+        // alert.addAction(UIAlertAction(title: "OK", style: .default))
+        // present(alert, animated: true)
+    }
+    
+    func viewModelDidLevelUp(newLevel: Int, newRank: String) {
+        // TODO: Показать пользователю анимацию/сообщение о повышении уровня/ранга
+        print("*** ExerciseExecutionVC Level Up! New Level: \(newLevel), New Rank: \(newRank) ***")
+        // Пример показа алерта:
+        // let alert = UIAlertController(title: "Level Up!", message: "Вы достигли \(newLevel) уровня!\nНовый ранг: \(newRank)", preferredStyle: .alert)
+        // alert.addAction(UIAlertAction(title: "Awesome!", style: .default))
+        // present(alert, animated: true)
+    }
 }
 
 // MARK: - FPS Timer Logic (Новый раздел)

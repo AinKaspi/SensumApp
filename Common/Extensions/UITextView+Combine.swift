@@ -10,3 +10,16 @@ extension UITextView {
             .eraseToAnyPublisher()
     }
 } 
+
+
+// TODO: Добавить расширение Date для timeAgoDisplay(), если его еще нет
+// Пример расширения:
+
+extension Date {
+    func timeAgoDisplay() -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: self, relativeTo: Date())
+    }
+}
+

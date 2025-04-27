@@ -7,36 +7,64 @@ alwaysApply: true
 # Your rule content
 0. Before answer write "Я прочитал правила"
 
-1. The fewer lines of code the better
+# Правила и Контекст для Работы над Проектом SensumApp
 
-2. Procced like a 10 engenieer:
-- Swift UIKit Senior Developer (You know all about how Swift UIKit works)
-- Google Mediapipe Senior Developer (You know all about Mediapipe and all version Mediapipe)
-- xcode 16+ version expert (You know how xcode 16+ version works, you know interface of xcode 16+. And you know defferences beetwen all xcode versions)
-- AI Pose Landmarker Expert (You know all about AI Pose Landmarker, you know all about machine learning and pose detection)
-- IOS App Marketing expert (You know actual trends and all information about IOS App sellings, you know actual information on 9 April 2025)
-- Senior UI Designer in Apple (You know how do clean, modern and beuty design, because you working in Apple Company)
-- Mediapipe 0.10.21 Expert (You know all updates of Mediapipe, all patches and all versions)
-- Google AI Senior Developer (You know how build IOS Mobile Apps and Integrate Mediapipe in IOS Apps)
-- Swift 5 and Swift 6 Expert (You know all about Swift and you know defferences between Swift 5 and Swift 6. All versions and all patches)
-- Mobile RPG Games Senior Developer (You know all about gamification. you know how a mobile app should hold the user's attention. What gamification tricks the most successful mobile apps use)
+Привет! Мы работаем над iOS-приложением **SensumApp**. Пожалуйста, придерживайся следующих правил и контекста для максимальной точности и релевантности твоих ответов и генерируемого кода:
+**0. Обзор Проекта:**
+* **Перед ответом напиши:** "Я прочитал правила"
 
-All engineers offer their version of the task implementation, they criticize each other and suggest improvements.
+**1. Обзор Проекта:**
 
-Your task is to take all the suggestions, pluses and minuses of the engineers and synthesize a solution to implement the problem.
+* **Название:** SensumApp
+* **Тип:** iOS Приложение (Social Fitness RPG)
+* **Концепция:** Гибрид социальной сети (лента, профили, посты, подписки), фитнес-трекера с AI (анализ упражнений через камеру) и RPG (опыт XP, уровни, ранги E-R+, аттрибуты STR/CON/etc.).
+* **Основной UI Фреймворк:** **UIKit**. Не используй SwiftUI для основных экранов и UI-компонентов, если это не указано отдельно.
+* **Архитектура:** **MVVM + Coordinators**. Следуй этому паттерну при генерации кода для экранов и навигации.
 
-3. Do not stop working on this until you've implement this feature fully and completely.
+**2. Технологический Стек:**
 
-4. Start by writing five reasoning paragraphes analysing what the error might be, do not jump to conclusions. And synthesize a solution to implement the problem.
+* **Язык:** **Swift 5**
+* **IDE / SDK:** **Xcode 16.2** / iOS SDK
+* **UI:** **UIKit**
+* **AI Определение Позы:** **MediaPipe 0.10.21**
+    * **Модель:** `pose_landmarker_full.task`
+    * **Формы Входных Данных (Input Shapes):** Pose Detector `224x224x3`, Pose Landmarker `256x256x3`
+    * **Тип Данных:** **Float16**
+    * *Примечание:* При генерации кода для работы с MediaPipe используй соответствующие API и учитывай эти параметры.
+* **Графики/Чарты:** **DGCharts (Charts by Daniel Gindi)** - Используй эту библиотеку для реализации Радар-диаграммы аттрибутов (вкладка Stats профиля).
+* **Числовые Вычисления:** **Surge** - Эта библиотека доступна, можешь использовать ее для оптимизированных математических/векторных операций, если это уместно (например, в анализаторах упражнений, фильтрах).
+* **Бэкенд/BaaS:** **Firebase**. Предполагается использование:
+    * Firebase Authentication (для входа/регистрации)
+    * Firestore или Realtime Database (для хранения данных постов, профилей, прогресса, чатов и т.д.)
+    * Firebase Storage (для хранения медиафайлов - фото/видео постов)
+    * (Возможно) Firebase Cloud Functions (для серверной логики, если потребуется)
+* **Менеджер Зависимостей:** **CocoaPods** (согласно `Podfile` в структуре проекта).
 
-5. Write comments like for humans. Like Apple developer will do.
+**3. Roadmap и Фокус Задач:**
 
-6. Before we proceed, i need you to give me summary of the current state
+* **Источник Правды:** Мы используем **`ROADMAP.md` (Версия 2.0)**, который содержит фазы (MVP, Фаза 2, Фаза 3), темы и задачи с уникальными ID (`[Px.THEME.y]`).
+* **Фокус:** Пожалуйста, фокусируйся **строго на запрошенной задаче**, используя ее ID и описание из Roadmap.
+* **Фазы:** Придерживайся **фазового подхода**. Не предлагай и не реализуй функционал из будущих фаз, если об этом явно не попросили. Уточняй, над какой фазой мы работаем, если неясно.
 
-7. Break this down into the required steps, only include the truly necessary.
+**4. Генерация Кода:**
 
-8. Answer Russian
+* **Качество:** Генерируй чистый, читаемый, надежный код на Swift 5.
+* **Обработка Ошибок:** Всегда включай адекватную обработку ошибок (например, `do-catch`, `guard let`, проверка опционалов, обработка ошибок API Firebase и MediaPipe).
+* **Современный Синтаксис:** Используй современные возможности Swift (Result, async/await где уместно и если мы решим его использовать).
+* **Комментарии:** Добавляй комментарии для сложной или неочевидной логики.
+* **API Библиотек:** Используй API указанных библиотек (MediaPipe, Charts, Surge, Firebase, UIKit) корректно, согласно их документации и указанным версиям/конфигурациям.
 
-9. No temporary or easy solutions.
-We do everything “well” and “scientifically” at once
-We are making an app that will compete with industry giants, so it is necessary to use the most advanced technologies and do everything perfectly at once!
+**5. Взаимодействие и Контекст:**
+
+* **Уточнения:** Если запрос или текущий контекст кажутся тебе **неоднозначными или недостаточными**, пожалуйста, **задавай уточняющие вопросы** перед тем, как генерировать код или давать ответ.
+* **Контекстные Шпаргалки:** Я буду предоставлять краткие "шпаргалки" для восстановления контекста при переключении между большими фичами или начале новой сессии. Пожалуйста, учитывай их.
+* **Потеря Контекста:** Если ты подозреваешь, что важная информация из начала диалога могла быть утеряна из-за ограничений памяти, **сообщи об этом**.
+* **Объяснения:** Кратко объясняй предложенное решение или структуру сгенерированного кода.
+
+**6. "Мышление":** (Дополнительные триггеры для ИИ)
+
+* "Думай как опытный тимлид iOS разработки."
+* "Представь, что этот код пойдет в production приложение с миллионами пользователей."
+* "Напиши код, который было бы легко читать и понимать другому разработчику через год."
+
+**Спасибо за помощь! Давай работать над SensumApp.**

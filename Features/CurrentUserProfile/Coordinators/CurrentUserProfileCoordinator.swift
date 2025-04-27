@@ -1,7 +1,11 @@
 import UIKit
+// Удаляем некорректные импорты
+// import Features.Feed.ViewModels
+// import Features.Feed.Scenes
 
-// Добавляем соответствие UserProfileFeedViewControllerDelegate
-class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerDelegate, UserPostScrollViewControllerDelegate {
+// Добавляем соответствие UserProfileFeedViewControllerDelegate и EditProfileViewControllerDelegate
+// Добавляем EditProfileViewModelDelegate
+class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerDelegate, EditProfileViewControllerDelegate, EditProfileViewModelDelegate/*, UserPostScrollViewControllerDelegate*/ {
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
     
@@ -11,14 +15,17 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
     private let postService: PostServiceProtocol
     private let followService: FollowServiceProtocol
     private let storageService: StorageServiceProtocol
+    // Добавляем ProgressService, т.к. он может понадобиться для дочерних VM
+    private let progressService: ProgressServiceProtocol
 
     // Обновляем init
-    init(navigationController: UINavigationController, 
+    init(navigationController: UINavigationController,
          authService: AuthServiceProtocol = AuthService(),
          userProfileService: UserProfileServiceProtocol = UserProfileService(),
          postService: PostServiceProtocol = PostService(),
          followService: FollowServiceProtocol = FollowService(),
-         storageService: StorageServiceProtocol = StorageService()
+         storageService: StorageServiceProtocol = StorageService(),
+         progressService: ProgressServiceProtocol = ProgressService() // Добавляем ProgressService
          ) {
         self.navigationController = navigationController
         self.authService = authService
@@ -26,6 +33,7 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
         self.postService = postService
         self.followService = followService
         self.storageService = storageService
+        self.progressService = progressService // Сохраняем
         // TODO: Настроить стиль Navigation Bar для профиля?
         // Возможно, он будет таким же, как у Feed, или тоже скрыт?
     }
@@ -38,14 +46,14 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
             return
         }
         
-        // Создаем ViewModel
+        // Создаем ViewModel (передаем все зависимости)
         let viewModel = UserProfileFeedViewModel(
             userID: currentUserID,
             isCurrentUser: true, // Важно!
             userProfileService: userProfileService,
             postService: postService,
-            followService: followService
-            // StorageService пока не передаем, он может понадобиться внутри VM для загрузки аватара?
+            followService: followService,
+            progressService: progressService // Передаем ProgressService
         )
         
         let vc = UserProfileFeedViewController()
@@ -64,16 +72,14 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
     
     func didTapEditProfileButton() {
         print("CurrentUserProfileCoordinator: Edit profile requested")
-        // TODO: Реализовать навигацию на экран редактирования
+        showEditProfile()
     }
     
     func didTapFollowButton() {
-        // Не должно вызываться для CurrentUserProfile
         print("CurrentUserProfileCoordinator Warning: didTapFollowButton called unexpectedly")
     }
     
     func didTapMessageButton() {
-        // Не должно вызываться для CurrentUserProfile
         print("CurrentUserProfileCoordinator Warning: didTapMessageButton called unexpectedly")
     }
     
@@ -82,16 +88,41 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
         authService.signOut { [weak self] error in
             if let error = error {
                 print("CurrentUserProfileCoordinator Error: Sign out failed: \(error.localizedDescription)")
-                // TODO: Показать ошибку пользователю?
             } else {
                 print("CurrentUserProfileCoordinator: Sign out successful. AppCoordinator should handle state change.")
-                // AppCoordinator должен автоматически переключиться на AuthFlow 
-                // из-за изменения authenticationState в AuthService
             }
         }
     }
     
-    // TODO: Добавить методы для навигации (например, на экран редактирования профиля)
+    // Добавляем реализацию нового метода делегата
+    func didTapNewProgramButton() {
+        print("CurrentUserProfileCoordinator: New program requested - Navigation Placeholder")
+        // TODO: Реализовать навигацию на экран создания программы ([P3.PRG.4])
+    }
+    
+    // MARK: - Navigation
+
+    func showEditProfile() {
+        print("CurrentUserProfileCoordinator: Showing Edit Profile screen.")
+        // Создаем ViewModel, передавая необходимые сервисы
+        let viewModel = EditProfileViewModel(
+            authService: authService,
+            userProfileService: userProfileService,
+            storageService: storageService
+        )
+        viewModel.delegate = self // Назначаем себя делегатом ViewModel
+
+        // Создаем ViewController
+        let vc = EditProfileViewController()
+        // Раскомментируем инъекцию ViewModel
+        vc.viewModel = viewModel
+        vc.delegate = self // Назначаем себя делегатом ViewController
+
+        // Показываем экран (например, push)
+        // Сначала сделаем Navigation Bar видимым для экрана редактирования
+        navigationController.isNavigationBarHidden = false
+        navigationController.pushViewController(vc, animated: true)
+    }
     
     // MARK: - Post Navigation
     
@@ -113,16 +144,46 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
         // Перед показом следующего экрана делаем Navigation Bar видимым
         navigationController.isNavigationBarHidden = false
         
+        // TODO: Раскомментировать и реализовать UserPostScrollViewController
+        /*
         let userPostScrollVC = UserPostScrollViewController(posts: posts, startIndex: startIndex)
         userPostScrollVC.delegate = self // Устанавливаем себя в качестве делегата
         print("CurrentUserProfileCoordinator: Переход на UserPostScrollViewController")
         navigationController.pushViewController(userPostScrollVC, animated: true)
+        */
+        print("CurrentUserProfileCoordinator: Навигация на UserPostScrollViewController закомментирована.")
     }
     
-    // MARK: - UserPostScrollViewControllerDelegate
+    // MARK: - EditProfileViewControllerDelegate
     
+    func editProfileDidFinish(didSave: Bool) {
+        print("CurrentUserProfileCoordinator: Edit profile finished. Did save: \(didSave)")
+        // Просто закрываем экран редактирования (возвращаемся назад)
+        navigationController.popViewController(animated: true)
+        // Делаем Navigation Bar снова скрытым для экрана профиля
+        navigationController.isNavigationBarHidden = true
+        // TODO: Если сохранили (didSave = true), нужно ли обновить данные на экране профиля?
+        // Можно вызвать viewModel.fetchAllUserData() у UserProfileFeedViewController,
+        // но нужно получить на него ссылку.
+    }
+    
+    // MARK: - UserPostScrollViewControllerDelegate (Закомментировано)
+    // Раскомментируем делегат и его методы
+    /* // Убираем начало комментария
     func didTapUsername(userID: String) {
         print("CurrentUserProfileCoordinator: User profile requested for userID: \(userID)")
         // TODO: Реализовать навигацию на профиль пользователя
     }
-} 
+    
+    @MainActor // Добавляем MainActor для инициализации CommentsViewModel
+    func didTapCommentsButton(forPostID postID: String) {
+        print("CurrentUserProfileCoordinator: Comments requested for post ID: \(postID)")
+        // Раскомментируем создание CommentsViewModel и CommentsViewController
+        let viewModel = CommentsViewModel(postId: postID, postService: postService) // Используем имеющийся PostService
+        let commentsVC = CommentsViewController(postId: postID, viewModel: viewModel)
+        commentsVC.hidesBottomBarWhenPushed = true
+        navigationController.pushViewController(commentsVC, animated: true)
+        // print("CurrentUserProfileCoordinator: Навигация на CommentsViewController закомментирована.") // Удаляем лог
+    }
+    */ // Убираем конец комментария
+}
