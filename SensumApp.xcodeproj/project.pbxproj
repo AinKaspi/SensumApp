@@ -16,7 +16,6 @@
 		B117CBD92DB6DFD200A696B9 /* UserProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBD52DB6DFD200A696B9 /* UserProfileService.swift */; };
 		B117CBDA2DB6DFD200A696B9 /* StorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBD42DB6DFD200A696B9 /* StorageService.swift */; };
 		B134D8152DBA62160014DB02 /* ProgressData.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D8142DBA62160014DB02 /* ProgressData.swift */; };
-		B134D8192DBA62AC0014DB02 /* Comment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D8182DBA62AC0014DB02 /* Comment.swift */; };
 		B134D81D2DBA68370014DB02 /* ProgramService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D81C2DBA68370014DB02 /* ProgramService.swift */; };
 		B134D8352DBE48D30014DB02 /* TrainingProgram.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D8342DBE48D30014DB02 /* TrainingProgram.swift */; };
 		B134D8372DBE4A370014DB02 /* AppNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D8362DBE4A370014DB02 /* AppNotification.swift */; };
@@ -25,6 +24,8 @@
 		B134D83D2DBE4AC60014DB02 /* MessagingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D83C2DBE4AC60014DB02 /* MessagingService.swift */; };
 		B134D8422DBE52EE0014DB02 /* ProgressService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B134D8412DBE52EE0014DB02 /* ProgressService.swift */; };
 		B1686B4C2DBF44C70074FA46 /* STRUCT.md in Resources */ = {isa = PBXBuildFile; fileRef = B1686B4B2DBF44C70074FA46 /* STRUCT.md */; };
+		B1686C392DBF7D200074FA46 /* Comment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1686C372DBF7D200074FA46 /* Comment.swift */; };
+		B1686C3A2DBF7D200074FA46 /* Exercise.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1686C382DBF7D200074FA46 /* Exercise.swift */; };
 		B16E96222DBA6121005893D5 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBD12DB6DFD200A696B9 /* AuthService.swift */; };
 		B1A4835E2DB6CD0000755E25 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = B1A4835D2DB6CD0000755E25 /* FirebaseAnalyticsOnDeviceConversion */; };
 		B1A483602DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */ = {isa = PBXBuildFile; productRef = B1A4835F2DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport */; };
@@ -64,7 +65,6 @@
 		B117CBD42DB6DFD200A696B9 /* StorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageService.swift; sourceTree = "<group>"; };
 		B117CBD52DB6DFD200A696B9 /* UserProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileService.swift; sourceTree = "<group>"; };
 		B134D8142DBA62160014DB02 /* ProgressData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressData.swift; sourceTree = "<group>"; };
-		B134D8182DBA62AC0014DB02 /* Comment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Comment.swift; sourceTree = "<group>"; };
 		B134D81C2DBA68370014DB02 /* ProgramService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgramService.swift; sourceTree = "<group>"; };
 		B134D8342DBE48D30014DB02 /* TrainingProgram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingProgram.swift; sourceTree = "<group>"; };
 		B134D8362DBE4A370014DB02 /* AppNotification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNotification.swift; sourceTree = "<group>"; };
@@ -74,6 +74,8 @@
 		B134D8412DBE52EE0014DB02 /* ProgressService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressService.swift; sourceTree = "<group>"; };
 		B14866692DA4351800C4A753 /* SensumApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SensumApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1686B4B2DBF44C70074FA46 /* STRUCT.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = STRUCT.md; sourceTree = "<group>"; };
+		B1686C372DBF7D200074FA46 /* Comment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Comment.swift; sourceTree = "<group>"; };
+		B1686C382DBF7D200074FA46 /* Exercise.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Exercise.swift; sourceTree = "<group>"; };
 		B1A6E6E92DA7F0F500E9E9EB /* ROADMAP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ROADMAP.md; sourceTree = "<group>"; };
 		B1AE8A622DB8E4F90089728F /* UITextView+Combine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UITextView+Combine.swift"; sourceTree = "<group>"; };
 		C1B889D639EA09C28DFCEA72 /* Pods-SensumApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SensumApp.debug.xcconfig"; path = "Target Support Files/Pods-SensumApp/Pods-SensumApp.debug.xcconfig"; sourceTree = "<group>"; };
@@ -167,6 +169,8 @@
 		B117CBCE2DB6DFA100A696B9 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				B1686C372DBF7D200074FA46 /* Comment.swift */,
+				B1686C382DBF7D200074FA46 /* Exercise.swift */,
 				B134D8142DBA62160014DB02 /* ProgressData.swift */,
 				B117CBCC2DB6DFA100A696B9 /* Post.swift */,
 				B117CBCD2DB6DFA100A696B9 /* User.swift */,
@@ -202,7 +206,6 @@
 				B1A6E6E92DA7F0F500E9E9EB /* ROADMAP.md */,
 				B1686B4B2DBF44C70074FA46 /* STRUCT.md */,
 				B1BE36982DA6A74900BF1C55 /* Managers */,
-				B1BE36952DA6A6CF00BF1C55 /* Models */,
 				B148669E2DA43B8000C4A753 /* Features */,
 				B148666B2DA4351800C4A753 /* SensumApp */,
 				B148666A2DA4351800C4A753 /* Products */,
@@ -243,14 +246,6 @@
 				B1AE8A632DB8E4F90089728F /* Extensions */,
 			);
 			path = Common;
-			sourceTree = "<group>";
-		};
-		B1BE36952DA6A6CF00BF1C55 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				B134D8182DBA62AC0014DB02 /* Comment.swift */,
-			);
-			path = Models;
 			sourceTree = "<group>";
 		};
 		B1BE36982DA6A74900BF1C55 /* Managers */ = {
@@ -386,7 +381,8 @@
 				B117CBD82DB6DFD200A696B9 /* PostService.swift in Sources */,
 				B117CBD92DB6DFD200A696B9 /* UserProfileService.swift in Sources */,
 				B117CBDA2DB6DFD200A696B9 /* StorageService.swift in Sources */,
-				B134D8192DBA62AC0014DB02 /* Comment.swift in Sources */,
+				B1686C392DBF7D200074FA46 /* Comment.swift in Sources */,
+				B1686C3A2DBF7D200074FA46 /* Exercise.swift in Sources */,
 				B134D8392DBE4A520014DB02 /* NotificationService.swift in Sources */,
 				B134D8352DBE48D30014DB02 /* TrainingProgram.swift in Sources */,
 				B134D8372DBE4A370014DB02 /* AppNotification.swift in Sources */,
