@@ -15,9 +15,9 @@ protocol UserProfileFeedViewControllerDelegate: AnyObject {
     func didTapNewProgramButton()
 }
 
-// Добавляем делегат для UIImagePickerController
 // Обновляем: используем PHPickerViewControllerDelegate и добавляем CreatePostViewControllerDelegate
-class UserProfileFeedViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, PHPickerViewControllerDelegate, CreatePostViewControllerDelegate {
+// Убираем лишние протоколы из объявления класса, они будут в extensions
+class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDelegate {
 
     // Добавляем ViewModel
     var viewModel: UserProfileFeedViewModel! // Используем !, т.к. он будет инжектирован координатором
@@ -28,6 +28,14 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
     // TODO: Добавить ViewModel для загрузки данных профиля и постов
 
     // MARK: - UI Elements
+    
+    // Добавляем ScrollView
+    private let scrollView: UIScrollView = {
+        let scrollView = UIScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.alwaysBounceVertical = true
+        return scrollView
+    }()
     
     // Добавляем contentWrapperView
     private let contentWrapperView: UIView = {
@@ -222,13 +230,7 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
     // --- Сетка Постов ---
     private lazy var postsCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
-        // Настраиваем layout для сетки
         let spacing: CGFloat = 1
-        let itemsPerRow: CGFloat = 3
-        let totalSpacing = (itemsPerRow - 1) * spacing
-        let itemWidth = (view.bounds.width - totalSpacing) / itemsPerRow
-        let itemHeight = itemWidth * (16 / 9.0) // Используем 9.0 для деления с плавающей точкой
-        layout.itemSize = CGSize(width: itemWidth, height: itemHeight) // Устанавливаем новый размер
         layout.minimumInteritemSpacing = spacing
         layout.minimumLineSpacing = spacing
         layout.scrollDirection = .vertical
@@ -236,10 +238,9 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.backgroundColor = .clear
-        // Регистрируем ячейку
         collectionView.register(PostGridCell.self, forCellWithReuseIdentifier: PostGridCell.identifier)
-        collectionView.dataSource = self // Устанавливаем dataSource
-        collectionView.delegate = self   // Устанавливаем delegate (для FlowLayout и нажатий)
+        collectionView.dataSource = self
+        collectionView.delegate = self // Устанавливаем delegate для FlowLayout
         return collectionView
     }()
 
@@ -264,18 +265,22 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .black // Фон как в макете
+        view.backgroundColor = .black
         setupViews()
         setupConstraints()
-        setupBindings() // <-- Вызываем настройку биндингов
+        setupBindings()
+        // Устанавливаем contentInset ПОСЛЕ настройки констрейнтов
+        setupContentInset()
     }
 
     // MARK: - Setup UI
 
     private func setupViews() {
-        // Добавляем сначала wrapper
-        view.addSubview(contentWrapperView)
-        // Добавляем все остальные элементы ВНУТРЬ wrapper
+        // Добавляем scrollView, затем wrapper внутрь него
+        view.addSubview(scrollView)
+        scrollView.addSubview(contentWrapperView)
+        
+        // Остальные элементы добавляем в wrapper
         contentWrapperView.addSubview(profileHeaderView)
         contentWrapperView.addSubview(usernameLabel)
         contentWrapperView.addSubview(statusLabel)
@@ -288,10 +293,7 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
         profileHeaderView.addSubview(avatarImageView)
         profileHeaderView.addSubview(statsStackView)
         
-        // Добавляем кнопки в стек действий
-        // Пока добавим обе: Edit и New Post
-        actionButtonsStackView.addArrangedSubview(editProfileButton)
-        actionButtonsStackView.addArrangedSubview(newPostButton) 
+        // Кнопки будут добавлены в configureActionButtons
     }
 
     private func setupConstraints() {
@@ -299,21 +301,24 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
         let containerWidthMultiplier: CGFloat = 0.86
         
         NSLayoutConstraint.activate([
-            // Констрейнты для contentWrapperView (86% ширины, центрирован, прижат к safe area)
-            contentWrapperView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            contentWrapperView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            contentWrapperView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: containerWidthMultiplier),
-            contentWrapperView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            // Констрейнты для scrollView (на весь экран ViewController)
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+
+            // Констрейнты для contentWrapperView (86% ширины, центрирован, прижат к scrollView.contentLayoutGuide)
+            contentWrapperView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentWrapperView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            contentWrapperView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, multiplier: containerWidthMultiplier),
+            contentWrapperView.centerXAnchor.constraint(equalTo: scrollView.contentLayoutGuide.centerXAnchor),
 
             // --- Констрейнты ВНУТРИ contentWrapperView --- 
-            
-            // Шапка (прижата к верху wrapper, ширина = ширине wrapper)
             profileHeaderView.topAnchor.constraint(equalTo: contentWrapperView.topAnchor),
             profileHeaderView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor),
             profileHeaderView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor),
             profileHeaderView.heightAnchor.constraint(equalToConstant: 100),
             
-            // Аватар и Статы внутри шапки (без изменений, они уже привязаны к profileHeaderView)
             avatarImageView.leadingAnchor.constraint(equalTo: profileHeaderView.leadingAnchor, constant: padding),
             avatarImageView.centerYAnchor.constraint(equalTo: profileHeaderView.centerYAnchor),
             avatarImageView.widthAnchor.constraint(equalToConstant: 80),
@@ -322,45 +327,47 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
             statsStackView.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding),
             statsStackView.centerYAnchor.constraint(equalTo: profileHeaderView.centerYAnchor),
             
-            // Имя пользователя (под шапкой, отступы внутри wrapper)
             usernameLabel.topAnchor.constraint(equalTo: profileHeaderView.bottomAnchor, constant: 10),
             usernameLabel.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: padding),
             usernameLabel.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -padding),
             
-            // Статус (под именем, отступы внутри wrapper)
             statusLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 4),
             statusLabel.leadingAnchor.constraint(equalTo: usernameLabel.leadingAnchor),
             statusLabel.trailingAnchor.constraint(equalTo: usernameLabel.trailingAnchor),
             
-            // Стек кнопок (под статусом, отступы внутри wrapper)
             actionButtonsStackView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 10),
             actionButtonsStackView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: padding),
             actionButtonsStackView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -padding),
             actionButtonsStackView.heightAnchor.constraint(equalToConstant: 30),
             
-            // Segmented Control (под кнопками, отступы внутри wrapper)
             contentSegmentedControl.topAnchor.constraint(equalTo: actionButtonsStackView.bottomAnchor, constant: padding),
             contentSegmentedControl.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: padding),
             contentSegmentedControl.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -padding),
             
-            // Сетка постов (под Segmented Control, до кнопки выхода, ширина = ширине wrapper)
             postsCollectionView.topAnchor.constraint(equalTo: contentSegmentedControl.bottomAnchor, constant: padding),
             postsCollectionView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor),
             postsCollectionView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor),
             postsCollectionView.bottomAnchor.constraint(equalTo: signOutButton.topAnchor, constant: -padding),
             
-            // Placeholder для программ (там же, где и сетка)
             programsPlaceholderView.topAnchor.constraint(equalTo: postsCollectionView.topAnchor),
             programsPlaceholderView.leadingAnchor.constraint(equalTo: postsCollectionView.leadingAnchor),
             programsPlaceholderView.trailingAnchor.constraint(equalTo: postsCollectionView.trailingAnchor),
             programsPlaceholderView.bottomAnchor.constraint(equalTo: postsCollectionView.bottomAnchor),
 
-            // Кнопка Выхода (внизу wrapper)
             signOutButton.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: padding),
             signOutButton.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -padding),
-            signOutButton.bottomAnchor.constraint(equalTo: contentWrapperView.bottomAnchor, constant: -10),
-            signOutButton.heightAnchor.constraint(equalToConstant: 44)
+            signOutButton.bottomAnchor.constraint(equalTo: contentWrapperView.bottomAnchor, constant: -10.0),
+            signOutButton.heightAnchor.constraint(equalToConstant: 44.0)
         ])
+    }
+    
+    // Новый метод для установки contentInset
+    private func setupContentInset() {
+        // Используем CGFloat литералы для расчета
+        let topInset = 80.0 + 70.0 + 10.0 
+        scrollView.contentInset = UIEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
+        scrollView.scrollIndicatorInsets = UIEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
+        scrollView.contentOffset = CGPoint(x: 0, y: -topInset)
     }
     
     // MARK: - Bindings
@@ -632,40 +639,21 @@ class UserProfileFeedViewController: UIViewController, UICollectionViewDataSourc
 
     // MARK: - CreatePostViewControllerDelegate
 
-    func didFinishCreatingPost(_ controller: CreatePostViewController) {
-        print("CreatePostViewController finished creating post.")
-        controller.dismiss(animated: true) {
-            // Обновляем все данные пользователя после создания поста
-            self.viewModel.fetchAllUserData() 
-            print("CreatePostViewController dismissed. (Finished & Reloading profile data)")
-        }
-    }
-
-    func didCancelCreatingPost(_ controller: CreatePostViewController) {
-        print("CreatePostViewController cancelled.")
-        controller.dismiss(animated: true) {
-            print("CreatePostViewController dismissed. (Cancelled)")
-        }
-    }
-
     // Вспомогательный Alert для теста (можно удалить или оставить для других нужд)
     private func showAlert(title: String, message: String) {
          let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
          alert.addAction(UIAlertAction(title: "OK", style: .default))
          present(alert, animated: true)
      }
-     
-    // TODO: Actions для Follow/Message
 }
 
 // MARK: - UICollectionViewDataSource
+extension UserProfileFeedViewController: UICollectionViewDataSource {
 
-extension UserProfileFeedViewController {
-    
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return viewModel.userPosts.count
     }
-    
+
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PostGridCell.identifier, for: indexPath) as? PostGridCell else {
             fatalError("Unable to dequeue PostGridCell")
@@ -677,35 +665,64 @@ extension UserProfileFeedViewController {
 }
 
 // MARK: - UICollectionViewDelegateFlowLayout
-
-// Delegate нужен, чтобы FlowLayout работал корректно (размеры и отступы)
-// Конкретные методы для этого layout не требуются, т.к. все задано в init
-// extension UserProfileFeedViewController: UICollectionViewDelegateFlowLayout {}
+extension UserProfileFeedViewController: UICollectionViewDelegateFlowLayout {
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        let layout = collectionViewLayout as! UICollectionViewFlowLayout
+        let spacing = layout.minimumInteritemSpacing
+        let itemsPerRow: CGFloat = 3
+        let totalSpacing = (itemsPerRow - 1) * spacing
+        // Используем ширину CollectionView (которая ограничена contentWrapperView)
+        let itemWidth = (collectionView.bounds.width - totalSpacing) / itemsPerRow
+        // Рассчитываем высоту 16:9
+        let itemHeight = itemWidth * (16.0 / 9.0)
+        return CGSize(width: itemWidth, height: itemHeight)
+    }
+}
 
 // MARK: - UICollectionViewDelegate
-
 extension UserProfileFeedViewController: UICollectionViewDelegate {
+    
+    
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let selectedPost = viewModel.userPosts[indexPath.item]
         print("UserProfileFeedViewController: Выбран пост с ID: \(selectedPost.id ?? "N/A"), индекс: \(indexPath.item)")
-        print("UserProfileFeedViewController: Всего постов: \(viewModel.userPosts.count)")
-        
-        // Проверяем содержимое массива
-        for (index, post) in viewModel.userPosts.enumerated() {
-            print("UserProfileFeedViewController: Пост #\(index): ID=\(post.id ?? "nil"), URL=\(post.imageURL)")
-        }
-        
-        // Вызываем метод координатора для показа постов в полноэкранном просмотре
-        // Пытаемся привести делегата к нужному типу координатора
+
+        // Пытаемся получить координатора через свойство delegate
         if let coordinator = delegate as? CurrentUserProfileCoordinator {
             print("UserProfileFeedViewController: Вызываем coordinator.showUserPostScroll")
             coordinator.showUserPostScroll(posts: viewModel.userPosts, startIndex: indexPath.item)
-        } else if let coordinator = self.parent?.parent as? UserProfileCoordinator { // Пытаемся получить координатор из родительского контейнера
-             print("UserProfileFeedViewController: Вызываем coordinator.showUserPostScroll (via parent)")
-            // TODO: Нужен способ передать userID в UserProfileCoordinator
-            // coordinator.showUserPostScroll(forUserID: viewModel.userID, posts: viewModel.userPosts, startIndex: indexPath.item)
+        }
+        // Пытаемся получить координатора через иерархию view controller'ов (если delegate не установлен или имеет другой тип)
+        else if let containerCoordinator = self.parent?.parent as? UserProfileCoordinator {
+             print("UserProfileFeedViewController: Вызываем coordinator.showUserPostScroll (via parent container)")
+             // В этом сценарии UserProfileCoordinator уже знает userID
+             // containerCoordinator.showUserPostScroll(posts: viewModel.userPosts, startIndex: indexPath.item)
+             // TODO: Уточнить, как UserProfileCoordinator должен получать посты и индекс для этого сценария
         } else {
-            print("UserProfileFeedViewController: ОШИБКА - не удалось получить координатора")
+            print("UserProfileFeedViewController: ОШИБКА - не удалось получить координатора для навигации на UserPostScroll")
         }
     }
-} 
+}
+
+// MARK: - CreatePostViewControllerDelegate
+// Реализация делегата находится в extension для лучшей организации
+extension UserProfileFeedViewController: CreatePostViewControllerDelegate {
+
+    func didFinishCreatingPost(_ controller: CreatePostViewController) {
+        print("CreatePostViewController finished creating post.")
+        controller.dismiss(animated: true) {
+            // Обновляем все данные пользователя после создания поста
+            // Убедитесь, что ваш ViewModel имеет этот метод или аналогичный
+            self.viewModel.fetchAllUserData()
+            print("CreatePostViewController dismissed. (Finished & Reloading profile data)")
+        }
+    }
+
+    func didCancelCreatingPost(_ controller: CreatePostViewController) {
+        print("CreatePostViewController cancelled.")
+        controller.dismiss(animated: true) {
+            print("CreatePostViewController dismissed. (Cancelled)")
+        }
+    }
+
+} // Конец extension

@@ -117,27 +117,25 @@ class UserProfileContainerViewController: UIViewController {
     
     // MARK: - Child VC Management
     private func displayChildViewController(_ childVC: UIViewController) {
-        // Удаляем предыдущий дочерний контроллер
         if let currentChild = currentChildVC {
             currentChild.willMove(toParent: nil)
             currentChild.view.removeFromSuperview()
             currentChild.removeFromParent()
         }
         
-        // Добавляем новый дочерний контроллер
         addChild(childVC)
         view.addSubview(childVC.view)
         childVC.view.translatesAutoresizingMaskIntoConstraints = false
         
-        // Устанавливаем констрейнты
+        // Возвращаем констрейнты: дочерний VC снова на весь экран
         NSLayoutConstraint.activate([
-            childVC.view.topAnchor.constraint(equalTo: view.topAnchor), // Растягиваем на весь экран
+            childVC.view.topAnchor.constraint(equalTo: view.topAnchor), 
             childVC.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             childVC.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             childVC.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         
-        // Помещаем topMenuView поверх дочернего контроллера
+        // Возвращаем TopMenuView на передний план
         view.bringSubviewToFront(topMenuView)
         
         childVC.didMove(toParent: self)

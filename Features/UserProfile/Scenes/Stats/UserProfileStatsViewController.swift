@@ -51,8 +51,7 @@ class UserProfileStatsViewController: UIViewController {
         xAxis.labelTextColor = .label
         xAxis.xOffset = 0
         xAxis.yOffset = 0
-        // Используем self
-        xAxis.valueFormatter = self 
+        xAxis.valueFormatter = self
 
         let yAxis = chartView.yAxis
         yAxis.labelFont = .systemFont(ofSize: 9, weight: .light)
@@ -61,8 +60,7 @@ class UserProfileStatsViewController: UIViewController {
         yAxis.axisMaximum = 100
         yAxis.drawLabelsEnabled = true
         yAxis.labelTextColor = .secondaryLabel
-        // Используем стандартный форматер для целых чисел
-        yAxis.valueFormatter = DefaultAxisValueFormatter(decimals: 0)
+        yAxis.valueFormatter = YAxisValueFormatter()
 
         return chartView
     }()
@@ -133,7 +131,7 @@ class UserProfileStatsViewController: UIViewController {
         setupViews()
         setupConstraints()
         setupBindings()
-        // viewModel.fetchStats() // VM загружает данные в init
+        setupContentInset()
     }
 
     // MARK: - Setup UI
@@ -163,20 +161,19 @@ class UserProfileStatsViewController: UIViewController {
          let containerPadding: CGFloat = 15
          let verticalSpacing: CGFloat = 15
          let chartPadding: CGFloat = 10
+         let containerWidthMultiplier: CGFloat = 0.86
 
          NSLayoutConstraint.activate([
-             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
              scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
              scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-             scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
 
              contentWrapperView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-             contentWrapperView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
-             contentWrapperView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
              contentWrapperView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-             contentWrapperView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
+             contentWrapperView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, multiplier: containerWidthMultiplier),
+             contentWrapperView.centerXAnchor.constraint(equalTo: scrollView.contentLayoutGuide.centerXAnchor),
 
-             // --- Констрейнты внутри contentWrapperView ---
              radarChartView.topAnchor.constraint(equalTo: contentWrapperView.topAnchor, constant: verticalSpacing),
              radarChartView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: chartPadding),
              radarChartView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -chartPadding),
@@ -185,6 +182,7 @@ class UserProfileStatsViewController: UIViewController {
              infoContainerView.topAnchor.constraint(equalTo: radarChartView.bottomAnchor, constant: verticalSpacing * 1.5),
              infoContainerView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: sidePadding),
              infoContainerView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -sidePadding),
+             infoContainerView.bottomAnchor.constraint(equalTo: attributesStackView.bottomAnchor, constant: containerPadding),
 
              usernameLabel.topAnchor.constraint(equalTo: infoContainerView.topAnchor, constant: containerPadding),
              usernameLabel.leadingAnchor.constraint(equalTo: infoContainerView.leadingAnchor, constant: containerPadding),
@@ -197,7 +195,6 @@ class UserProfileStatsViewController: UIViewController {
              attributesStackView.topAnchor.constraint(equalTo: rankLabel.bottomAnchor, constant: containerPadding),
              attributesStackView.leadingAnchor.constraint(equalTo: infoContainerView.leadingAnchor, constant: containerPadding),
              attributesStackView.trailingAnchor.constraint(equalTo: infoContainerView.trailingAnchor, constant: -containerPadding),
-             attributesStackView.bottomAnchor.constraint(equalTo: infoContainerView.bottomAnchor, constant: -containerPadding),
 
              levelLabel.topAnchor.constraint(equalTo: infoContainerView.bottomAnchor, constant: verticalSpacing),
              levelLabel.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: sidePadding),
@@ -212,7 +209,6 @@ class UserProfileStatsViewController: UIViewController {
              xpLabel.trailingAnchor.constraint(equalTo: levelLabel.trailingAnchor),
              xpLabel.bottomAnchor.constraint(equalTo: contentWrapperView.bottomAnchor, constant: -verticalSpacing),
 
-             // Activity Indicator и Error Label
              activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
              activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
 
@@ -230,11 +226,9 @@ class UserProfileStatsViewController: UIViewController {
             return
         }
 
-        // Подписка на данные прогресса
         viewModel.$progressData
             .receive(on: DispatchQueue.main)
             .sink { [weak self] progressData in 
-                // Отображаем данные прогресса, если они есть
                 if let data = progressData {
                      self?.updateProgressUI(with: data)
                      self?.updateRadarChart(with: data.attributes)
@@ -242,22 +236,18 @@ class UserProfileStatsViewController: UIViewController {
             }
             .store(in: &cancellables)
             
-        // Подписка на данные пользователя
         viewModel.$userProfile
             .receive(on: DispatchQueue.main)
             .sink { [weak self] user in
-                // Отображаем имя пользователя, если оно есть
                 self?.updateUserUI(with: user)
             }
             .store(in: &cancellables)
 
-        // Объединяем состояния isLoading и errorMessage для управления UI
         Publishers.CombineLatest(viewModel.$isLoading, viewModel.$errorMessage)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isLoading, errorMessage in
                 guard let self = self else { return }
                 
-                // Скрываем ошибку при начале загрузки
                 if isLoading { self.errorLabel.isHidden = true }
                 
                 self.activityIndicator.isHidden = !isLoading
@@ -265,16 +255,14 @@ class UserProfileStatsViewController: UIViewController {
                 
                 let hasError = errorMessage != nil
                 self.errorLabel.text = errorMessage
-                self.errorLabel.isHidden = !hasError || isLoading // Не показываем ошибку во время загрузки
+                self.errorLabel.isHidden = !hasError || isLoading
                 
-                // Скрываем контент при загрузке или ошибке
                 self.scrollView.isHidden = isLoading || hasError
             }
             .store(in: &cancellables)
     }
 
     // MARK: - UI Update Logic
-    // Разделяем обновление UI
     private func updateProgressUI(with data: ProgressData) {
         rankLabel.text = "Ранг: \(data.rank)"
         levelLabel.text = "Уровень: \(data.level)"
@@ -293,7 +281,7 @@ class UserProfileStatsViewController: UIViewController {
     
     private func updateUserUI(with user: User?) {
         usernameLabel.text = user?.username ?? "-"
-        usernameLabel.isHidden = (user == nil) // Скрываем, если нет пользователя
+        usernameLabel.isHidden = (user == nil)
     }
 
     // MARK: - Radar Chart Update Logic
@@ -323,8 +311,6 @@ class UserProfileStatsViewController: UIViewController {
         let data = RadarChartData(dataSets: [dataSet])
 
         radarChartView.data = data
-        // УДАЛЯЕМ ПОВТОРНОЕ ПРИСВАИВАНИЕ ФОРМАТЕРА
-        // radarChartView.xAxis.valueFormatter = XAxisValueFormatter()
         radarChartView.xAxis.axisMinimum = 0
         radarChartView.xAxis.axisMaximum = Double(sortedAttributeTypes.count - 1)
         radarChartView.xAxis.setLabelCount(sortedAttributeTypes.count, force: true)
@@ -387,10 +373,16 @@ class UserProfileStatsViewController: UIViewController {
             activityIndicator.isHidden = true
         }
     }
+
+    private func setupContentInset() {
+        let topInset = 80.0 + 70.0 + 10.0 
+        scrollView.contentInset = UIEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
+        scrollView.scrollIndicatorInsets = UIEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
+        scrollView.contentOffset = CGPoint(x: 0, y: -topInset)
+    }
 }
 
 // MARK: - AxisFormatters
-// ВОССТАНАВЛИВАЕМ extension и класс YAxisValueFormatter с правильным протоколом
 extension UserProfileStatsViewController: AxisValueFormatter {
     func stringForValue(_ value: Double, axis: AxisBase?) -> String {
         let index = Int(value) % AttributeType.allCases.count
