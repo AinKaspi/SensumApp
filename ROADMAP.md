@@ -33,6 +33,13 @@
 - [x] `[P1.FND.3]` Реализация основной структуры UI: `UITabBarController` (5 табов), `UINavigationController` для каждого таба.
 - [~] `[P1.FND.4]` Реализация базовой `UINavigationBar` с логотипом "DOJO". *(Логотип реализован в кастомном TopMenuView в FeedViewController, не в стандартном UINavigationBar)*.
 
+### Тема: UI Исправления (Фаза 1) [UIFIX]
+- [x] `[P1.UIFIX.1]` Исправлено отображение логотипа DOJO в FeedViewController (полная ширина topBar).
+- [x] `[P1.UIFIX.2]` Исправлено масштабирование аватара (`.scaleAspectFill`) и ширина нижней панели (100%) в UserProfileCardViewController.
+- [x] `[P1.UIFIX.3]` Исправлен layout (смещение контента) в UserProfileFeedViewController (констрейнт ширины для contentWrapperView).
+- [x] `[P1.UIFIX.4]` Исправлен layout (позиционирование) в UserProfileStatsViewController (констрейнты для containerView).
+- [x] `[P1.UIFIX.5]` Исправлен layout в табе Person (использует UserProfileFeedViewController, исправленный в P1.UIFIX.3).
+
 ### Тема: Общее Ядро (Core) [COR]
 - [x] `[P1.COR.1]` Определение базовых Моделей Данных: `User`, `Post`, `Exercise`, `ProgressData` (с полями `level`, `currentXP`, `xpToNextLevel`, `rank`, `attributes: [Attribute]`). *(Модели User, Post, Exercise, ProgressData, Attribute определены)*.
 - [x] `[P1.COR.2]` Реализация базовых Core Services (протоколы + начальная имплементация): `AuthService`, `UserProfileService`, `PostService`, `StorageService`, `ProgressService`. *(Auth, UserProfile, Post, Storage, Progress реализованы. Конфликт с DataManager устранен. `FollowService` из Фазы 2 также реализован)*. 

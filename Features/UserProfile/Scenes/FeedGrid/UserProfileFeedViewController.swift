@@ -17,7 +17,8 @@ protocol UserProfileFeedViewControllerDelegate: AnyObject {
 
 // Обновляем: используем PHPickerViewControllerDelegate и добавляем CreatePostViewControllerDelegate
 // Убираем лишние протоколы из объявления класса, они будут в extensions
-class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDelegate {
+// Consolidated protocol conformances here
+class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDelegate, CreatePostViewControllerDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
 
     // Добавляем ViewModel
     var viewModel: UserProfileFeedViewModel! // Используем !, т.к. он будет инжектирован координатором
@@ -263,6 +264,31 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         return view
     }()
 
+    // Add missing UI elements
+    private lazy var activityIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .large)
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.color = .white
+        indicator.hidesWhenStopped = true
+        return indicator
+    }()
+
+    private lazy var errorLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.textColor = .systemRed
+        label.font = .systemFont(ofSize: 16, weight: .medium)
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.isHidden = true // Hidden by default
+        return label
+    }()
+
+    // Moved height constraint property inside the class
+    private lazy var collectionViewHeightConstraint: NSLayoutConstraint = {
+        postsCollectionView.heightAnchor.constraint(equalToConstant: 0) // Начальная высота 0
+    }()
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
@@ -274,100 +300,146 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     }
 
     // MARK: - Setup UI
-
     private func setupViews() {
-        // Добавляем scrollView, затем wrapper внутрь него
         view.addSubview(scrollView)
         scrollView.addSubview(contentWrapperView)
-        
-        // Остальные элементы добавляем в wrapper
+
+        // Добавляем элементы шапки в contentWrapperView
         contentWrapperView.addSubview(profileHeaderView)
-        contentWrapperView.addSubview(usernameLabel)
-        contentWrapperView.addSubview(statusLabel)
-        contentWrapperView.addSubview(actionButtonsStackView)
-        contentWrapperView.addSubview(contentSegmentedControl)
-        contentWrapperView.addSubview(postsCollectionView) 
-        contentWrapperView.addSubview(programsPlaceholderView)
-        contentWrapperView.addSubview(signOutButton)
-        
+        // Элементы ДОЛЖНЫ добавляться в profileHeaderView, а не напрямую в contentWrapperView
         profileHeaderView.addSubview(avatarImageView)
         profileHeaderView.addSubview(statsStackView)
-        
-        // Кнопки будут добавлены в configureActionButtons
+        profileHeaderView.addSubview(usernameLabel)
+        profileHeaderView.addSubview(statusLabel)
+        profileHeaderView.addSubview(actionButtonsStackView)
+        // Добавляем кнопки в стек
+        configureActionButtons(isCurrentUser: self.viewModel.isCurrentUser) // Этот метод добавит кнопки в actionButtonsStackView
+
+        // Добавляем Segmented Control в contentWrapperView
+        contentWrapperView.addSubview(contentSegmentedControl)
+
+        // Добавляем CollectionView в contentWrapperView ПОД шапкой
+        contentWrapperView.addSubview(postsCollectionView)
+
+        // Добавляем Placeholder View для вкладки Programs
+        contentWrapperView.addSubview(programsPlaceholderView)
+
+        // Добавляем индикатор загрузки и сообщение об ошибке поверх всего scrollView
+        view.addSubview(activityIndicator)
+        view.addSubview(errorLabel)
     }
 
     private func setupConstraints() {
-        let padding: CGFloat = 15
-        let containerWidthMultiplier: CGFloat = 0.86
-        
+        let padding: CGFloat = 16
+        let statsSpacing: CGFloat = 5
+        let avatarSize: CGFloat = 80 // Явно задаем размер аватара
+
+        // ScrollView и ContentWrapperView
         NSLayoutConstraint.activate([
-            // Констрейнты для scrollView (на весь экран ViewController)
-            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
 
-            // Констрейнты для contentWrapperView (86% ширины, центрирован, прижат к scrollView.contentLayoutGuide)
             contentWrapperView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentWrapperView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentWrapperView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
             contentWrapperView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            contentWrapperView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, multiplier: containerWidthMultiplier),
-            contentWrapperView.centerXAnchor.constraint(equalTo: scrollView.contentLayoutGuide.centerXAnchor),
+            contentWrapperView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor) // Ширина равна ширине scrollView
+        ])
 
-            // --- Констрейнты ВНУТРИ contentWrapperView --- 
+        // Элементы в profileHeaderView
+        NSLayoutConstraint.activate([
             profileHeaderView.topAnchor.constraint(equalTo: contentWrapperView.topAnchor),
             profileHeaderView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor),
             profileHeaderView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor),
-            profileHeaderView.heightAnchor.constraint(equalToConstant: 100),
-            
+            // Нижний край profileHeaderView будет определяться его содержимым
+
+            // Аватар
+            avatarImageView.topAnchor.constraint(equalTo: profileHeaderView.topAnchor, constant: padding),
             avatarImageView.leadingAnchor.constraint(equalTo: profileHeaderView.leadingAnchor, constant: padding),
-            avatarImageView.centerYAnchor.constraint(equalTo: profileHeaderView.centerYAnchor),
-            avatarImageView.widthAnchor.constraint(equalToConstant: 80),
-            avatarImageView.heightAnchor.constraint(equalToConstant: 80),
+            avatarImageView.widthAnchor.constraint(equalToConstant: avatarSize), // Явная ширина
+            avatarImageView.heightAnchor.constraint(equalToConstant: avatarSize), // Явная высота
+
+            // Стек статов
+            statsStackView.centerYAnchor.constraint(equalTo: avatarImageView.centerYAnchor),
             statsStackView.leadingAnchor.constraint(equalTo: avatarImageView.trailingAnchor, constant: padding),
             statsStackView.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding),
-            statsStackView.centerYAnchor.constraint(equalTo: profileHeaderView.centerYAnchor),
-            
-            usernameLabel.topAnchor.constraint(equalTo: profileHeaderView.bottomAnchor, constant: 10),
-            usernameLabel.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: padding),
-            usernameLabel.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -padding),
-            
+            statsStackView.heightAnchor.constraint(lessThanOrEqualTo: avatarImageView.heightAnchor), // Ограничиваем высоту статов
+
+            // Имя пользователя
+            usernameLabel.topAnchor.constraint(equalTo: avatarImageView.bottomAnchor, constant: padding * 0.75),
+            usernameLabel.leadingAnchor.constraint(equalTo: profileHeaderView.leadingAnchor, constant: padding),
+            usernameLabel.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding),
+
+            // Статус
             statusLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 4),
             statusLabel.leadingAnchor.constraint(equalTo: usernameLabel.leadingAnchor),
             statusLabel.trailingAnchor.constraint(equalTo: usernameLabel.trailingAnchor),
-            
-            actionButtonsStackView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 10),
-            actionButtonsStackView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: padding),
-            actionButtonsStackView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -padding),
-            actionButtonsStackView.heightAnchor.constraint(equalToConstant: 30),
-            
-            contentSegmentedControl.topAnchor.constraint(equalTo: actionButtonsStackView.bottomAnchor, constant: padding),
+
+            // Стек кнопок действий
+            actionButtonsStackView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: padding),
+            actionButtonsStackView.leadingAnchor.constraint(equalTo: profileHeaderView.leadingAnchor, constant: padding),
+            actionButtonsStackView.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding),
+            // Привязываем низ хедера к низу стека кнопок
+            profileHeaderView.bottomAnchor.constraint(equalTo: actionButtonsStackView.bottomAnchor, constant: padding)
+        ])
+
+        // Сегментный контрол и CollectionView
+        NSLayoutConstraint.activate([
+            contentSegmentedControl.topAnchor.constraint(equalTo: profileHeaderView.bottomAnchor, constant: padding),
             contentSegmentedControl.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: padding),
             contentSegmentedControl.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -padding),
-            
+
+            // CollectionView
             postsCollectionView.topAnchor.constraint(equalTo: contentSegmentedControl.bottomAnchor, constant: padding),
             postsCollectionView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor),
             postsCollectionView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor),
-            postsCollectionView.bottomAnchor.constraint(equalTo: signOutButton.topAnchor, constant: -padding),
-            
-            programsPlaceholderView.topAnchor.constraint(equalTo: postsCollectionView.topAnchor),
-            programsPlaceholderView.leadingAnchor.constraint(equalTo: postsCollectionView.leadingAnchor),
-            programsPlaceholderView.trailingAnchor.constraint(equalTo: postsCollectionView.trailingAnchor),
-            programsPlaceholderView.bottomAnchor.constraint(equalTo: postsCollectionView.bottomAnchor),
+            // Важно: Привязываем низ CollectionView к низу contentWrapperView
+            // Это позволит contentWrapperView растягиваться по высоте контента
+            postsCollectionView.bottomAnchor.constraint(equalTo: contentWrapperView.bottomAnchor, constant: -padding),
+            // Добавляем констрейнт высоты для CollectionView, который будет обновляться
+            collectionViewHeightConstraint
+        ])
 
-            signOutButton.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: padding),
-            signOutButton.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -padding),
-            signOutButton.bottomAnchor.constraint(equalTo: contentWrapperView.bottomAnchor, constant: -10.0),
-            signOutButton.heightAnchor.constraint(equalToConstant: 44.0)
+        // Placeholder для Programs
+        NSLayoutConstraint.activate([
+            programsPlaceholderView.topAnchor.constraint(equalTo: contentSegmentedControl.bottomAnchor, constant: padding),
+            programsPlaceholderView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor),
+            programsPlaceholderView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor),
+            programsPlaceholderView.bottomAnchor.constraint(equalTo: contentWrapperView.bottomAnchor, constant: -padding) // Также привязываем к низу
+        ])
+
+        // Кнопка выхода (если она нужна вне хедера)
+        // Если кнопка выхода должна быть всегда видна внизу, ее нужно добавлять в view, а не в scrollView
+        // Если она должна скроллиться, то ее место в contentWrapperView
+        // Пока оставим ее привязку к низу contentWrapperView для скроллинга
+        // NSLayoutConstraint.activate([
+        //     signOutButton.topAnchor.constraint(greaterThanOrEqualTo: postsCollectionView.bottomAnchor, constant: padding * 2), // Отступ сверху
+        //     signOutButton.centerXAnchor.constraint(equalTo: contentWrapperView.centerXAnchor),
+        //     signOutButton.bottomAnchor.constraint(equalTo: contentWrapperView.bottomAnchor, constant: -padding * 2) // Отступ снизу
+        // ])
+
+        // Индикатор загрузки и ошибка (поверх scrollView)
+        NSLayoutConstraint.activate([
+            activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+
+            errorLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            errorLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            errorLabel.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: padding),
+            errorLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -padding)
         ])
     }
-    
+
     // Новый метод для установки contentInset
     private func setupContentInset() {
-        // Используем CGFloat литералы для расчета
-        let topInset = 80.0 + 70.0 + 10.0 
+        // Рассчитываем отступ: Высота TopMenu (55) + Отступ TopMenu от Safe Area (15) + Дополнительный зазор (10)
+        let topInset: CGFloat = 55.0 + 15.0 + 10.0 // Итого = 80
         scrollView.contentInset = UIEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
         scrollView.scrollIndicatorInsets = UIEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
-        scrollView.contentOffset = CGPoint(x: 0, y: -topInset)
+        // Начальное смещение ставим в 0, чтобы не было пустого места сверху при первой загрузке
+        scrollView.contentOffset = CGPoint(x: 0, y: 0)
     }
     
     // MARK: - Bindings
@@ -399,7 +471,8 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
                         placeholder: placeholder, 
                         options: [
                             .transition(.fade(0.2)),
-                            .cacheOriginalImage
+                            .cacheOriginalImage,
+                            .onFailureImage(UIImage(named: "default_avatar")?.withTintColor(.darkGray))
                         ],
                         completionHandler: { result in
                             switch result {
@@ -407,14 +480,14 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
                                 print("Kingfisher: Image loaded successfully from \(value.source.url?.absoluteString ?? "N/A")")
                             case .failure(let error):
                                 print("Kingfisher Error: Failed to load image - \(error.localizedDescription)")
-                                self.avatarImageView.image = placeholder 
-                                self.avatarImageView.tintColor = .darkGray
+                                self.avatarImageView.image = placeholder
+                                self.avatarImageView.contentMode = .scaleAspectFit // Может быть лучше для плейсхолдера
                             }
                         }
                     )
                 } else {
                     self.avatarImageView.image = placeholder
-                    self.avatarImageView.tintColor = .darkGray 
+                    self.avatarImageView.contentMode = .scaleAspectFit // Может быть лучше для плейсхолдера
                 }
                 
                 // Настраиваем кнопки в зависимости от isCurrentUser
@@ -645,10 +718,39 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
          alert.addAction(UIAlertAction(title: "OK", style: .default))
          present(alert, animated: true)
      }
+
+    // MARK: - CollectionView Height Calculation (Moved inside class)
+
+    // Метод для обновления высоты CollectionView
+    private func updateCollectionViewHeight() {
+        // Пересчитываем высоту контента CollectionView
+        postsCollectionView.layoutIfNeeded() // Убедимся, что layout актуален
+        let contentHeight = postsCollectionView.collectionViewLayout.collectionViewContentSize.height
+
+        // Обновляем констрейнт высоты
+        // Use a reasonable minimum height, maybe related to one row? Calculate based on sizeForItemAt?
+        // For now, keep the previous logic or a fixed minimum. Let's stick to the previous minimum.
+        collectionViewHeightConstraint.constant = max(contentHeight, 200) // Минимальная высота, чтобы не схлопывался
+
+        // Анимируем изменение высоты (опционально)
+        // UIView.animate(withDuration: 0.3) {
+        //     self.view.layoutIfNeeded()
+        // }
+        print("Updated CollectionView height constraint to: \(collectionViewHeightConstraint.constant)")
+    }
+
+    // Вызываем обновление высоты после перезагрузки данных
+    // Moved inside class
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Обновляем высоту после того, как bounds станут известны
+        // Делаем это здесь, а не в reloadData, чтобы учесть изменения layout
+        updateCollectionViewHeight()
+    }
 }
 
 // MARK: - UICollectionViewDataSource
-extension UserProfileFeedViewController: UICollectionViewDataSource {
+extension UserProfileFeedViewController {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return viewModel.userPosts.count
@@ -665,7 +767,7 @@ extension UserProfileFeedViewController: UICollectionViewDataSource {
 }
 
 // MARK: - UICollectionViewDelegateFlowLayout
-extension UserProfileFeedViewController: UICollectionViewDelegateFlowLayout {
+extension UserProfileFeedViewController {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let layout = collectionViewLayout as! UICollectionViewFlowLayout
         let spacing = layout.minimumInteritemSpacing
@@ -680,7 +782,7 @@ extension UserProfileFeedViewController: UICollectionViewDelegateFlowLayout {
 }
 
 // MARK: - UICollectionViewDelegate
-extension UserProfileFeedViewController: UICollectionViewDelegate {
+extension UserProfileFeedViewController {
     
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
@@ -706,7 +808,7 @@ extension UserProfileFeedViewController: UICollectionViewDelegate {
 
 // MARK: - CreatePostViewControllerDelegate
 // Реализация делегата находится в extension для лучшей организации
-extension UserProfileFeedViewController: CreatePostViewControllerDelegate {
+extension UserProfileFeedViewController {
 
     func didFinishCreatingPost(_ controller: CreatePostViewController) {
         print("CreatePostViewController finished creating post.")

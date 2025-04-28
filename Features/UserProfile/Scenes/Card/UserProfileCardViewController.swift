@@ -45,7 +45,7 @@ class UserProfileCardViewController: UIViewController, UIImagePickerControllerDe
     private lazy var backgroundImageView: UIImageView = {
         let imageView = UIImageView()
         imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.contentMode = .scaleAspectFill
+        imageView.contentMode = .scaleAspectFill // <-- Изменено на .scaleAspectFill
         imageView.clipsToBounds = true
         imageView.backgroundColor = .darkGray // Placeholder
         imageView.isUserInteractionEnabled = true
@@ -61,9 +61,10 @@ class UserProfileCardViewController: UIViewController, UIImagePickerControllerDe
         gradientLayer.locations = [0.0, 0.4, 1.0] // Примерные точки градиента
         // Важно: Frame градиента нужно будет обновить в viewDidLayoutSubviews
         view.layer.insertSublayer(gradientLayer, at: 0)
-        view.layer.cornerRadius = 20
-        view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        view.clipsToBounds = true
+        // Убираем скругление углов, так как плашка теперь на всю ширину
+        // view.layer.cornerRadius = 20
+        // view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        // view.clipsToBounds = true // Убираем clipsToBounds, если градиент должен выходить за края
         return view
     }()
 
@@ -179,10 +180,14 @@ class UserProfileCardViewController: UIViewController, UIImagePickerControllerDe
 
     // MARK: - Setup
     private func setupViews() {
+        // Сначала добавляем фоновое изображение
         view.addSubview(backgroundImageView)
+        // Затем добавляем контейнер с информацией поверх фона
         view.addSubview(bottomInfoContainerView)
-        view.addSubview(activityIndicator) // Добавляем индикатор
+        // Индикатор загрузки тоже поверх всего
+        view.addSubview(activityIndicator)
 
+        // Добавляем элементы в нижний контейнер
         bottomInfoContainerView.addSubview(miniAvatarImageView)
         bottomInfoContainerView.addSubview(usernameLabel)
         bottomInfoContainerView.addSubview(followButton)
@@ -193,61 +198,82 @@ class UserProfileCardViewController: UIViewController, UIImagePickerControllerDe
     }
 
     private func setupConstraints() {
-        // Фоновое изображение (100% экрана)
+        // Фоновое изображение (привязываем ко всем краям view)
         NSLayoutConstraint.activate([
             backgroundImageView.topAnchor.constraint(equalTo: view.topAnchor),
             backgroundImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             backgroundImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            backgroundImageView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            backgroundImageView.bottomAnchor.constraint(equalTo: view.bottomAnchor) // Привязываем к низу view
         ])
 
-        // Нижний блок информации (86% ширины, центрирован, прижат к низу)
-        let containerWidthMultiplier: CGFloat = 0.86
+        // Нижний контейнер информации (100% ширины, прижат к низу)
         NSLayoutConstraint.activate([
-            bottomInfoContainerView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: containerWidthMultiplier),
-            bottomInfoContainerView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            // Убираем привязку к leading/trailing
-            // bottomInfoContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            // bottomInfoContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            bottomInfoContainerView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            bottomInfoContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomInfoContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            // Привязываем низ к safeAreaLayoutGuide
+            bottomInfoContainerView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor), 
+            // Верхний край контейнера будет определяться его содержимым
+            // Убедимся, что верхний край miniAvatarImageView привязан к верху bottomInfoContainerView
+            // И нижний край xpProgressBar привязан к низу bottomInfoContainerView
         ])
 
-        // Констрейнты ВНУТРИ нижнего блока (остаются прежними, привязаны к bottomInfoContainerView)
-        let padding: CGFloat = 20 
-        let smallPadding: CGFloat = 12
+        // Элементы внутри bottomInfoContainerView
+        let contentPadding: CGFloat = 20 // Новый отступ контента слева/справа (20)
+        let topPadding: CGFloat = 20 // Отступ сверху для аватара
+        let bottomPadding: CGFloat = 25 // Отступ снизу для прогресс-бара (может потребоваться увеличить из-за safe area)
+        let verticalSpacing: CGFloat = 15 // Вертикальный отступ между элементами
+        let avatarSize: CGFloat = 50
+        let buttonWidth: CGFloat = 80
+        let buttonHeight: CGFloat = 30
 
         NSLayoutConstraint.activate([
-            miniAvatarImageView.topAnchor.constraint(equalTo: bottomInfoContainerView.topAnchor, constant: padding),
-            miniAvatarImageView.leadingAnchor.constraint(equalTo: bottomInfoContainerView.leadingAnchor, constant: padding),
-            miniAvatarImageView.widthAnchor.constraint(equalToConstant: 50),
-            miniAvatarImageView.heightAnchor.constraint(equalToConstant: 50),
+            // Мини-аватар
+            miniAvatarImageView.leadingAnchor.constraint(equalTo: bottomInfoContainerView.leadingAnchor, constant: contentPadding), // Используем contentPadding
+            miniAvatarImageView.topAnchor.constraint(equalTo: bottomInfoContainerView.topAnchor, constant: topPadding), // Привязка к верху контейнера
+            miniAvatarImageView.widthAnchor.constraint(equalToConstant: avatarSize),
+            miniAvatarImageView.heightAnchor.constraint(equalToConstant: avatarSize),
 
-            followButton.trailingAnchor.constraint(equalTo: bottomInfoContainerView.trailingAnchor, constant: -padding),
-            followButton.centerYAnchor.constraint(equalTo: miniAvatarImageView.centerYAnchor),
-            followButton.widthAnchor.constraint(equalToConstant: 90),
-            followButton.heightAnchor.constraint(equalToConstant: 34),
+            // Имя пользователя
+            usernameLabel.leadingAnchor.constraint(equalTo: miniAvatarImageView.trailingAnchor, constant: 12),
+            usernameLabel.topAnchor.constraint(equalTo: miniAvatarImageView.topAnchor),
+            usernameLabel.trailingAnchor.constraint(lessThanOrEqualTo: followButton.leadingAnchor, constant: -12), // Ограничение справа до кнопки
 
-            usernameLabel.leadingAnchor.constraint(equalTo: miniAvatarImageView.trailingAnchor, constant: smallPadding),
-            usernameLabel.trailingAnchor.constraint(equalTo: followButton.leadingAnchor, constant: -smallPadding),
-            usernameLabel.centerYAnchor.constraint(equalTo: miniAvatarImageView.centerYAnchor),
+            // Кнопка Follow/Following
+            followButton.trailingAnchor.constraint(equalTo: bottomInfoContainerView.trailingAnchor, constant: -contentPadding), // Используем contentPadding
+            followButton.centerYAnchor.constraint(equalTo: usernameLabel.centerYAnchor),
+            followButton.widthAnchor.constraint(equalToConstant: buttonWidth),
+            followButton.heightAnchor.constraint(equalToConstant: buttonHeight),
 
-            statusLabel.topAnchor.constraint(equalTo: miniAvatarImageView.bottomAnchor, constant: smallPadding),
-            statusLabel.leadingAnchor.constraint(equalTo: bottomInfoContainerView.leadingAnchor, constant: padding),
-            statusLabel.trailingAnchor.constraint(equalTo: bottomInfoContainerView.trailingAnchor, constant: -padding),
+            // Статус
+            statusLabel.leadingAnchor.constraint(equalTo: usernameLabel.leadingAnchor),
+            statusLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 4),
+            statusLabel.trailingAnchor.constraint(equalTo: bottomInfoContainerView.trailingAnchor, constant: -contentPadding), // Используем contentPadding
+            // Убедимся, что статус не налезает на уровень
+            statusLabel.bottomAnchor.constraint(lessThanOrEqualTo: levelLabel.topAnchor, constant: -8),
 
-            xpProgressBar.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: padding),
-            xpProgressBar.leadingAnchor.constraint(equalTo: bottomInfoContainerView.leadingAnchor, constant: padding),
-            xpProgressBar.trailingAnchor.constraint(equalTo: bottomInfoContainerView.trailingAnchor, constant: -padding),
+            // Уровень
+            levelLabel.leadingAnchor.constraint(equalTo: miniAvatarImageView.leadingAnchor), // Привязка к аватару слева
+            // Привязываем верх levelLabel к низу miniAvatarImageView с отступом
+            levelLabel.topAnchor.constraint(equalTo: miniAvatarImageView.bottomAnchor, constant: verticalSpacing),
+            // Убираем ограничение снизу, т.к. оно будет определяться xpProgressBar
+            // levelLabel.bottomAnchor.constraint(lessThanOrEqualTo: bottomInfoContainerView.bottomAnchor, constant: -20),
 
-            levelLabel.topAnchor.constraint(equalTo: xpProgressBar.bottomAnchor, constant: smallPadding),
-            levelLabel.leadingAnchor.constraint(equalTo: bottomInfoContainerView.leadingAnchor, constant: padding),
-            levelLabel.bottomAnchor.constraint(equalTo: bottomInfoContainerView.safeAreaLayoutGuide.bottomAnchor, constant: -padding), // Используем safeArea для низа
+            // Прогресс бар XP
+            xpProgressBar.leadingAnchor.constraint(equalTo: levelLabel.leadingAnchor), // Привязка к levelLabel слева
+            // Привязываем верх xpProgressBar к низу levelLabel с отступом
+            xpProgressBar.topAnchor.constraint(equalTo: levelLabel.bottomAnchor, constant: 8),
+            xpProgressBar.trailingAnchor.constraint(equalTo: xpLabel.leadingAnchor, constant: -8),
+            // Привязка к низу контейнера с отступом
+            xpProgressBar.bottomAnchor.constraint(equalTo: bottomInfoContainerView.bottomAnchor, constant: -bottomPadding), // Отступ от НИЗА контейнера (safe area)
 
-            xpLabel.centerYAnchor.constraint(equalTo: levelLabel.centerYAnchor),
-            xpLabel.trailingAnchor.constraint(equalTo: bottomInfoContainerView.trailingAnchor, constant: -padding),
-            xpLabel.leadingAnchor.constraint(greaterThanOrEqualTo: levelLabel.trailingAnchor, constant: smallPadding),
-            
-            // Констрейнты для индикатора
+            // Текст XP
+            xpLabel.trailingAnchor.constraint(equalTo: bottomInfoContainerView.trailingAnchor, constant: -contentPadding), // Используем contentPadding
+            xpLabel.centerYAnchor.constraint(equalTo: xpProgressBar.centerYAnchor),
+            xpLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 60) // Минимальная ширина для текста XP
+        ])
+
+        // Индикатор загрузки (по центру)
+        NSLayoutConstraint.activate([
             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
@@ -332,7 +358,7 @@ class UserProfileCardViewController: UIViewController, UIImagePickerControllerDe
         } else {
             backgroundImageView.image = placeholder
             backgroundImageView.tintColor = .darkGray
-            backgroundImageView.contentMode = .scaleAspectFit 
+            backgroundImageView.contentMode = .scaleAspectFill 
             backgroundImageView.backgroundColor = UIColor(white: 0.1, alpha: 1.0) 
             miniAvatarImageView.image = miniPlaceholder
             miniAvatarImageView.tintColor = .lightGray

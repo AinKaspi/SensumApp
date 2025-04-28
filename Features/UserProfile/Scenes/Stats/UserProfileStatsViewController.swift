@@ -40,15 +40,15 @@ class UserProfileStatsViewController: UIViewController {
         chartView.translatesAutoresizingMaskIntoConstraints = false
         chartView.webLineWidth = 1.5
         chartView.innerWebLineWidth = 0.75
-        chartView.webColor = .systemGray3
-        chartView.innerWebColor = .systemGray5
+        chartView.webColor = .darkGray
+        chartView.innerWebColor = .gray
         chartView.webAlpha = 1.0
         chartView.rotationEnabled = false
         chartView.legend.enabled = false
 
         let xAxis = chartView.xAxis
         xAxis.labelFont = .systemFont(ofSize: 10, weight: .medium)
-        xAxis.labelTextColor = .label
+        xAxis.labelTextColor = .lightGray
         xAxis.xOffset = 0
         xAxis.yOffset = 0
         xAxis.valueFormatter = self
@@ -59,7 +59,7 @@ class UserProfileStatsViewController: UIViewController {
         yAxis.axisMinimum = 0
         yAxis.axisMaximum = 100
         yAxis.drawLabelsEnabled = true
-        yAxis.labelTextColor = .secondaryLabel
+        yAxis.labelTextColor = .lightGray
         yAxis.valueFormatter = YAxisValueFormatter()
 
         return chartView
@@ -68,7 +68,7 @@ class UserProfileStatsViewController: UIViewController {
     private lazy var infoContainerView: UIView = {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
-        view.backgroundColor = .secondarySystemGroupedBackground
+        view.backgroundColor = UIColor(white: 0.1, alpha: 1.0)
         view.layer.cornerRadius = 12
         view.layer.masksToBounds = true
         return view
@@ -101,13 +101,17 @@ class UserProfileStatsViewController: UIViewController {
         progressView.layer.cornerRadius = 5
         progressView.clipsToBounds = true
         progressView.heightAnchor.constraint(equalToConstant: 10).isActive = true
+
+        // Update track color for black background
+        progressView.trackTintColor = UIColor.darkGray.withAlphaComponent(0.7)
+
         return progressView
     }()
 
     private lazy var activityIndicator: UIActivityIndicatorView = {
         let indicator = UIActivityIndicatorView(style: .large)
         indicator.translatesAutoresizingMaskIntoConstraints = false
-        indicator.color = .label
+        indicator.color = .white
         indicator.hidesWhenStopped = true
         return indicator
     }()
@@ -127,7 +131,7 @@ class UserProfileStatsViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         assert(viewModel != nil, "ViewModel not injected into UserProfileStatsViewController")
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = .black
         setupViews()
         setupConstraints()
         setupBindings()
@@ -157,67 +161,91 @@ class UserProfileStatsViewController: UIViewController {
     }
 
     private func setupConstraints() {
-         let sidePadding: CGFloat = 20
-         let containerPadding: CGFloat = 15
-         let verticalSpacing: CGFloat = 15
-         let chartPadding: CGFloat = 10
-         let containerWidthMultiplier: CGFloat = 0.86
+        // Контейнер занимает все безопасное пространство
+        NSLayoutConstraint.activate([
+            // ScrollView занимает все безопасное пространство view
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
 
-         NSLayoutConstraint.activate([
-             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
-             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            // ContentWrapperView внутри scrollView
+            contentWrapperView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentWrapperView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentWrapperView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            contentWrapperView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            // Ширина contentWrapperView равна ширине scrollView
+            contentWrapperView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
+        ])
 
-             contentWrapperView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-             contentWrapperView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-             contentWrapperView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, multiplier: containerWidthMultiplier),
-             contentWrapperView.centerXAnchor.constraint(equalTo: scrollView.contentLayoutGuide.centerXAnchor),
+        // Элементы внутри контейнера
+        let padding: CGFloat = 16
+        let sidePadding: CGFloat = 20
+        let containerPadding: CGFloat = 15
+        let verticalSpacing: CGFloat = 15
+        let chartPadding: CGFloat = 45
+        // Убираем containerWidthMultiplier, т.к. ширина contentWrapperView теперь равна ширине scrollView
+        // let containerWidthMultiplier: CGFloat = 0.86
 
-             radarChartView.topAnchor.constraint(equalTo: contentWrapperView.topAnchor, constant: verticalSpacing),
-             radarChartView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: chartPadding),
-             radarChartView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -chartPadding),
-             radarChartView.heightAnchor.constraint(equalTo: radarChartView.widthAnchor),
+        NSLayoutConstraint.activate([
+            // Удаляем старые констрейнты для contentWrapperView
+            /*
+            contentWrapperView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), // Use contentWrapperView
+            contentWrapperView.leadingAnchor.constraint(equalTo: view.leadingAnchor),           // Use contentWrapperView
+            contentWrapperView.trailingAnchor.constraint(equalTo: view.trailingAnchor),         // Use contentWrapperView
+            contentWrapperView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor) // Use contentWrapperView
+            */
 
-             infoContainerView.topAnchor.constraint(equalTo: radarChartView.bottomAnchor, constant: verticalSpacing * 1.5),
-             infoContainerView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: sidePadding),
-             infoContainerView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -sidePadding),
-             infoContainerView.bottomAnchor.constraint(equalTo: attributesStackView.bottomAnchor, constant: containerPadding),
+            // Оставляем констрейнты для элементов внутри contentWrapperView
+            radarChartView.topAnchor.constraint(equalTo: contentWrapperView.topAnchor, constant: verticalSpacing),
+            radarChartView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: chartPadding),
+            radarChartView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -chartPadding),
+            radarChartView.heightAnchor.constraint(equalTo: radarChartView.widthAnchor),
 
-             usernameLabel.topAnchor.constraint(equalTo: infoContainerView.topAnchor, constant: containerPadding),
-             usernameLabel.leadingAnchor.constraint(equalTo: infoContainerView.leadingAnchor, constant: containerPadding),
-             usernameLabel.trailingAnchor.constraint(equalTo: infoContainerView.trailingAnchor, constant: -containerPadding),
+            infoContainerView.topAnchor.constraint(equalTo: radarChartView.bottomAnchor, constant: verticalSpacing * 1.5),
+            infoContainerView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: sidePadding),
+            infoContainerView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -sidePadding),
+            // infoContainerView.bottomAnchor должен быть привязан к низу последнего элемента внутри него (attributesStackView)
+            // infoContainerView.bottomAnchor.constraint(equalTo: attributesStackView.bottomAnchor, constant: containerPadding), // Перенесено ниже
 
-             rankLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 8),
-             rankLabel.leadingAnchor.constraint(equalTo: usernameLabel.leadingAnchor),
-             rankLabel.trailingAnchor.constraint(equalTo: usernameLabel.trailingAnchor),
+            usernameLabel.topAnchor.constraint(equalTo: infoContainerView.topAnchor, constant: containerPadding),
+            usernameLabel.leadingAnchor.constraint(equalTo: infoContainerView.leadingAnchor, constant: containerPadding),
+            usernameLabel.trailingAnchor.constraint(equalTo: infoContainerView.trailingAnchor, constant: -containerPadding),
 
-             attributesStackView.topAnchor.constraint(equalTo: rankLabel.bottomAnchor, constant: containerPadding),
-             attributesStackView.leadingAnchor.constraint(equalTo: infoContainerView.leadingAnchor, constant: containerPadding),
-             attributesStackView.trailingAnchor.constraint(equalTo: infoContainerView.trailingAnchor, constant: -containerPadding),
+            rankLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 8),
+            rankLabel.leadingAnchor.constraint(equalTo: usernameLabel.leadingAnchor),
+            rankLabel.trailingAnchor.constraint(equalTo: usernameLabel.trailingAnchor),
 
-             levelLabel.topAnchor.constraint(equalTo: infoContainerView.bottomAnchor, constant: verticalSpacing),
-             levelLabel.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: sidePadding),
-             levelLabel.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -sidePadding),
+            attributesStackView.topAnchor.constraint(equalTo: rankLabel.bottomAnchor, constant: containerPadding),
+            attributesStackView.leadingAnchor.constraint(equalTo: infoContainerView.leadingAnchor, constant: containerPadding),
+            attributesStackView.trailingAnchor.constraint(equalTo: infoContainerView.trailingAnchor, constant: -containerPadding),
+            // Привязываем низ infoContainerView к низу attributesStackView
+            infoContainerView.bottomAnchor.constraint(equalTo: attributesStackView.bottomAnchor, constant: containerPadding),
 
-             xpProgressBar.topAnchor.constraint(equalTo: levelLabel.bottomAnchor, constant: 8),
-             xpProgressBar.leadingAnchor.constraint(equalTo: levelLabel.leadingAnchor, constant: containerPadding),
-             xpProgressBar.trailingAnchor.constraint(equalTo: levelLabel.trailingAnchor, constant: -containerPadding),
+            levelLabel.topAnchor.constraint(equalTo: infoContainerView.bottomAnchor, constant: verticalSpacing),
+            levelLabel.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: sidePadding),
+            levelLabel.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -sidePadding),
 
-             xpLabel.topAnchor.constraint(equalTo: xpProgressBar.bottomAnchor, constant: 8),
-             xpLabel.leadingAnchor.constraint(equalTo: levelLabel.leadingAnchor),
-             xpLabel.trailingAnchor.constraint(equalTo: levelLabel.trailingAnchor),
-             xpLabel.bottomAnchor.constraint(equalTo: contentWrapperView.bottomAnchor, constant: -verticalSpacing),
+            xpProgressBar.topAnchor.constraint(equalTo: levelLabel.bottomAnchor, constant: 8),
+            xpProgressBar.leadingAnchor.constraint(equalTo: levelLabel.leadingAnchor, constant: containerPadding),
+            xpProgressBar.trailingAnchor.constraint(equalTo: levelLabel.trailingAnchor, constant: -containerPadding),
 
-             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-             activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            xpLabel.topAnchor.constraint(equalTo: xpProgressBar.bottomAnchor, constant: 8),
+            xpLabel.leadingAnchor.constraint(equalTo: levelLabel.leadingAnchor),
+            xpLabel.trailingAnchor.constraint(equalTo: levelLabel.trailingAnchor),
+            // Привязываем низ xpLabel к низу contentWrapperView
+            xpLabel.bottomAnchor.constraint(equalTo: contentWrapperView.bottomAnchor, constant: -verticalSpacing),
 
-             errorLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-             errorLabel.topAnchor.constraint(equalTo: activityIndicator.bottomAnchor, constant: 20),
-             errorLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: sidePadding),
-             errorLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -sidePadding)
-         ])
-     }
+            // Констрейнты для activityIndicator и errorLabel остаются в view, а не в scrollView
+            activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+
+            errorLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            errorLabel.topAnchor.constraint(equalTo: activityIndicator.bottomAnchor, constant: 20),
+            errorLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: sidePadding),
+            errorLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -sidePadding)
+        ])
+    }
 
     // MARK: - Bindings with Combine
     private func setupBindings() {
@@ -323,7 +351,7 @@ class UserProfileStatsViewController: UIViewController {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
         label.font = .systemFont(ofSize: fontSize, weight: weight)
-        label.textColor = .label
+        label.textColor = .white
         label.textAlignment = alignment
         label.numberOfLines = 0
         label.text = text
@@ -352,12 +380,14 @@ class UserProfileStatsViewController: UIViewController {
 
         for type in leftTypes {
             let label = createInfoLabel(fontSize: 14, weight: .regular, text: "\(type.rawValue): -", alignment: .left)
+            label.textColor = .lightGray
             attributeLabels[type] = label
             leftAttributesStack.addArrangedSubview(label)
         }
 
         for type in rightTypes {
             let label = createInfoLabel(fontSize: 14, weight: .regular, text: "\(type.rawValue): -", alignment: .left)
+            label.textColor = .lightGray
             attributeLabels[type] = label
             rightAttributesStack.addArrangedSubview(label)
         }
@@ -375,10 +405,13 @@ class UserProfileStatsViewController: UIViewController {
     }
 
     private func setupContentInset() {
-        let topInset = 80.0 + 70.0 + 10.0 
+        // let topInset: CGFloat = 20 // Старый отступ
+        // Рассчитываем отступ: Высота TopMenu (55) + Отступ TopMenu от Safe Area (15) + Дополнительный зазор (10)
+        let topInset: CGFloat = 55.0 + 15.0 + 10.0 // Итого = 80
         scrollView.contentInset = UIEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
         scrollView.scrollIndicatorInsets = UIEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
-        scrollView.contentOffset = CGPoint(x: 0, y: -topInset)
+        // Начальное смещение ставим в 0
+        scrollView.contentOffset = CGPoint(x: 0, y: 0)
     }
 }
 

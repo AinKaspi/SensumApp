@@ -80,6 +80,7 @@ class TopMenuView: UIView {
     
     private var selectedSegment: Segment = .card { // Начальный сегмент - Card
         didSet {
+            print("[TopMenuView] selectedSegment.didSet: New value = \(selectedSegment), Old value = \(oldValue)")
             updateButtonSelection()
             moveSelectionIndicator()
         }
@@ -100,7 +101,11 @@ class TopMenuView: UIView {
     }
 
     override func layoutSubviews() {
-        // ... (без изменений) ...
+        super.layoutSubviews() 
+        // Вызываем moveSelectionIndicator без анимации, чтобы 
+        // индикатор встал на правильную позицию после расчета layout.
+        // Анимация будет применяться только при вызове setSelectedSegment с animated: true.
+        moveSelectionIndicator(animated: false)
     }
 
     required init?(coder: NSCoder) {
@@ -147,11 +152,16 @@ class TopMenuView: UIView {
             
             // Стек кнопок меню
             buttonStackLeadingConstraint!, // Активируем начальный констрейнт
-            buttonStackView.trailingAnchor.constraint(equalTo: settingsButton.leadingAnchor, constant: -horizontalSpacing),
+            {
+                 // Создаем констрейнт с пониженным приоритетом
+                 let trailingConstraint = buttonStackView.trailingAnchor.constraint(equalTo: settingsButton.leadingAnchor, constant: -horizontalSpacing)
+                 trailingConstraint.priority = .defaultHigh // 999
+                 return trailingConstraint
+            }(),
             
             // Индикатор (привязан к первой кнопке - cardButton)
             selectionIndicatorView.heightAnchor.constraint(equalToConstant: 2),
-            selectionIndicatorView.bottomAnchor.constraint(equalTo: buttonStackView.bottomAnchor, constant: -4),
+            selectionIndicatorView.bottomAnchor.constraint(equalTo: buttonStackView.bottomAnchor, constant: -1),
             selectionIndicatorView.centerXAnchor.constraint(equalTo: cardButton.centerXAnchor),
             selectionIndicatorView.widthAnchor.constraint(equalTo: cardButton.widthAnchor, constant: -20)
         ])
@@ -184,7 +194,28 @@ class TopMenuView: UIView {
         let buttons = [cardButton, personButton, statsButton]
         guard let currentButton = buttons.first(where: { $0.tag == selectedSegment.rawValue }),
               let firstButton = buttons.first else { return }
-        // ... (расчет и анимация transform - без изменений) ...
+        
+        print("[TopMenuView] moveSelectionIndicator: Moving to segment \(selectedSegment), button: \(currentButton.titleLabel?.text ?? "N/A")")
+              
+        // Рассчитываем смещение и масштаб
+        let buttonFrameInStack = buttonStackView.convert(currentButton.frame, from: currentButton.superview)
+        let firstButtonFrameInStack = buttonStackView.convert(firstButton.frame, from: firstButton.superview)
+        let dx = buttonFrameInStack.midX - firstButtonFrameInStack.midX
+        // Рассчитываем масштаб относительно первой кнопки (или можно использовать фиксированную ширину?) 
+        // Убедимся, что ширина первой кнопки не ноль
+        let scaleX = firstButtonFrameInStack.width > 0 ? buttonFrameInStack.width / firstButtonFrameInStack.width : 1.0
+        
+        let newTransform = CGAffineTransform(translationX: dx, y: 0).scaledBy(x: scaleX, y: 1.0)
+        print("[TopMenuView] moveSelectionIndicator: Calculated transform = \(newTransform)")
+        
+        // Анимация
+        if animated {
+            UIView.animate(withDuration: 0.2) {
+                self.selectionIndicatorView.transform = newTransform
+            }
+        } else {
+            self.selectionIndicatorView.transform = newTransform
+        }
     }
     
     // НОВЫЙ МЕТОД: Обновляет констрейнты при показе/скрытии кнопки "Назад"
@@ -220,5 +251,20 @@ class TopMenuView: UIView {
     // Добавляем action для кнопки "Назад"
     @objc private func backButtonTapped() {
         delegate?.topMenuViewDidTapBack()
+    }
+    
+    // MARK: - Public Methods
+    
+    // Метод для установки выбранного сегмента извне
+    public func setSelectedSegment(_ segment: Segment, animated: Bool) {
+        print("[TopMenuView] setSelectedSegment called: Target segment = \(segment), Current = \(selectedSegment)")
+        guard segment != selectedSegment else { 
+            print("[TopMenuView] setSelectedSegment: Segment already selected.")
+            return
+        } 
+        // Обновляем внутреннее состояние. didSet вызовет обновление UI.
+        selectedSegment = segment 
+        // Если нужно принудительно вызвать анимацию ИМЕННО из этого метода:
+        // if animated { moveSelectionIndicator(animated: true) }
     }
 } 

@@ -47,13 +47,16 @@ class FeedViewController: UIViewController {
         
         // Констрейнты внутри topBarView
         NSLayoutConstraint.activate([
-            logoImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor), // Прижат к левому краю контейнера
+            logoImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16), // <-- Отступ слева
             logoImageView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            // Ограничим высоту логотипа, чтобы он не растягивался
+            // Ограничим высоту логотипа
             logoImageView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.5), // Например, 50% высоты topBar
+            // Добавим констрейнт ширины, чтобы сохранить пропорции (если известно соотношение) или задать фиксированную ширину
+            // Пример: logoImageView.widthAnchor.constraint(equalTo: logoImageView.heightAnchor, multiplier: 3.0) // Если соотношение 3:1
+            logoImageView.widthAnchor.constraint(equalToConstant: 100), // Или фиксированная ширина
             
             // Кнопка Сообщений прижата к правому краю
-            messagesButton.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            messagesButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16), // <-- Отступ справа
             messagesButton.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             messagesButton.widthAnchor.constraint(equalToConstant: 30),
             messagesButton.heightAnchor.constraint(equalToConstant: 30),
@@ -147,19 +150,19 @@ class FeedViewController: UIViewController {
         let topBarHeight: CGFloat = 100
         let topBarTopPadding: CGFloat = 64 
         
-        // Множитель ширины
-        let containerWidthMultiplier: CGFloat = 0.86
+        // Убираем множитель ширины
+        // let containerWidthMultiplier: CGFloat = 0.86
 
         NSLayoutConstraint.activate([
-            // Верхняя плашка (86% ширины, центрирована)
-            topBarView.topAnchor.constraint(equalTo: view.topAnchor, constant: topBarTopPadding),
-            topBarView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: containerWidthMultiplier),
-            topBarView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            // Верхняя плашка (100% ширины, привязана к safeArea)
+            topBarView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), // Используем safeAreaLayoutGuide
+            topBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            topBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             topBarView.heightAnchor.constraint(equalToConstant: topBarHeight),
             
-            // Лента (UITableView) (86% ширины, центрирована)
+            // Лента (UITableView) (оставляем 86% ширины, центрирована)
             feedTableView.topAnchor.constraint(equalTo: topBarView.bottomAnchor, constant: 8),
-            feedTableView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: containerWidthMultiplier),
+            feedTableView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.86), // <-- Оставляем 86%
             feedTableView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             feedTableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
         ])
@@ -342,4 +345,4 @@ extension FeedViewController: UITableViewDataSource, UITableViewDelegate, UIColl
         // feedTableView.beginUpdates()
         // feedTableView.endUpdates()
     }
-} 
+}

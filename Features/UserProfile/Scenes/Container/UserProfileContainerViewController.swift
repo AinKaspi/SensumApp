@@ -70,6 +70,8 @@ class UserProfileContainerViewController: UIViewController {
         self.progressService = progressService
         self.userProfileService = userProfileService
         print("UserProfileContainerViewController configured for userID: \(userID)")
+        // Устанавливаем начальный сегмент в TopMenuView
+        topMenuView.setSelectedSegment(.card, animated: false)
         displayChildViewController(cardVC)
     }
 
@@ -102,15 +104,21 @@ class UserProfileContainerViewController: UIViewController {
 
     // Восстанавливаем метод setupConstraints
     private func setupConstraints() {
-        let topBarHeight: CGFloat = 80 // Новая высота
-        let topBarTopPadding: CGFloat = 70 // Новый верхний отступ
-        let containerWidthMultiplier: CGFloat = 0.86 // 86% ширины
+        // let topBarHeight: CGFloat = 80 // Старая высота
+        let topBarHeight: CGFloat = 55 // Новая уменьшенная высота
+        // Убираем topBarTopPadding и containerWidthMultiplier
+        // let sidePadding: CGFloat = 80 // Старый боковой отступ
+        let sidePadding: CGFloat = 20 // Новый боковой отступ (20)
+        let topPadding: CGFloat = 15 // Новый верхний отступ от safe area
         
         NSLayoutConstraint.activate([
-            // Верхнее меню (86% ширины, центрировано, с отступом сверху)
-            topMenuView.topAnchor.constraint(equalTo: view.topAnchor, constant: topBarTopPadding),
-            topMenuView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            topMenuView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: containerWidthMultiplier),
+            // Верхнее меню (отступы по 20 слева/справа, отступ 15 сверху от safe area)
+            topMenuView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: topPadding), // Привязка к safe area
+            topMenuView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: sidePadding),
+            topMenuView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -sidePadding),
+            // Убираем старые centerXAnchor и widthAnchor
+            // topMenuView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            // topMenuView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: containerWidthMultiplier),
             topMenuView.heightAnchor.constraint(equalToConstant: topBarHeight),
         ])
     }
@@ -159,18 +167,24 @@ extension UserProfileContainerViewController: TopMenuViewDelegate {
              if currentChildVC is UserProfileCardViewController { return }
              // TODO: Передать/обновить ViewModel для cardVC?
              displayChildViewController(cardVC)
+             // Сообщаем TopMenuView об изменении
+             topMenuView.setSelectedSegment(.card, animated: true)
              
         case .person: 
              if currentChildVC is UserProfileFeedViewController { return }
              // ViewModel уже создан при инициализации lazy var
              // Можно добавить обновление данных, если нужно: personFeedVC.viewModel.fetchAllUserData()
              displayChildViewController(personFeedVC)
+             // Сообщаем TopMenuView об изменении
+             topMenuView.setSelectedSegment(.person, animated: true)
              
         case .stats: 
              if currentChildVC is UserProfileStatsViewController { return }
              // ViewModel уже создан при инициализации lazy var
              // Можно добавить обновление данных: statsVC.viewModel.fetchProgressData()
              displayChildViewController(statsVC)
+             // Сообщаем TopMenuView об изменении
+             topMenuView.setSelectedSegment(.stats, animated: true)
         }
     }
     
