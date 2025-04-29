@@ -1,4 +1,5 @@
 import UIKit
+import AVFoundation // Добавляем для AVAsset
 // Удаляем некорректные импорты
 // import Features.Feed.ViewModels
 // import Features.Feed.Scenes
@@ -6,7 +7,8 @@ import UIKit
 // Добавляем соответствие UserProfileFeedViewControllerDelegate и EditProfileViewControllerDelegate
 // Добавляем EditProfileViewModelDelegate
 // Раскомментируем UserPostScrollViewControllerDelegate
-class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerDelegate, EditProfileViewControllerDelegate, EditProfileViewModelDelegate, UserPostScrollViewControllerDelegate {
+// Добавляем CreatePostViewControllerDelegate
+class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerDelegate, EditProfileViewControllerDelegate, EditProfileViewModelDelegate, UserPostScrollViewControllerDelegate, CreatePostViewControllerDelegate {
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
     
@@ -123,7 +125,29 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
         navigationController.isNavigationBarHidden = false
         navigationController.pushViewController(vc, animated: true)
     }
-    
+
+    // Добавляем метод для показа экрана создания поста
+    func showCreatePost(with mediaItems: [MediaItem]) {
+        print("CurrentUserProfileCoordinator: Showing Create Post screen with \(mediaItems.count) items.")
+        guard !mediaItems.isEmpty else {
+            print("CurrentUserProfileCoordinator Error: Cannot show Create Post screen with empty media items.")
+            // TODO: Показать алерт пользователю?
+            return
+        }
+
+        // Создаем ViewModel для CreatePost
+        let createPostViewModel = CreatePostViewModel(initialMedia: mediaItems)
+
+        // Создаем ViewController
+        let createPostVC = CreatePostViewController(viewModel: createPostViewModel)
+        createPostVC.delegate = self // Устанавливаем себя делегатом
+
+        // Представляем модально или в новом NavigationController
+        let createPostNavController = UINavigationController(rootViewController: createPostVC)
+        createPostNavController.modalPresentationStyle = .fullScreen // Или .automatic
+        navigationController.present(createPostNavController, animated: true)
+    }
+
     // MARK: - Post Navigation
     
     func showUserPostScroll(posts: [Post], startIndex: Int) {
@@ -191,5 +215,21 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
         let commentsVC = CommentsViewController(postId: postID, viewModel: viewModel) 
         commentsVC.hidesBottomBarWhenPushed = true
         navigationController.pushViewController(commentsVC, animated: true)
+    }
+
+    // MARK: - CreatePostViewControllerDelegate
+
+    func didFinishCreatingPost(_ controller: CreatePostViewController) {
+        print("CurrentUserProfileCoordinator: Create Post finished successfully.")
+        controller.dismiss(animated: true) { [weak self] in
+            // TODO: Обновить ленту или профиль после создания поста?
+            // Возможно, отправить уведомление или вызвать метод обновления у UserProfileFeedViewModel
+            print("CurrentUserProfileCoordinator: Create Post controller dismissed.")
+        }
+    }
+
+    func didCancelCreatingPost(_ controller: CreatePostViewController) {
+        print("CurrentUserProfileCoordinator: Create Post cancelled.")
+        controller.dismiss(animated: true)
     }
 }

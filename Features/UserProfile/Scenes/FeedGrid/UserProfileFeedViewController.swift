@@ -255,18 +255,6 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         return button
     }()
     
-    // Добавляем кнопку Выхода (будет ниже)
-    private lazy var signOutButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.setTitle("Sign Out", for: .normal)
-        button.setTitleColor(.systemRed, for: .normal)
-        button.titleLabel?.font = .systemFont(ofSize: 15, weight: .medium)
-        button.addTarget(self, action: #selector(signOutTapped), for: .touchUpInside)
-        // TODO: Скрывать, если !isCurrentUser?
-        return button
-    }()
-    
     // --- Переключатель Контента --- 
     /*
     private lazy var contentSegmentedControl: UISegmentedControl = {
@@ -663,13 +651,11 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         if isCurrentUser {
             actionButtonsStackView.addArrangedSubview(newPostButton)
             actionButtonsStackView.addArrangedSubview(editProfileButton)
-            signOutButton.isHidden = false
         } else {
             // Для чужого профиля добавляем Follow и Message
             actionButtonsStackView.addArrangedSubview(followButton)
             actionButtonsStackView.addArrangedSubview(messageButton)
             configureFollowButton(isFollowing: viewModel.isFollowing) // Настроить начальный вид кнопки Follow
-            signOutButton.isHidden = true
         }
     }
     
@@ -696,25 +682,17 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     }
 
     // MARK: - Actions
+
     @objc private func editProfileTapped() {
-        // Вызываем делегата
         delegate?.didTapEditProfileButton()
-        // viewModel.editProfileButtonTapped() // Логику VM убираем отсюда, делегат решает
     }
-    
-    @objc private func signOutTapped() {
-        // Вызываем делегата
-        delegate?.didRequestSignOut()
-    }
-    
-    // Action для кнопки New Post
+
+    // Обновляем newPostButtonTapped для вызова presentMediaPicker. Добавить presentMediaPicker для настройки и показа PHPickerViewController. Реализовать PHPickerViewControllerDelegate для обработки выбранных медиа и вызова координатора. Удалить ненужные методы CreatePostViewControllerDelegate.
     @objc private func newPostButtonTapped() {
         print("New Post button tapped")
-        // TODO: Проверить права доступа к галерее
-        presentImagePicker()
+        presentMediaPicker()
     }
-    
-    // Добавляем actions для Follow/Message
+
     @objc private func followButtonTapped() {
         viewModel.followButtonTapped() // Вызываем метод ViewModel
     }
@@ -729,7 +707,7 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     private func presentImagePicker() {
         var config = PHPickerConfiguration()
         config.filter = .images // Только изображения
-        config.selectionLimit = 1 // Только одно фото
+        config.selectionLimit = 0 // 0 = без лимита (позволяем выбрать несколько фото)
         let picker = PHPickerViewController(configuration: config)
         picker.delegate = self
         present(picker, animated: true)
@@ -740,83 +718,86 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true)
 
-        guard let provider = results.first?.itemProvider else { return }
-
-        if provider.canLoadObject(ofClass: UIImage.self) {
-            provider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
-                guard let self = self, let selectedImage = image as? UIImage else {
-                    print("Failed to load selected image from picker.")
-                    // TODO: Show error to user
-                    return
-                }
-
-                DispatchQueue.main.async {
-                    print("Image selected via PHPicker. Size: \(selectedImage.size)")
-                    // Шаг 3: Показываем CreatePostViewController
-                    self.showCreatePostScreen(image: selectedImage)
-                }
-            }
-        } else {
-            print("Cannot load UIImage object from provider.")
-            // TODO: Show error to user
+        guard !results.isEmpty else {
+            print("Media selection cancelled.")
+            return
         }
-    }
 
-    // MARK: - Navigation to Create Post
+        var selectedMediaItems: [MediaItem] = []
+        let dispatchGroup = DispatchGroup()
 
-    private func showCreatePostScreen(image: UIImage) {
-        // 1. Создаем ViewModel
-        let viewModel = CreatePostViewModel(selectedImage: image)
+        for result in results {
+            dispatchGroup.enter()
+            let provider = result.itemProvider
 
-        // 2. Создаем ViewController
-        let createPostVC = CreatePostViewController(viewModel: viewModel)
-        createPostVC.delegate = self // Устанавливаем себя делегатом
+            if provider.canLoadObject(ofClass: UIImage.self) {
+                provider.loadObject(ofClass: UIImage.self) { [weak self] image, error in
+                    defer { dispatchGroup.leave() }
+                    if let image = image as? UIImage {
+                        print("Loaded image")
+                        selectedMediaItems.append(.image(image))
+                    } else if let error = error {
+                        print("Error loading image: \(error.localizedDescription)")
+                        // TODO: Показать ошибку пользователю?
+                    }
+                }
+            } else {
+                // Убрали обработку видео (UTType.movie/UTType.video)
+                print("Unsupported media type selected (expected image).")
+                // TODO: Показать сообщение пользователю?
+                dispatchGroup.leave()
+            }
+        }
 
-        // 3. Оборачиваем в UINavigationController для показа navigation bar
-        let navigationController = UINavigationController(rootViewController: createPostVC)
-        navigationController.modalPresentationStyle = .fullScreen // Или .automatic
-
-        // 4. Показываем модально
-        present(navigationController, animated: true)
+        dispatchGroup.notify(queue: .main) { [weak self] in
+            print("Finished loading all media. Count: \(selectedMediaItems.count)")
+            if !selectedMediaItems.isEmpty {
+                // Вызываем метод координатора для показа экрана создания поста
+                // TODO: Убедиться, что координатор реализует showCreatePost
+                if let coordinator = self?.delegate as? CurrentUserProfileCoordinator {
+                     coordinator.showCreatePost(with: selectedMediaItems)
+                } else {
+                    print("Error: Delegate does not conform to expected coordinator type or is nil.")
+                    // TODO: Показать ошибку
+                }
+            } else {
+                print("No valid media items were loaded.")
+                // TODO: Показать сообщение пользователю?
+            }
+        }
     }
 
     // MARK: - CreatePostViewControllerDelegate
 
-    // Вспомогательный Alert для теста (можно удалить или оставить для других нужд)
-    private func showAlert(title: String, message: String) {
-         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-         alert.addAction(UIAlertAction(title: "OK", style: .default))
-         present(alert, animated: true)
-     }
-
-    // MARK: - CollectionView Height Calculation (Moved inside class)
-
-    // Метод для обновления высоты CollectionView
-    private func updateCollectionViewHeight() {
-        // Пересчитываем высоту контента CollectionView
-        postsCollectionView.layoutIfNeeded() // Убедимся, что layout актуален
-        let contentHeight = postsCollectionView.collectionViewLayout.collectionViewContentSize.height
-
-        // Обновляем констрейнт высоты
-        // Use a reasonable minimum height, maybe related to one row? Calculate based on sizeForItemAt?
-        // For now, keep the previous logic or a fixed minimum. Let's stick to the previous minimum.
-        collectionViewHeightConstraint.constant = max(contentHeight, 200) // Минимальная высота, чтобы не схлопывался
-
-        // Анимируем изменение высоты (опционально)
-        // UIView.animate(withDuration: 0.3) {
-        //     self.view.layoutIfNeeded()
-        // }
-        print("Updated CollectionView height constraint to: \(collectionViewHeightConstraint.constant)")
+    // Эти методы теперь не нужны здесь, так как делегатом CreatePostVC является координатор
+    /*
+    func didFinishCreatingPost(_ controller: CreatePostViewController) {
+        controller.dismiss(animated: true) {
+            // TODO: Обновить ленту постов?
+            print("Post created successfully!")
+            self.viewModel.fetchPosts() // Перезагружаем посты
+        }
     }
 
-    // Вызываем обновление высоты после перезагрузки данных
-    // Moved inside class
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        // Обновляем высоту после того, как bounds станут известны
-        // Делаем это здесь, а не в reloadData, чтобы учесть изменения layout
-        updateCollectionViewHeight()
+    func didCancelCreatingPost(_ controller: CreatePostViewController) {
+        controller.dismiss(animated: true)
     }
+    */
+
+    // MARK: - Helpers
+
+    private func presentMediaPicker() {
+        var config = PHPickerConfiguration()
+        config.filter = .any(of: [.images, .videos]) // Разрешаем фото и видео
+        config.selectionLimit = 10 // Ограничение на количество выбранных файлов (можно изменить)
+        config.preferredAssetRepresentationMode = .current // Получаем наиболее подходящее представление
+
+        let picker = PHPickerViewController(configuration: config)
+        picker.delegate = self
+        present(picker, animated: true)
+    }
+
+    // ... остальной код ...
 }
 
 // MARK: - UICollectionViewDataSource
@@ -909,13 +890,61 @@ extension UserProfileFeedViewController {
 extension UserProfileFeedViewController {
     @objc private func topBarSettingsButtonTapped() {
         print("Top bar settings button tapped")
-        // TODO: Реализовать переход на экран настроек (через делегата/координатора)
-        // delegate?.didTapSettingsButton()
+        
+        // Создаем UIAlertController для отображения опций настроек
+        let alertController = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        
+        // Добавляем опцию Sign Out
+        let signOutAction = UIAlertAction(title: "Sign Out", style: .destructive) { [weak self] _ in
+            self?.signOutTapped()
+        }
+        alertController.addAction(signOutAction)
+        
+        // Добавляем опцию Edit Profile
+        let editProfileAction = UIAlertAction(title: "Edit Profile", style: .default) { [weak self] _ in
+            self?.editProfileTapped()
+        }
+        alertController.addAction(editProfileAction)
+        
+        // Добавляем опцию отмены
+        let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
+        alertController.addAction(cancelAction)
+        
+        // Для iPad, указываем источник всплывающего окна
+        if let popoverController = alertController.popoverPresentationController {
+            popoverController.sourceView = topBarSettingsButton
+            popoverController.sourceRect = topBarSettingsButton.bounds
+        }
+        
+        present(alertController, animated: true)
     }
     
     @objc private func topBarChatsButtonTapped() {
         print("Top bar chats/notifications button tapped")
         // TODO: Реализовать переход к списку чатов/уведомлений (через делегата/координатора)
         // delegate?.didTapChatsButton()
+    }
+    
+    // Добавляем метод для выхода из системы
+    @objc private func signOutTapped() {
+        print("Sign out requested")
+        
+        // Показываем диалог подтверждения
+        let confirmAlert = UIAlertController(
+            title: "Sign Out",
+            message: "Are you sure you want to sign out?",
+            preferredStyle: .alert
+        )
+        
+        let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
+        let confirmAction = UIAlertAction(title: "Sign Out", style: .destructive) { [weak self] _ in
+            // Вызываем метод делегата для выхода из системы
+            self?.delegate?.didRequestSignOut()
+        }
+        
+        confirmAlert.addAction(cancelAction)
+        confirmAlert.addAction(confirmAction)
+        
+        present(confirmAlert, animated: true)
     }
 }

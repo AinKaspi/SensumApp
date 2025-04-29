@@ -330,9 +330,20 @@ class PostCell: UITableViewCell {
         // Обновляем вид кнопки лайка
         updateLikeButtonAppearance()
         
-        if let url = URL(string: post.imageURL) {
+        // Загружаем изображение поста
+        // Сначала проверяем, есть ли превью для сетки
+        if let url = URL(string: post.gridThumbnailURL), !post.gridThumbnailURL.isEmpty {
             postImageView.kf.indicatorType = .activity
             postImageView.kf.setImage(with: url)
+        } 
+        // Если нет превью, используем первый элемент из mediaItems
+        else if let firstMediaItem = post.mediaItems.first, 
+                let url = URL(string: firstMediaItem.url) {
+            postImageView.kf.indicatorType = .activity
+            postImageView.kf.setImage(with: url)
+        } else {
+            postImageView.image = UIImage(systemName: "photo")
+            postImageView.tintColor = .gray
         }
         
         // Проверяем необходимость кнопки "more" после установки текста

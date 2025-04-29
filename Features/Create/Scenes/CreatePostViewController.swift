@@ -1,30 +1,70 @@
 import UIKit
-import Combine // Импортируем Combine
+import Combine
+import PhotosUI // Импортируем PhotosUI для PHPickerViewController
 
 protocol CreatePostViewControllerDelegate: AnyObject {
-    // Обновляем делегат для соответствия новым требованиям (ViewModel сам разберется с данными)
     func didFinishCreatingPost(_ controller: CreatePostViewController)
     func didCancelCreatingPost(_ controller: CreatePostViewController)
 }
 
+// Используем PostAspectRatio из ViewModel
+
 class CreatePostViewController: UIViewController {
 
     weak var delegate: CreatePostViewControllerDelegate?
-    private let viewModel: CreatePostViewModel // Добавляем ViewModel
-    private var cancellables = Set<AnyCancellable>() // Для хранения подписок Combine
-
-    // Убираем selectedImage, так как оно теперь в ViewModel
-    // private let selectedImage: UIImage
+    private let viewModel: CreatePostViewModel
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - UI Elements
 
-    private lazy var imageView: UIImageView = {
+    // Заменяем imageView на collectionView для медиа
+    private lazy var mediaCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        layout.minimumLineSpacing = 2
+        layout.minimumInteritemSpacing = 2
+        // Размер ячейки будет установлен позже
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        collectionView.backgroundColor = .black
+        collectionView.showsHorizontalScrollIndicator = false
+        collectionView.register(MediaThumbnailCell.self, forCellWithReuseIdentifier: MediaThumbnailCell.reuseIdentifier)
+        collectionView.dataSource = self
+        collectionView.delegate = self
+        return collectionView
+    }()
+
+    // Добавляем View для предпросмотра кадрирования
+    private lazy var cropPreviewView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = .darkGray // Для наглядности
+        view.clipsToBounds = true
+        // Добавим imageView внутрь для отображения контента
+        view.addSubview(previewImageView)
+        return view
+    }()
+
+    private lazy var previewImageView: UIImageView = {
         let imageView = UIImageView()
         imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.contentMode = .scaleAspectFill // Используем scaleAspectFill для квадрата
+        imageView.contentMode = .scaleAspectFill // Заполняем превью
         imageView.clipsToBounds = true
-        // imageView.image = selectedImage - Устанавливаем в viewDidLoad
         return imageView
+    }()
+
+    // Добавляем кнопки/контролы для выбора соотношения сторон
+    private lazy var aspectRatioSegmentedControl: UISegmentedControl = {
+        let items = PostAspectRatio.allCases.map { $0.stringValue }
+        let control = UISegmentedControl(items: items)
+        control.translatesAutoresizingMaskIntoConstraints = false
+        control.selectedSegmentIndex = 0 // По умолчанию 1:1
+        control.backgroundColor = .darkGray
+        control.selectedSegmentTintColor = .systemBlue
+        control.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
+        control.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
+        control.addTarget(self, action: #selector(aspectRatioChanged(_:)), for: .valueChanged)
+        return control
     }()
 
     private lazy var captionTextView: UITextView = {
@@ -69,10 +109,11 @@ class CreatePostViewController: UIViewController {
         setupNavigationBar()
         setupViews()
         setupConstraints()
-        setupBindings() // Вызываем настройку биндингов
+        setupBindings()
 
-        // Устанавливаем изображение из ViewModel
-        imageView.image = viewModel.selectedImage
+        // Устанавливаем начальное изображение для превью (если есть)
+        updatePreviewImage(at: 0) // Показываем первое изображение
+        updateCropPreviewAspectRatio() // Устанавливаем начальное соотношение сторон
     }
 
     // MARK: - Setup
@@ -94,24 +135,50 @@ class CreatePostViewController: UIViewController {
     }
 
     private func setupViews() {
-        view.addSubview(imageView)
+        // Убираем старый imageView
+        // view.addSubview(imageView)
+        view.addSubview(cropPreviewView) // Добавляем превью
+        view.addSubview(aspectRatioSegmentedControl) // Добавляем сегментный контрол
+        view.addSubview(mediaCollectionView) // Добавляем коллекцию медиа
         view.addSubview(captionTextView)
-        view.addSubview(activityIndicatorView) // Добавляем индикатор
+        view.addSubview(activityIndicatorView)
     }
 
     private func setupConstraints() {
+        let previewHeightMultiplier = PostAspectRatio.square.ratio // Начальное соотношение 1:1
+
         NSLayoutConstraint.activate([
-            imageView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
-            imageView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
-            imageView.widthAnchor.constraint(equalToConstant: 100),
-            imageView.heightAnchor.constraint(equalToConstant: 100),
+            // Превью кадрирования сверху
+            cropPreviewView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
+            cropPreviewView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            cropPreviewView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            // Высота превью зависит от ширины и соотношения сторон (будет обновляться)
+            cropPreviewView.heightAnchor.constraint(equalTo: cropPreviewView.widthAnchor, multiplier: previewHeightMultiplier),
 
-            captionTextView.topAnchor.constraint(equalTo: imageView.topAnchor),
-            captionTextView.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 10),
+            // ImageView внутри превью
+            previewImageView.topAnchor.constraint(equalTo: cropPreviewView.topAnchor),
+            previewImageView.leadingAnchor.constraint(equalTo: cropPreviewView.leadingAnchor),
+            previewImageView.trailingAnchor.constraint(equalTo: cropPreviewView.trailingAnchor),
+            previewImageView.bottomAnchor.constraint(equalTo: cropPreviewView.bottomAnchor),
+
+            // Сегментный контрол под превью
+            aspectRatioSegmentedControl.topAnchor.constraint(equalTo: cropPreviewView.bottomAnchor, constant: 10),
+            aspectRatioSegmentedControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
+            aspectRatioSegmentedControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
+
+            // Коллекция медиа под сегментным контролом
+            mediaCollectionView.topAnchor.constraint(equalTo: aspectRatioSegmentedControl.bottomAnchor, constant: 10),
+            mediaCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            mediaCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            mediaCollectionView.heightAnchor.constraint(equalToConstant: 100), // Фиксированная высота для горизонтального скролла
+
+            // Текстовое поле под коллекцией
+            captionTextView.topAnchor.constraint(equalTo: mediaCollectionView.bottomAnchor, constant: 10),
+            captionTextView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
             captionTextView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
-            captionTextView.bottomAnchor.constraint(equalTo: imageView.bottomAnchor), // Выравниваем низ
+            captionTextView.heightAnchor.constraint(equalToConstant: 80), // Задаем высоту для поля ввода
 
-            // Размещаем индикатор по центру
+            // Индикатор активности по центру
             activityIndicatorView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             activityIndicatorView.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
@@ -166,27 +233,100 @@ class CreatePostViewController: UIViewController {
     }
 
     @objc private func shareTapped() {
-        // Убираем клавиатуру
         view.endEditing(true)
-
-        // Вызываем метод ViewModel
         viewModel.sharePost { [weak self] error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 if error == nil {
-                    // Успех - уведомляем делегата
                     self.delegate?.didFinishCreatingPost(self)
-                } // Ошибка обработается через $errorMessage sink
+                }
             }
         }
     }
 
+    @objc private func aspectRatioChanged(_ sender: UISegmentedControl) {
+        let selectedIndex = sender.selectedSegmentIndex
+        guard selectedIndex >= 0 && selectedIndex < PostAspectRatio.allCases.count else { return }
+        let selectedAspectRatio = PostAspectRatio.allCases[selectedIndex]
+        viewModel.selectedAspectRatio = selectedAspectRatio
+        // Обновление соотношения сторон превью произойдет через биндинг
+    }
+
     // MARK: - Helpers
+
+    private func updatePreviewImage(at index: Int) {
+        guard index >= 0 && index < viewModel.selectedMedia.count else {
+            previewImageView.image = nil // Очищаем, если индекс невалиден
+            return
+        }
+        // TODO: Получить полноразмерное изображение или кешированную версию из ViewModel
+        // Пока просто используем то, что есть в selectedMedia (это могут быть thumbnails)
+        let media = viewModel.selectedMedia[index]
+        switch media {
+        case .image(let image):
+            previewImageView.image = image
+        // case .video(let avAsset): // TODO: Handle video preview (e.g., first frame)
+        //     previewImageView.image = getThumbnailFrom(video: avAsset)
+        default:
+             previewImageView.image = nil // Placeholder for video or other types
+        }
+    }
+
+    private func updateCropPreviewAspectRatio() {
+        let aspectRatio = viewModel.selectedAspectRatio.ratio
+        // Находим существующий constraint высоты и обновляем его multiplier
+        if let heightConstraint = cropPreviewView.constraints.first(where: { $0.firstAttribute == .height }) {
+            NSLayoutConstraint.deactivate([heightConstraint])
+            let newHeightConstraint = cropPreviewView.heightAnchor.constraint(equalTo: cropPreviewView.widthAnchor, multiplier: aspectRatio)
+            NSLayoutConstraint.activate([newHeightConstraint])
+            // Анимируем изменение высоты
+            UIView.animate(withDuration: 0.3) {
+                self.view.layoutIfNeeded()
+            }
+        } else {
+            // Если constraint не найден (не должно случиться при правильной настройке)
+            let newHeightConstraint = cropPreviewView.heightAnchor.constraint(equalTo: cropPreviewView.widthAnchor, multiplier: aspectRatio)
+            NSLayoutConstraint.activate([newHeightConstraint])
+        }
+    }
 
     private func showAlert(title: String = "Error", message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
+    }
+}
+
+// MARK: - UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout
+extension CreatePostViewController: UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return viewModel.selectedMedia.count
+    }
+
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: MediaThumbnailCell.reuseIdentifier, for: indexPath) as? MediaThumbnailCell else {
+            fatalError("Unable to dequeue MediaThumbnailCell")
+        }
+        let media = viewModel.selectedMedia[indexPath.item]
+        cell.configure(with: media)
+        // TODO: Add visual indication for the selected item (viewModel.selectedMediaIndex)
+        cell.layer.borderWidth = (indexPath.item == viewModel.selectedMediaIndex) ? 2.0 : 0.0
+        cell.layer.borderColor = (indexPath.item == viewModel.selectedMediaIndex) ? UIColor.systemBlue.cgColor : UIColor.clear.cgColor
+        return cell
+    }
+
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        // Делаем ячейки квадратными, равными высоте коллекции
+        let height = collectionView.bounds.height - collectionView.contentInset.top - collectionView.contentInset.bottom
+        return CGSize(width: height, height: height)
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        viewModel.selectedMediaIndex = indexPath.item
+        // Обновление превью и выделения ячейки произойдет через биндинги
+        collectionView.reloadData() // Перезагружаем для обновления выделения
+        collectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: true)
     }
 }
 
@@ -219,3 +359,5 @@ extension CreatePostViewController: UITextViewDelegate {
 //        }
 //    }
 } 
+
+// Убрали временные определения MediaThumbnailCell и MediaItem

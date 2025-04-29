@@ -19,4 +19,4 @@ struct Comment: Identifiable, Codable, Equatable {
     static func == (lhs: Comment, rhs: Comment) -> Bool {
         lhs.id == rhs.id
     }
-} 
+}

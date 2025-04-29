@@ -37,7 +37,7 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFl
         collectionView.register(FullPostCell.self, forCellWithReuseIdentifier: FullPostCell.identifier) // Регистрируем FullPostCell
         collectionView.dataSource = self
         collectionView.delegate = self
-        collectionView.isPagingEnabled = true // Включаем постраничную прокрутку (одна ячейка за раз)
+        collectionView.isPagingEnabled = false // Отключаем постраничную прокрутку
         collectionView.showsVerticalScrollIndicator = false
         // Добавляем футер для индикатора пагинации
         collectionView.register(PaginationIndicatorFooterView.self, 
@@ -225,8 +225,24 @@ extension UserPostScrollViewController {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         // Используем bounds CollectionView для расчета размера
         // Отнимаем safeAreaInsets, чтобы контент не заезжал под NavigationBar/TabBar
-        let safeAreaHeight = collectionView.bounds.height - view.safeAreaInsets.top - view.safeAreaInsets.bottom
-        return CGSize(width: collectionView.bounds.width, height: safeAreaHeight)
+        // let safeAreaHeight = collectionView.bounds.height - view.safeAreaInsets.top - view.safeAreaInsets.bottom // Старый расчет
+        // return CGSize(width: collectionView.bounds.width, height: safeAreaHeight) // Старый расчет
+
+        // НОВЫЙ РАСЧЕТ: Динамическая высота ячейки
+        let width = collectionView.bounds.width
+        
+        // TODO: Точный расчет высоты зависит от содержимого FullPostCell.
+        // Примерный расчет: высота картинки (например, 1:1) + фиксированная высота для остального (header, caption, actions)
+        let imageAspectRatio: CGFloat = 1.0 // Примерное соотношение 1:1, настройте под ваш дизайн
+        let imageHeight = width / imageAspectRatio
+        let estimatedOtherContentHeight: CGFloat = 150 // Примерная высота для хедера, кнопок, текста и отступов
+        
+        // Если у вас есть точная информация о высоте текста/изображения, используйте ее.
+        // Или настройте FullPostCell на использование Auto Layout и используйте estimatedItemSize у FlowLayout.
+        
+        let totalHeight = imageHeight + estimatedOtherContentHeight
+        
+        return CGSize(width: width, height: totalHeight)
     }
     
     // Метод для установки размера футера

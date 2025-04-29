@@ -80,15 +80,21 @@ class PostService: PostServiceProtocol {
             
             switch result {
             case .success(let user):
+                // Создаем MediaItemDTO
+                let mediaItemDTO = MediaItemDTO(type: .image, url: imageURL)
+                
                 // 2. Создаем объект Post с данными автора
-                let newPost = Post(userID: currentUserID,
-                                   imageURL: imageURL,
-                                   caption: caption,
-                                   createdAt: Timestamp(),
-                                   likeCount: 0,
-                                   commentCount: 0,
-                                   authorUsername: user.username, // <-- Денормализация
-                                   authorAvatarURL: user.avatarURL) // <-- Денормализация
+                let newPost = Post(
+                    userID: currentUserID,
+                    mediaItems: [mediaItemDTO], // Используем массив из одного MediaItemDTO
+                    feedAspectRatio: "1:1", // По умолчанию квадрат
+                    gridThumbnailURL: imageURL, // Используем то же изображение для миниатюры
+                    caption: caption,
+                    createdAt: Timestamp(),
+                    likeCount: 0,
+                    commentCount: 0,
+                    authorUsername: user.username, // <-- Денормализация
+                    authorAvatarURL: user.avatarURL) // <-- Денормализация
                 
                 // 3. Сохраняем пост в Firestore
                 do {

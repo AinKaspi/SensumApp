@@ -26,6 +26,7 @@
 		B1686B4C2DBF44C70074FA46 /* STRUCT.md in Resources */ = {isa = PBXBuildFile; fileRef = B1686B4B2DBF44C70074FA46 /* STRUCT.md */; };
 		B1686C392DBF7D200074FA46 /* Comment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1686C372DBF7D200074FA46 /* Comment.swift */; };
 		B1686C3A2DBF7D200074FA46 /* Exercise.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1686C382DBF7D200074FA46 /* Exercise.swift */; };
+		B1686C3C2DC0AC4A0074FA46 /* MediaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1686C3B2DC0AC4A0074FA46 /* MediaItem.swift */; };
 		B16E96222DBA6121005893D5 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBD12DB6DFD200A696B9 /* AuthService.swift */; };
 		B1A4835E2DB6CD0000755E25 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = B1A4835D2DB6CD0000755E25 /* FirebaseAnalyticsOnDeviceConversion */; };
 		B1A483602DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */ = {isa = PBXBuildFile; productRef = B1A4835F2DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport */; };
@@ -76,6 +77,7 @@
 		B1686B4B2DBF44C70074FA46 /* STRUCT.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = STRUCT.md; sourceTree = "<group>"; };
 		B1686C372DBF7D200074FA46 /* Comment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Comment.swift; sourceTree = "<group>"; };
 		B1686C382DBF7D200074FA46 /* Exercise.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Exercise.swift; sourceTree = "<group>"; };
+		B1686C3B2DC0AC4A0074FA46 /* MediaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaItem.swift; sourceTree = "<group>"; };
 		B1A6E6E92DA7F0F500E9E9EB /* ROADMAP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ROADMAP.md; sourceTree = "<group>"; };
 		B1AE8A622DB8E4F90089728F /* UITextView+Combine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UITextView+Combine.swift"; sourceTree = "<group>"; };
 		C1B889D639EA09C28DFCEA72 /* Pods-SensumApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SensumApp.debug.xcconfig"; path = "Target Support Files/Pods-SensumApp/Pods-SensumApp.debug.xcconfig"; sourceTree = "<group>"; };
@@ -177,6 +179,7 @@
 				B134D8342DBE48D30014DB02 /* TrainingProgram.swift */,
 				B134D8362DBE4A370014DB02 /* AppNotification.swift */,
 				B134D83A2DBE4AAD0014DB02 /* Chat.swift */,
+				B1686C3B2DC0AC4A0074FA46 /* MediaItem.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -388,6 +391,7 @@
 				B134D8372DBE4A370014DB02 /* AppNotification.swift in Sources */,
 				B134D83B2DBE4AAD0014DB02 /* Chat.swift in Sources */,
 				B134D8422DBE52EE0014DB02 /* ProgressService.swift in Sources */,
+				B1686C3C2DC0AC4A0074FA46 /* MediaItem.swift in Sources */,
 				B1AE8A652DB8E4F90089728F /* UITextView+Combine.swift in Sources */,
 				B134D83D2DBE4AC60014DB02 /* MessagingService.swift in Sources */,
 				B16E96222DBA6121005893D5 /* AuthService.swift in Sources */,

@@ -6,7 +6,9 @@ struct Post: Codable, Identifiable {
     
     @DocumentID var id: String?
     let userID: String        // ID автора поста
-    let imageURL: String      // URL фото в Firebase Storage
+    let mediaItems: [MediaItemDTO] // Массив медиа (фото/видео) с поддержкой Codable
+    let feedAspectRatio: String // Соотношение сторон для ленты ("1:1", "9:16"...)
+    let gridThumbnailURL: String // URL на 9:16 превью для сетки
     var caption: String?      // Текст под фото
     let createdAt: Timestamp  // Дата создания
     
@@ -31,7 +33,9 @@ struct Post: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id // @DocumentID обрабатывается автоматически
         case userID
-        case imageURL
+        case mediaItems
+        case feedAspectRatio
+        case gridThumbnailURL
         case caption
         case createdAt
         case likeCount
@@ -45,11 +49,12 @@ struct Post: Codable, Identifiable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         // Декодируем @DocumentID (может быть nil до сохранения)
-        // Пытаемся декодировать id, если не получается - оставляем nil
         self.id = try? container.decodeIfPresent(String.self, forKey: .id)
         
         self.userID = try container.decode(String.self, forKey: .userID)
-        self.imageURL = try container.decode(String.self, forKey: .imageURL)
+        self.mediaItems = try container.decodeIfPresent([MediaItemDTO].self, forKey: .mediaItems) ?? [] // Декодируем массив, [] по умолчанию
+        self.feedAspectRatio = try container.decodeIfPresent(String.self, forKey: .feedAspectRatio) ?? "1:1" // "1:1" по умолчанию?
+        self.gridThumbnailURL = try container.decodeIfPresent(String.self, forKey: .gridThumbnailURL) ?? "" // Пустая строка по умолчанию?
         self.caption = try container.decodeIfPresent(String.self, forKey: .caption)
         self.createdAt = try container.decode(Timestamp.self, forKey: .createdAt)
         self.likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount) ?? 0 // Значение по умолчанию
@@ -66,7 +71,9 @@ struct Post: Codable, Identifiable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         // @DocumentID id не кодируется вручную
         try container.encode(self.userID, forKey: .userID)
-        try container.encode(self.imageURL, forKey: .imageURL)
+        try container.encode(self.mediaItems, forKey: .mediaItems)
+        try container.encode(self.feedAspectRatio, forKey: .feedAspectRatio)
+        try container.encode(self.gridThumbnailURL, forKey: .gridThumbnailURL)
         try container.encodeIfPresent(self.caption, forKey: .caption)
         try container.encode(self.createdAt, forKey: .createdAt)
         try container.encode(self.likeCount, forKey: .likeCount)
@@ -76,12 +83,24 @@ struct Post: Codable, Identifiable {
         // isLiked не кодируем
     }
     
-    // Оставляем пустой init для возможности создания объекта без декодирования
-    // (например, при создании нового поста на клиенте до отправки)
-    init(id: String? = nil, userID: String, imageURL: String, caption: String?, createdAt: Timestamp, likeCount: Int = 0, commentCount: Int = 0, isLiked: Bool = false, authorUsername: String?, authorAvatarURL: String?) {
+    // Обновляем кастомный init
+    init(id: String? = nil, 
+         userID: String, 
+         mediaItems: [MediaItemDTO], 
+         feedAspectRatio: String, 
+         gridThumbnailURL: String, 
+         caption: String?, 
+         createdAt: Timestamp, 
+         likeCount: Int = 0, 
+         commentCount: Int = 0, 
+         isLiked: Bool = false, 
+         authorUsername: String?, 
+         authorAvatarURL: String?) {
         self.id = id
         self.userID = userID
-        self.imageURL = imageURL
+        self.mediaItems = mediaItems
+        self.feedAspectRatio = feedAspectRatio
+        self.gridThumbnailURL = gridThumbnailURL
         self.caption = caption
         self.createdAt = createdAt
         self.likeCount = likeCount

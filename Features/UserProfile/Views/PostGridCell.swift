@@ -47,8 +47,21 @@ class PostGridCell: UICollectionViewCell {
     }
     
     func configure(with post: Post) {
-        // Загружаем изображение поста
-        if let url = URL(string: post.imageURL) {
+        // Загружаем изображение поста из gridThumbnailURL или первый mediaItem
+        // Сначала проверяем, есть ли превью для сетки
+        if let url = URL(string: post.gridThumbnailURL), !post.gridThumbnailURL.isEmpty {
+            postImageView.kf.indicatorType = .activity
+            postImageView.kf.setImage(
+                with: url,
+                options: [
+                    .transition(.fade(0.2)),
+                    .cacheOriginalImage
+                ]
+            )
+        } 
+        // Если нет превью, используем первый элемент из mediaItems
+        else if let firstMediaItem = post.mediaItems.first, 
+                let url = URL(string: firstMediaItem.url) {
             postImageView.kf.indicatorType = .activity
             postImageView.kf.setImage(
                 with: url,

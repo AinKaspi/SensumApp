@@ -325,42 +325,24 @@ class FullPostCell: UICollectionViewCell {
             authorAvatarImageView.image = UIImage(systemName: "person.circle.fill")?.withTintColor(.lightGray)
         }
 
-        // Пост
-        if let url = URL(string: post.imageURL) {
-            print("FullPostCell: Загрузка изображения поста из URL: \(post.imageURL)")
-            postImageView.kf.indicatorType = .activity
-            // Определяем плейсхолдер
-            let placeholderImage = UIImage(systemName: "photo")?.withTintColor(.darkGray)
-            postImageView.kf.setImage(
-                with: url,
-                placeholder: placeholderImage, // Добавлен плейсхолдер
-                options: [.transition(.fade(0.2))],
-                completionHandler: { [weak self] result in // Исправлен синтаксис completionHandler
-                    // Используем слабую ссылку на замыкание тоже
-                    guard let self = self, let currentIndexPath = self.indexPath, let updateAction = self.needsLayoutUpdateAction else { return }
-                    var finalAspectRatio: CGFloat = 1.0 // Дефолтное значение
-                    
-                    switch result {
-                    case .success(let value):
-                        print("FullPostCell: Изображение поста успешно загружено для indexPath \(currentIndexPath), размер: \(value.image.size)")
-                        if value.image.size.width > 0 {
-                            finalAspectRatio = value.image.size.height / value.image.size.width
-                        }
-                    case .failure(let error):
-                         print("FullPostCell: ОШИБКА загрузки изображения поста для indexPath \(currentIndexPath): \(error.localizedDescription)")
-                         // Используем дефолтное ratio 1.0
-                    }
-                    // Вызываем замыкание для обновления размера с ФИНАЛЬНЫМ aspect ratio
-                    updateAction(currentIndexPath, finalAspectRatio) // Передаем aspect ratio
-                }
-            )
+        // Пост - используем превью или первый медиа-элемент
+        // Сначала проверяем gridThumbnailURL
+        if let url = URL(string: post.gridThumbnailURL), !post.gridThumbnailURL.isEmpty {
+            print("FullPostCell: Загрузка изображения поста из gridThumbnailURL: \(post.gridThumbnailURL)")
+            loadPostImage(from: url, indexPath: indexPath)
+        }
+        // Иначе используем первый элемент mediaItems
+        else if let firstMediaItem = post.mediaItems.first, let url = URL(string: firstMediaItem.url) {
+            print("FullPostCell: Загрузка изображения поста из mediaItems[0]: \(firstMediaItem.url)")
+            loadPostImage(from: url, indexPath: indexPath)
         } else {
-             print("FullPostCell: ОШИБКА - URL изображения поста пустой или некорректный: \(post.imageURL)")
-             // Вызываем замыкание для обновления с дефолтным ratio 1.0
-             // Исправлено: используем self.indexPath и self.needsLayoutUpdateAction
-             if let currentPath = self.indexPath, let updateAction = self.needsLayoutUpdateAction {
+            print("FullPostCell: ОШИБКА - URL изображения поста отсутствует")
+            // Устанавливаем placeholder
+            postImageView.image = UIImage(systemName: "photo")?.withTintColor(.darkGray)
+            // Вызываем замыкание для обновления с дефолтным ratio 1.0
+            if let currentPath = self.indexPath, let updateAction = self.needsLayoutUpdateAction {
                 updateAction(currentPath, 1.0) // Передаем дефолтный aspect ratio
-             }
+            }
         }
 
         // Лайки
@@ -396,6 +378,37 @@ class FullPostCell: UICollectionViewCell {
             captionLabel.numberOfLines = 0
             isCaptionExpanded = true // Считаем развернутым
         }
+    }
+
+    // Вспомогательный метод для загрузки изображения поста
+    private func loadPostImage(from url: URL, indexPath: IndexPath) {
+        postImageView.kf.indicatorType = .activity
+        // Определяем плейсхолдер
+        let placeholderImage = UIImage(systemName: "photo")?.withTintColor(.darkGray)
+        
+        postImageView.kf.setImage(
+            with: url,
+            placeholder: placeholderImage,
+            options: [.transition(.fade(0.2))],
+            completionHandler: { [weak self] result in
+                // Используем слабую ссылку на self
+                guard let self = self, let currentIndexPath = self.indexPath, let updateAction = self.needsLayoutUpdateAction else { return }
+                var finalAspectRatio: CGFloat = 1.0 // Дефолтное значение
+                
+                switch result {
+                case .success(let value):
+                    print("FullPostCell: Изображение поста успешно загружено для indexPath \(currentIndexPath), размер: \(value.image.size)")
+                    if value.image.size.width > 0 {
+                        finalAspectRatio = value.image.size.height / value.image.size.width
+                    }
+                case .failure(let error):
+                    print("FullPostCell: ОШИБКА загрузки изображения поста для indexPath \(currentIndexPath): \(error.localizedDescription)")
+                    // Используем дефолтное ratio 1.0
+                }
+                // Вызываем замыкание для обновления размера с ФИНАЛЬНЫМ aspect ratio
+                updateAction(currentIndexPath, finalAspectRatio)
+            }
+        )
     }
 
     // MARK: - Actions
