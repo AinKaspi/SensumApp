@@ -3,7 +3,8 @@ import PhotosUI
 
 protocol ImageCropViewControllerDelegate: AnyObject {
     /// Вызывается, когда пользователь закончил кроп изображения
-    func imageCropViewController(_ controller: ImageCropViewController, didFinishCroppingImage image: UIImage)
+    /// - Parameter aspectRatioString: Строковое представление выбранного соотношения ("1:1", "9:16", "1.91:1")
+    func imageCropViewController(_ controller: ImageCropViewController, didFinishCroppingImage image: UIImage, withAspectRatio aspectRatioString: String)
     
     /// Вызывается, когда пользователь отменил кроп
     func imageCropViewControllerDidCancel(_ controller: ImageCropViewController)
@@ -57,7 +58,7 @@ class ImageCropViewController: UIViewController {
     }()
     
     private lazy var aspectRatioSegmentedControl: UISegmentedControl = {
-        let items = ["1:1", "4:5", "16:9"]
+        let items = ["1:1", "9:16", "1.91:1"]
         let control = UISegmentedControl(items: items)
         control.selectedSegmentIndex = 0
         control.backgroundColor = UIColor.darkGray
@@ -88,8 +89,8 @@ class ImageCropViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         
-        // Устанавливаем изображение
-        cropView.setImage(originalImage)
+        // Устанавливаем изображение через свойство
+        cropView.image = originalImage
         
         // Устанавливаем начальное соотношение сторон (квадрат)
         cropView.aspectRatio = 1.0
@@ -145,7 +146,11 @@ class ImageCropViewController: UIViewController {
     
     @objc private func doneButtonTapped() {
         if let croppedImage = cropView.croppedImage() {
-            delegate?.imageCropViewController(self, didFinishCroppingImage: croppedImage)
+            // Получаем строковое представление текущего выбранного соотношения
+            let selectedIndex = aspectRatioSegmentedControl.selectedSegmentIndex
+            let aspectRatioString = aspectRatioSegmentedControl.titleForSegment(at: selectedIndex) ?? "1:1" // Фоллбек на 1:1
+            // Вызываем обновленный метод делегата
+            delegate?.imageCropViewController(self, didFinishCroppingImage: croppedImage, withAspectRatio: aspectRatioString)
         } else {
             // Если по какой-то причине не удалось получить кропнутое изображение,
             // отменяем операцию
@@ -161,11 +166,11 @@ class ImageCropViewController: UIViewController {
             // 1:1
             aspectRatio = 1.0
         case 1:
-            // 4:5
-            aspectRatio = 4.0 / 5.0
+            // 9:16 (Вертикальное)
+            aspectRatio = 9.0 / 16.0
         case 2:
-            // 16:9
-            aspectRatio = 16.0 / 9.0
+            // 1.91:1 (Горизонтальное)
+            aspectRatio = 1.0 / 1.91
         default:
             aspectRatio = 1.0
         }

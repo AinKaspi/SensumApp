@@ -28,6 +28,7 @@
 		B1686C3A2DBF7D200074FA46 /* Exercise.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1686C382DBF7D200074FA46 /* Exercise.swift */; };
 		B1686C3C2DC0AC4A0074FA46 /* MediaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1686C3B2DC0AC4A0074FA46 /* MediaItem.swift */; };
 		B1686C482DC0F7C80074FA46 /* Inject in Frameworks */ = {isa = PBXBuildFile; productRef = B1686C472DC0F7C80074FA46 /* Inject */; };
+		B1686C4F2DC145850074FA46 /* ImageCropView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1686C4D2DC145850074FA46 /* ImageCropView.swift */; };
 		B16E96222DBA6121005893D5 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBD12DB6DFD200A696B9 /* AuthService.swift */; };
 		B1A4835E2DB6CD0000755E25 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = B1A4835D2DB6CD0000755E25 /* FirebaseAnalyticsOnDeviceConversion */; };
 		B1A483602DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */ = {isa = PBXBuildFile; productRef = B1A4835F2DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport */; };
@@ -79,6 +80,7 @@
 		B1686C372DBF7D200074FA46 /* Comment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Comment.swift; sourceTree = "<group>"; };
 		B1686C382DBF7D200074FA46 /* Exercise.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Exercise.swift; sourceTree = "<group>"; };
 		B1686C3B2DC0AC4A0074FA46 /* MediaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaItem.swift; sourceTree = "<group>"; };
+		B1686C4D2DC145850074FA46 /* ImageCropView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCropView.swift; sourceTree = "<group>"; };
 		B1A6E6E92DA7F0F500E9E9EB /* ROADMAP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ROADMAP.md; sourceTree = "<group>"; };
 		B1AE8A622DB8E4F90089728F /* UITextView+Combine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UITextView+Combine.swift"; sourceTree = "<group>"; };
 		C1B889D639EA09C28DFCEA72 /* Pods-SensumApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SensumApp.debug.xcconfig"; path = "Target Support Files/Pods-SensumApp/Pods-SensumApp.debug.xcconfig"; sourceTree = "<group>"; };
@@ -221,9 +223,18 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		B1686C4E2DC145850074FA46 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B1686C4D2DC145850074FA46 /* ImageCropView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
 		B190B3022DB6CF86007376B9 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				B1686C4E2DC145850074FA46 /* Views */,
 				B134D83E2DBE50630014DB02 /* DI */,
 				B117CBD62DB6DFD200A696B9 /* Services */,
 				B117CBCE2DB6DFA100A696B9 /* Models */,
@@ -377,6 +388,7 @@
 				B134D8152DBA62160014DB02 /* ProgressData.swift in Sources */,
 				B117CBD02DB6DFA100A696B9 /* Post.swift in Sources */,
 				B117CBD72DB6DFD200A696B9 /* FollowService.swift in Sources */,
+				B1686C4F2DC145850074FA46 /* ImageCropView.swift in Sources */,
 				B117CBD82DB6DFD200A696B9 /* PostService.swift in Sources */,
 				B117CBD92DB6DFD200A696B9 /* UserProfileService.swift in Sources */,
 				B117CBDA2DB6DFD200A696B9 /* StorageService.swift in Sources */,

@@ -34,14 +34,18 @@ class MediaThumbnailCell: UICollectionViewCell {
         fatalError("init(coder:) has not been implemented")
     }
 
-    // Используем MediaItem из Core/Models
-    func configure(with media: MediaItem) {
+    // Меняем сигнатуру для приема UIImage?
+    func configure(with image: UIImage?) {
+        imageView.image = image
+        // Убираем switch, так как теперь принимаем только UIImage?
+        /*
         switch media {
         case .image(let image):
             imageView.image = image
         // case .video: // Убрали обработку видео
         //     break
         }
+        */
         // Убрали currentMediaItem
     }
 

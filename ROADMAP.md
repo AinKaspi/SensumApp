@@ -1,5 +1,47 @@
 # Полный Roadmap Проекта SensumApp (Версия 1.9 - Включая скролл постов в Таб 2 Person)
 
+---
+
+## Текущая Задача: Рефакторинг Системы Постов [TASK.APS]
+
+**Цель:** Реализовать создание и отображение постов с поддержкой каруселей, индивидуального выбора формата (1:1, 9:16, 1.91:1) и кропа для каждого изображения, генерацией 9:16 миниатюр для сетки профиля и динамическим отображением в ленте.
+
+**Подзадачи:**
+
+1.  **[ ] `[TASK.APS.1]` Обновить Enum `PostAspectRatio`:** Заменить "16:9" на "1.91:1", скорректировать `ratio`.
+2.  **[ ] `[TASK.APS.2]` Рефакторинг `ImageCropViewController`:**
+    *   [ ] `-` Обновить `UISegmentedControl` на "1:1", "9:16", "1.91:1".
+    *   [ ] `-` Изменить делегат `ImageCropViewControllerDelegate` для передачи `aspectRatioString`.
+    *   [ ] `-` Обновить вызов делегата в `doneButtonTapped`.
+3.  **[ ] `[TASK.APS.3]` Рефакторинг `CreatePostViewModel`:**
+    *   [ ] `-` Определить структуру `EditableMediaItem` для хранения оригинала, кропа, соотношения сторон.
+    *   [ ] `-` Заменить `@Published var selectedMedia: [MediaItem]` на `@Published var editableMedia: [EditableMediaItem]`.
+    *   [ ] `-` Обновить логику инициализации и управления `editableMedia`.
+    *   [ ] `-` Переписать `sharePost`:
+        *   [ ] `-` Индивидуальный кроп каждого `EditableMediaItem`.
+        *   [ ] `-` Параллельная загрузка финальных изображений.
+        *   [ ] `-` Определение `feedAspectRatio` поста (по первому элементу).
+        *   [ ] `-` Генерация 9:16 кропа первого фото для `gridThumbnail`.
+        *   [ ] `-` Загрузка `gridThumbnail`.
+        *   [ ] `-` Формирование `[MediaItemDTO]`.
+        *   [ ] `-` Вызов нового `PostService.createPost(...)`.
+4.  **[ ] `[TASK.APS.4]` Рефакторинг `CreatePostViewController`:**
+    *   [ ] `-` Адаптировать UI для работы с `editableMedia` из ViewModel.
+    *   [ ] `-` Обновить логику выбора миниатюры (`didSelectItemAt`) для загрузки `EditableMediaItem` в `imageCropView`.
+    *   [ ] `-` Обновить логику `aspectRatioChanged` для изменения соотношения **только текущего** `EditableMediaItem`.
+    *   [ ] `-` Реализовать сохранение параметров кропа из `imageCropView` обратно в **текущий** `EditableMediaItem` при смене фокуса/перед `shareTapped`.
+5.  **[ ] `[TASK.APS.5]` Проверить `PostService.createPost(...)`:** Убедиться, что он корректно сохраняет `mediaItems`, `feedAspectRatio`, `gridThumbnailURL`.
+6.  **[ ] `[TASK.APS.6]` Рефакторинг Отображения `Feed`:**
+    *   [ ] `-` `FeedCell`: Поддержка карусели (`mediaItems.count > 1`). Динамическая высота медиа-контейнера по `post.feedAspectRatio`.
+    *   [ ] `-` `FeedViewController`: Включить self-sizing / динамический расчет высоты ячеек.
+7.  **[ ] `[TASK.APS.7]` Рефакторинг Отображения `Person` (Скролл):**
+    *   [ ] `-` Найти `UserPostScrollViewController` / Cell.
+    *   [ ] `-` `Cell`: Поддержка карусели. Динамическая высота медиа-контейнера по `post.feedAspectRatio`.
+8.  **[ ] `[TASK.APS.8]` Проверить Отображение `Person` (Сетка):**
+    *   [ ] `-` `PostGridCell`: Убедиться, что используется `post.gridThumbnailURL` и формат 9:16.
+
+---
+
 **Дата:** 24 апреля 2025 г.
 
 **Общее Видение:** Создать уникальное iOS-приложение (Social Fitness RPG) с 5 основными разделами (Feed, Person, Leveling, Progress, Store), отображающее логотип "DOJO", предоставляющее систему уведомлений и обмен сообщениями. Приложение мотивирует пользователей через комбинацию социального взаимодействия (лента рекомендаций, профили), AI-анализа фитнес-упражнений (MediaPipe) и продвинутых RPG-механик (XP, уровни, аттрибуты, ранги, бонусы).

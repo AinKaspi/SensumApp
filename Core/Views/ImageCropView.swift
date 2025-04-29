@@ -15,7 +15,7 @@ class ImageCropView: UIView {
             
             scrollView.isHidden = false
             imageView.image = image
-            resetImagePosition()
+            resetCropParameters(animated: false)
             
             // Обновляем layout после того, как view будет размещено
             if superview != nil {
@@ -84,12 +84,50 @@ class ImageCropView: UIView {
         super.layoutSubviews()
         updateConstraintsForAspectRatio()
         
+        // Обновляем минимальный зум ПОСЛЕ обновления констрейнтов контейнера
         if let image = image {
             updateMinZoomScaleForImage(image)
         }
     }
     
-    // MARK: - Public Methods
+    // MARK: - Public Methods (Crop Parameters)
+    
+    /// Текущий масштаб масштабирования изображения
+    var currentZoomScale: CGFloat {
+        return scrollView.zoomScale
+    }
+    
+    /// Минимально допустимый масштаб масштабирования
+    var minimumZoomScale: CGFloat {
+        return scrollView.minimumZoomScale
+    }
+    
+    /// Текущее смещение содержимого scrollView
+    var currentContentOffset: CGPoint {
+        return scrollView.contentOffset
+    }
+    
+    /// Устанавливает параметры кропа (масштаб и смещение)
+    /// - Parameters:
+    ///   - zoomScale: Новый масштаб
+    ///   - contentOffset: Новое смещение
+    ///   - animated: Анимировать ли изменение
+    func setCrop(zoomScale: CGFloat, contentOffset: CGPoint, animated: Bool = false) {
+        scrollView.setZoomScale(zoomScale, animated: animated)
+        scrollView.setContentOffset(contentOffset, animated: animated)
+    }
+    
+    /// Сбрасывает позицию и масштаб изображения к начальным значениям
+    /// - Parameter animated: Анимировать ли сброс
+    func resetCropParameters(animated: Bool = false) {
+        let minZoom = scrollView.minimumZoomScale
+        scrollView.setZoomScale(minZoom, animated: animated)
+        // После сброса зума нужно перецентровать
+        centerImage(animated: animated)
+    }
+    
+    
+    // MARK: - Public Methods (Image Interaction)
     
     /// Возвращает кропнутое изображение с текущими настройками
     func croppedImage() -> UIImage? {
@@ -122,13 +160,8 @@ class ImageCropView: UIView {
             return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
         }
         
+        print("⚠️ ImageCropView: Не удалось выполнить кроп cgImage.cropping(to: cropRect)")
         return nil
-    }
-    
-    /// Сбрасывает позицию и масштаб изображения
-    func resetImagePosition() {
-        scrollView.zoomScale = 1.0
-        centerImage()
     }
     
     // MARK: - Private Methods
@@ -214,19 +247,48 @@ class ImageCropView: UIView {
         centerImage()
     }
     
-    private func centerImage() {
+    private func centerImage(animated: Bool = false) {
         // Центрируем изображение, если оно меньше, чем scrollView
-        let contentSize = scrollView.contentSize
+        let contentWidth = scrollView.contentSize.width
+        let contentHeight = scrollView.contentSize.height
         let scrollViewSize = scrollView.bounds.size
-        let horizontalPadding = max(0, (scrollViewSize.width - contentSize.width) / 2)
-        let verticalPadding = max(0, (scrollViewSize.height - contentSize.height) / 2)
         
-        scrollView.contentInset = UIEdgeInsets(
+        // Используем frame imageView вместо contentSize, т.к. contentSize может быть больше scrollView
+        let imageViewSize = imageView.frame.size
+        
+        let horizontalPadding = max(0, (scrollViewSize.width - imageViewSize.width) / 2)
+        let verticalPadding = max(0, (scrollViewSize.height - imageViewSize.height) / 2)
+        
+        let newInsets = UIEdgeInsets(
             top: verticalPadding,
             left: horizontalPadding,
             bottom: verticalPadding,
             right: horizontalPadding
         )
+        
+        if animated {
+            UIView.animate(withDuration: 0.2) {
+                self.scrollView.contentInset = newInsets
+            }
+        } else {
+            scrollView.contentInset = newInsets
+        }
+        
+        // Корректируем contentOffset, если изображение стало меньше видимой области
+        // чтобы избежать пустого пространства по краям после зума/отдаления
+        let newOffsetX = max(-newInsets.left, min(scrollView.contentOffset.x, contentWidth - scrollViewSize.width + newInsets.right))
+        let newOffsetY = max(-newInsets.top, min(scrollView.contentOffset.y, contentHeight - scrollViewSize.height + newInsets.bottom))
+        let newOffset = CGPoint(x: newOffsetX, y: newOffsetY)
+
+        if !scrollView.contentOffset.equalTo(newOffset) {
+             if animated {
+                 UIView.animate(withDuration: 0.2) {
+                     self.scrollView.contentOffset = newOffset
+                 }
+             } else {
+                 scrollView.contentOffset = newOffset
+             }
+        }
     }
     
     @objc private func handleDoubleTap(_ gestureRecognizer: UITapGestureRecognizer) {
@@ -251,10 +313,31 @@ class ImageCropView: UIView {
 
 extension ImageCropView: UIScrollViewDelegate {
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        return containerView
+        // Указываем, какой view масштабировать
+        return imageView // Масштабируем imageView, а не containerView
     }
     
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
-        centerImage()
+        // Центрируем изображение после зума
+        centerImage(animated: false) // Не анимируем при зуме пальцами
     }
+    
+    // Опционально: можно добавить scrollViewDidEndZooming для сохранения состояния
+     func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+         // Можно использовать для вызова делегата или сохранения состояния
+         print("ScrollView Did End Zooming at scale: \(scale)")
+     }
+
+     // Опционально: можно добавить scrollViewDidEndDragging/Decelerating для сохранения состояния
+     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+         if !decelerate {
+             // Сохраняем состояние, если скролл закончился без инерции
+             print("ScrollView Did End Dragging at offset: \(scrollView.contentOffset)")
+         }
+     }
+
+     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+         // Сохраняем состояние, если скролл закончился с инерцией
+         print("ScrollView Did End Decelerating at offset: \(scrollView.contentOffset)")
+     }
 } 

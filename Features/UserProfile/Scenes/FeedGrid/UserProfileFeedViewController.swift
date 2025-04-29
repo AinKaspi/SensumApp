@@ -1163,64 +1163,17 @@ extension UserProfileFeedViewController {
 
 // Добавляем соответствие ImageCropViewControllerDelegate
 extension UserProfileFeedViewController: ImageCropViewControllerDelegate {
-    func imageCropViewController(_ controller: ImageCropViewController, didFinishCroppingImage image: UIImage) {
-        // Получаем соотношение сторон изображения для применения к остальным изображениям
-        let aspectRatio = image.size.width / image.size.height
-        print("Selected image aspect ratio: \(aspectRatio)")
-        
-        // Закрываем контроллер кропа
-        controller.dismiss(animated: true) { [weak self] in
-            guard let self = self else { return }
-            
-            // Получаем текущие результаты и обрабатываем следующее изображение
-            if let results = controller.originalResults, let currentIndex = controller.originalIndex {
-                var updatedCroppedImages = controller.croppedImages ?? []
-                // Добавляем кропнутое изображение в массив
-                updatedCroppedImages.append(.image(image))
-                
-                // Обрабатываем следующее изображение или завершаем процесс
-                if currentIndex + 1 < results.count {
-                    // Есть еще изображения для обработки - используем запомненное соотношение сторон
-                    self.processNextImage(from: results, at: currentIndex + 1, withCroppedImages: updatedCroppedImages, selectedAspectRatio: aspectRatio)
-                } else {
-                    // Все изображения обработаны, переходим к созданию поста
-                    if let coordinator = self.delegate as? CurrentUserProfileCoordinator {
-                        coordinator.showCreatePost(with: updatedCroppedImages)
-                    } else {
-                        print("Error: Delegate does not conform to expected coordinator type or is nil.")
-                    }
-                }
-            } else {
-                // Если по какой-то причине нет информации о результатах, показываем экран создания поста с этим одним изображением
-                if let coordinator = self.delegate as? CurrentUserProfileCoordinator {
-                    coordinator.showCreatePost(with: [.image(image)])
-                }
-            }
-        }
+    func imageCropViewController(_ controller: ImageCropViewController, didFinishCroppingImage image: UIImage, withAspectRatio aspectRatioString: String) {
+        print("✂️ ImageCropViewControllerDelegate: didFinishCroppingImage - Соотношение: \(aspectRatioString)")
+        // TODO: Реализовать логику сохранения обрезанного аватара
+        // Например:
+        // viewModel.updateAvatar(image: image)
+        controller.dismiss(animated: true)
     }
     
     func imageCropViewControllerDidCancel(_ controller: ImageCropViewController) {
-        // Закрываем контроллер кропа
-        controller.dismiss(animated: true) { [weak self] in
-            guard let self = self else { return }
-            
-            // Пользователь отменил обработку этого изображения, переходим к следующему или завершаем
-            if let results = controller.originalResults, let currentIndex = controller.originalIndex, let croppedImages = controller.croppedImages {
-                // Если у нас уже есть какие-то обработанные изображения, продолжаем с ними
-                if !croppedImages.isEmpty {
-                    self.processNextImage(from: results, at: currentIndex + 1, withCroppedImages: croppedImages, selectedAspectRatio: nil)
-                } else if currentIndex == 0 {
-                    // Если это было первое изображение и пользователь отменил его, отменяем весь процесс
-                    print("First image crop cancelled, aborting the whole process.")
-                } else {
-                    // Если это не первое изображение, продолжаем с тем, что уже имеем
-                    self.processNextImage(from: results, at: currentIndex + 1, withCroppedImages: croppedImages, selectedAspectRatio: nil)
-                }
-            } else {
-                // Если нет информации о результатах, просто завершаем процесс
-                print("Image crop cancelled and no previous images available.")
-            }
-        }
+        print("✂️ ImageCropViewControllerDelegate: didCancel")
+        controller.dismiss(animated: true)
     }
 }
 
