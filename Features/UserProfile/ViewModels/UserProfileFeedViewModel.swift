@@ -16,6 +16,7 @@ class UserProfileFeedViewModel {
     // Состояния для UI
     @Published var userProfile: User? = nil
     @Published var userPosts: [Post] = []
+    @Published var totalLikes: Int? = nil // TODO: Реализовать получение этого значения
     @Published var progressData: ProgressData? = nil
     @Published var isFollowing: Bool = false // Только если !isCurrentUser
     @Published var isLoadingProfile: Bool = false

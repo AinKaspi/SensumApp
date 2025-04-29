@@ -9,14 +9,17 @@ class PostGridCell: UICollectionViewCell {
         let imageView = UIImageView()
         imageView.translatesAutoresizingMaskIntoConstraints = false
         imageView.contentMode = .scaleAspectFill
-        imageView.clipsToBounds = true
-        imageView.backgroundColor = .secondarySystemBackground // Placeholder color
+        imageView.clipsToBounds = true // Важно для скругления
+        imageView.backgroundColor = .secondarySystemBackground // Placeholder
+        // Добавляем скругление углов
+        imageView.layer.cornerRadius = 10
+        imageView.layer.masksToBounds = true // Убедимся, что изображение обрезается
         return imageView
     }()
     
     override init(frame: CGRect) {
         super.init(frame: frame)
-        contentView.addSubview(postImageView)
+        setupViews()
         setupConstraints()
     }
     
@@ -28,6 +31,10 @@ class PostGridCell: UICollectionViewCell {
         super.prepareForReuse()
         postImageView.kf.cancelDownloadTask() // Отменяем загрузку при переиспользовании
         postImageView.image = nil // Сбрасываем изображение
+    }
+    
+    private func setupViews() {
+        contentView.addSubview(postImageView)
     }
     
     private func setupConstraints() {
@@ -50,6 +57,9 @@ class PostGridCell: UICollectionViewCell {
                     .cacheOriginalImage
                 ]
             )
+        } else {
+            postImageView.image = UIImage(systemName: "photo") // Placeholder
+            postImageView.tintColor = .gray
         }
     }
 } 

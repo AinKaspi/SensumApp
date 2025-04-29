@@ -125,7 +125,10 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     
     private lazy var postsStatStack: UIStackView = createStatLabel(label: "Posts")
     private lazy var followersStatStack: UIStackView = createStatLabel(label: "Followers")
-    private lazy var followingStatStack: UIStackView = createStatLabel(label: "Following")
+    // Убираем Following
+    // private lazy var followingStatStack: UIStackView = createStatLabel(label: "Following")
+    // Добавляем Likes
+    private lazy var likesStatStack: UIStackView = createStatLabel(label: "Likes")
     
     // Создаем spacer views для statsStackView
     private func createSpacerView() -> UIView {
@@ -137,6 +140,8 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     }
     private lazy var spacer1 = createSpacerView()
     private lazy var spacer2 = createSpacerView()
+    // Убираем третий spacer
+    // private lazy var spacer3 = createSpacerView()
     
     private lazy var statsStackView: UIStackView = {
         // Убираем subviews из инициализатора, будем добавлять в setupViews
@@ -153,8 +158,8 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         let stack = UIStackView()
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.axis = .vertical
-        // Увеличиваем зазор между именем и статами
-        stack.spacing = 8 // Было 4
+        // Увеличиваем зазор между именем и статами еще раз
+        stack.spacing = 11 // Было 8
         stack.alignment = .fill // Новое: заставляем дочерние view растягиваться
         return stack
     }()
@@ -281,10 +286,12 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     // --- Сетка Постов ---
     private lazy var postsCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
-        let spacing: CGFloat = 1
+        let spacing: CGFloat = 3 // Новый spacing = 3
         layout.minimumInteritemSpacing = spacing
         layout.minimumLineSpacing = spacing
         layout.scrollDirection = .vertical
+        // Задаем отступы секции
+        layout.sectionInset = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10) // Новый отступ = 10
         
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
@@ -378,9 +385,9 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         // Добавляем элементы и spacer'ы в statsStackView
         statsStackView.addArrangedSubview(postsStatStack)
         statsStackView.addArrangedSubview(spacer1)
-        statsStackView.addArrangedSubview(followersStatStack)
+        statsStackView.addArrangedSubview(likesStatStack)
         statsStackView.addArrangedSubview(spacer2)
-        statsStackView.addArrangedSubview(followingStatStack)
+        statsStackView.addArrangedSubview(followersStatStack)
         
         // Добавляем кнопки в стек
         configureActionButtons(isCurrentUser: self.viewModel.isCurrentUser) // Этот метод добавит кнопки в actionButtonsStackView
@@ -400,7 +407,7 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     }
 
     private func setupConstraints() {
-        let padding: CGFloat = 16
+        let padding: CGFloat = 10 // Новый основной отступ = 10
         let topBarHeight: CGFloat = 44 // Высота верхней панели
         let topBarButtonSize: CGFloat = 30 // Размер иконок вверху
         // let statsSpacing: CGFloat = 5 // Не используется напрямую
@@ -463,29 +470,31 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
 
             // Констрейнты для nameAndStatsContainer
             nameAndStatsContainer.centerYAnchor.constraint(equalTo: avatarImageView.centerYAnchor), // Центрируем по вертикали с аватаром
-            nameAndStatsContainer.leadingAnchor.constraint(equalTo: avatarImageView.trailingAnchor, constant: padding + 10), // Было padding + 5
+            nameAndStatsContainer.leadingAnchor.constraint(equalTo: avatarImageView.trailingAnchor, constant: padding + 13), // Было padding + 3
             nameAndStatsContainer.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding), // До правого края
             
             // Добавляем констрейнт для равенства ширины spacer'ов
             spacer1.widthAnchor.constraint(equalTo: spacer2.widthAnchor),
+            // Убираем равенство с spacer3
+            // spacer2.widthAnchor.constraint(equalTo: spacer3.widthAnchor),
             
             // Статус (под аватаром и статами)
-            statusLabel.topAnchor.constraint(greaterThanOrEqualTo: avatarImageView.bottomAnchor, constant: padding),
-            statusLabel.topAnchor.constraint(greaterThanOrEqualTo: nameAndStatsContainer.bottomAnchor, constant: padding),
+            statusLabel.topAnchor.constraint(greaterThanOrEqualTo: avatarImageView.bottomAnchor, constant: padding + 5),
+            statusLabel.topAnchor.constraint(greaterThanOrEqualTo: nameAndStatsContainer.bottomAnchor, constant: padding + 5), // Привязка к контейнеру
             statusLabel.leadingAnchor.constraint(equalTo: profileHeaderView.leadingAnchor, constant: padding),
             statusLabel.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding),
 
-            // Стек кнопок действий (под статусом)
-            actionButtonsStackView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: padding),
+            // Стек кнопок действий (под статусом) (используем новый padding = 10)
+            actionButtonsStackView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: padding + 10),
             actionButtonsStackView.leadingAnchor.constraint(equalTo: profileHeaderView.leadingAnchor, constant: padding),
             actionButtonsStackView.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding),
             // Привязываем низ хедера к низу стека кнопок
             profileHeaderView.bottomAnchor.constraint(equalTo: actionButtonsStackView.bottomAnchor, constant: padding)
         ])
 
-        // Обновляем констрейнты CollectionView (верх привязан к низу profileHeaderView)
+        // Обновляем констрейнты CollectionView (верх привязан к низу profileHeaderView) (используем новый padding = 10)
         NSLayoutConstraint.activate([
-            postsCollectionView.topAnchor.constraint(equalTo: profileHeaderView.bottomAnchor, constant: padding), 
+            postsCollectionView.topAnchor.constraint(equalTo: profileHeaderView.bottomAnchor, constant: padding + 10), 
             postsCollectionView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor),
             postsCollectionView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor),
             // Важно: Привязываем низ CollectionView к низу contentWrapperView
@@ -537,7 +546,8 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
                 // Обновляем статы (только Posts, Followers, Following)
                 self.updateStatStack(self.postsStatStack, value: "\(self.viewModel.userPosts.count)", label: "Posts")
                 self.updateStatStack(self.followersStatStack, value: "\(user.followerCount ?? 0)", label: "Followers")
-                self.updateStatStack(self.followingStatStack, value: "\(user.followingCount ?? 0)", label: "Following")
+                // Убираем обновление Following
+                // self.updateStatStack(self.followingStatStack, value: "\(user.followingCount ?? 0)", label: "Following")
                 
                 print("Attempting to load avatar from URL: \(user.avatarURL ?? "nil")") 
                 
@@ -573,6 +583,15 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
                 self.configureActionButtons(isCurrentUser: self.viewModel.isCurrentUser)
                 // Настраиваем видимость кнопок в topBarView
                 self.configureTopBarButtons(isCurrentUser: self.viewModel.isCurrentUser)
+            }
+            .store(in: &cancellables)
+        
+        // Подписка на общее количество лайков (НОВАЯ)
+        viewModel.$totalLikes
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] likes in
+                // Используем ?? 0 и форматируем?
+                self?.updateStatStack(self?.likesStatStack ?? UIStackView(), value: "\(likes ?? 0)", label: "Likes")
             }
             .store(in: &cancellables)
         
@@ -821,12 +840,18 @@ extension UserProfileFeedViewController {
 extension UserProfileFeedViewController {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let layout = collectionViewLayout as! UICollectionViewFlowLayout
-        let spacing = layout.minimumInteritemSpacing
+        let spacing: CGFloat = 3 // Используем новый spacing = 3
         let itemsPerRow: CGFloat = 3
-        let totalSpacing = (itemsPerRow - 1) * spacing
-        // Используем ширину CollectionView (которая ограничена contentWrapperView)
-        let itemWidth = (collectionView.bounds.width - totalSpacing) / itemsPerRow
-        // Рассчитываем высоту 16:9
+        let totalSpacing = (itemsPerRow - 1) * spacing // (3-1)*3 = 6
+        // Убираем расчет боковых отступов здесь, используем sectionInset
+        // let sidePadding: CGFloat = 20
+        // let totalPadding = sidePadding * 2
+        
+        // Доступная ширина = ширина collection view - отступы секции слева/справа - общее пространство между ячейками
+        let availableWidth = collectionView.bounds.width - layout.sectionInset.left - layout.sectionInset.right - totalSpacing
+        let itemWidth = availableWidth / itemsPerRow
+        
+        // Рассчитываем высоту 16:9 (перевернуто, т.к. ячейки вертикальные)
         let itemHeight = itemWidth * (16.0 / 9.0)
         return CGSize(width: itemWidth, height: itemHeight)
     }
