@@ -222,8 +222,31 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
     func didFinishCreatingPost(_ controller: CreatePostViewController) {
         print("CurrentUserProfileCoordinator: Create Post finished successfully.")
         controller.dismiss(animated: true) { [weak self] in
-            // TODO: Обновить ленту или профиль после создания поста?
-            // Возможно, отправить уведомление или вызвать метод обновления у UserProfileFeedViewModel
+            guard let self = self else { return }
+            
+            // Обновляем профиль и ленту после создания поста
+            print("CurrentUserProfileCoordinator: Updating profile and feed after post creation")
+            
+            // 1. Отправляем уведомление для обновления ленты и профиля
+            // Это вызовет обновление данных во всех подписанных ViewModel
+            NotificationCenter.default.post(name: .didCreateNewPost, object: nil)
+            print("CurrentUserProfileCoordinator: Notification .didCreateNewPost posted")
+            
+            // 2. Для надежности явно обновляем данные профиля текущего пользователя
+            // через первый экран в стеке навигации
+            if let profileVC = self.navigationController.viewControllers.first(where: { $0 is UserProfileFeedViewController }) as? UserProfileFeedViewController {
+                print("CurrentUserProfileCoordinator: Explicitly triggering fetchAllUserData()")
+                profileVC.viewModel.fetchAllUserData()
+                
+                // 3. Принудительно перезагружаем коллекцию с небольшой задержкой, чтобы данные успели загрузиться
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    print("CurrentUserProfileCoordinator: Forcing collectionView reload")
+                    profileVC.postsCollectionView.reloadData()
+                }
+            } else {
+                print("CurrentUserProfileCoordinator: Warning - couldn't find UserProfileFeedViewController in navigation stack")
+            }
+            
             print("CurrentUserProfileCoordinator: Create Post controller dismissed.")
         }
     }

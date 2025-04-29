@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import FirebaseFirestore
 
 class UserProfileFeedViewModel {
     
@@ -22,9 +23,12 @@ class UserProfileFeedViewModel {
     @Published var isLoadingProfile: Bool = false
     @Published var isLoadingProgress: Bool = false
     @Published var isLoadingPosts: Bool = false
+    @Published var isLastPageReached: Bool = false
     @Published var errorMessage: String? = nil
     
     private var cancellables = Set<AnyCancellable>()
+    private var lastDocumentSnapshot: DocumentSnapshot? = nil
+    private let postsPerPage: Int = 18
     
     init(userID: String, 
          isCurrentUser: Bool,
@@ -46,6 +50,24 @@ class UserProfileFeedViewModel {
         if !isCurrentUser {
             checkFollowingStatus()
         }
+        
+        // Подписываемся на уведомление о создании нового поста, но только если
+        // это профиль текущего пользователя (для других профилей не обновляем автоматически)
+        if isCurrentUser {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleNewPostCreated),
+                name: .didCreateNewPost,
+                object: nil
+            )
+            print("📣 UserProfileFeedVM: Подписались на уведомления о новых постах")
+        }
+    }
+    
+    deinit {
+        // Отписываемся от уведомлений
+        NotificationCenter.default.removeObserver(self, name: .didCreateNewPost, object: nil)
+        print("📣 UserProfileFeedVM: Отписались от уведомлений при деинициализации")
     }
     
     // MARK: - Data Fetching
@@ -95,14 +117,16 @@ class UserProfileFeedViewModel {
         
         // --- Загрузка Постов --- 
         group.enter()
+        print("🟢 UserProfileFeedVM: Начинаем загрузку постов для пользователя: \(userID)")
         postService.fetchPosts(forUserID: userID, limit: 18, startingAfter: nil) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isLoadingPosts = false
                 switch result {
                 case .success(let resultData):
-                    self?.userPosts = resultData.posts
+                    let posts = resultData.posts
+                    self?.userPosts = posts
                 case .failure(let error):
-                     print("UserProfileFeedVM Error (Fetch Posts): \(error.localizedDescription)")
+                     print("❌ UserProfileFeedVM Error (Fetch Posts): \(error.localizedDescription)")
                     if fetchError == nil { fetchError = error }
                 }
                 group.leave()
@@ -192,5 +216,99 @@ class UserProfileFeedViewModel {
         print("Edit profile button tapped")
         // TODO: Передать координатору запрос на открытие экрана редактирования
         // coordinatorDelegate?.didRequestEditProfile()
+    }
+    
+    // MARK: - Notification Handling
+    
+    @objc private func handleNewPostCreated() {
+        print("📣 UserProfileFeedVM: Получено уведомление о новом посте. Обновляем данные профиля.")
+        fetchAllUserData()
+    }
+    
+    // Добавляем метод для загрузки только постов, с возможностью принудительного обновления
+    func fetchPosts(forceReload: Bool = false) {
+        // Устанавливаем флаг загрузки
+        isLoadingPosts = true
+        
+        // Если это принудительное обновление, сбрасываем состояние пагинации
+        if forceReload {
+            lastDocumentSnapshot = nil
+            isLastPageReached = false
+        }
+        
+        print("🟢 UserProfileFeedVM: Начинаем загрузку постов для пользователя: \(userID)" + (forceReload ? " (принудительное обновление)" : ""))
+        
+        // Вызываем сервис для загрузки постов
+        postService.fetchPosts(forUserID: userID, limit: postsPerPage, startingAfter: nil) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                
+                self.isLoadingPosts = false
+                
+                switch result {
+                case .success(let resultData):
+                    let posts = resultData.posts
+                    print("✅ UserProfileFeedVM: Успешно загружено \(posts.count) постов для пользователя \(self.userID)")
+                    self.userPosts = posts
+                    
+                    // Сохраняем последний документ для пагинации
+                    self.lastDocumentSnapshot = resultData.lastSnapshot
+                    
+                    // Проверяем, достигнут ли конец страницы
+                    if posts.count < self.postsPerPage {
+                        self.isLastPageReached = true
+                        print("📜 UserProfileFeedVM: Достигнут конец списка постов (получено < \(self.postsPerPage))")
+                    } else {
+                        self.isLastPageReached = false
+                    }
+                    
+                case .failure(let error):
+                    print("❌ UserProfileFeedVM Error (Fetch Posts): \(error.localizedDescription)")
+                    self.errorMessage = "Не удалось загрузить посты: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    // Метод для загрузки следующей страницы постов
+    func loadMorePosts() {
+        // Проверяем, что не выполняется загрузка и не достигнут конец списка
+        guard !isLoadingPosts, !isLastPageReached else {
+            print("📜 UserProfileFeedVM: Пропускаем loadMorePosts - уже загружается или достигнут конец")
+            return
+        }
+        
+        isLoadingPosts = true
+        print("📜 UserProfileFeedVM: Загружаем следующую страницу постов после документа: \(lastDocumentSnapshot != nil ? "имеется" : "nil")")
+        
+        postService.fetchPosts(forUserID: userID, limit: postsPerPage, startingAfter: lastDocumentSnapshot) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                
+                self.isLoadingPosts = false
+                
+                switch result {
+                case .success(let resultData):
+                    let newPosts = resultData.posts
+                    print("✅ UserProfileFeedVM: Успешно загружено еще \(newPosts.count) постов")
+                    
+                    // Добавляем новые посты к существующим
+                    self.userPosts.append(contentsOf: newPosts)
+                    
+                    // Обновляем последний документ
+                    self.lastDocumentSnapshot = resultData.lastSnapshot
+                    
+                    // Проверяем, достигнут ли конец страницы
+                    if newPosts.count < self.postsPerPage {
+                        self.isLastPageReached = true
+                        print("📜 UserProfileFeedVM: Достигнут конец списка постов")
+                    }
+                    
+                case .failure(let error):
+                    print("❌ UserProfileFeedVM Error (Load More Posts): \(error.localizedDescription)")
+                    self.errorMessage = "Не удалось загрузить дополнительные посты: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 } 

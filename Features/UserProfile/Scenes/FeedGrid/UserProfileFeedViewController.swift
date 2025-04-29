@@ -18,7 +18,7 @@ protocol UserProfileFeedViewControllerDelegate: AnyObject {
 // Обновляем: используем PHPickerViewControllerDelegate и добавляем CreatePostViewControllerDelegate
 // Убираем лишние протоколы из объявления класса, они будут в extensions
 // Consolidated protocol conformances here
-class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDelegate, CreatePostViewControllerDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
+class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDelegate, CreatePostViewControllerDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout, UICollectionViewDataSourcePrefetching {
 
     // Добавляем ViewModel
     var viewModel: UserProfileFeedViewModel! // Используем !, т.к. он будет инжектирован координатором
@@ -272,21 +272,15 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     */
     
     // --- Сетка Постов ---
-    private lazy var postsCollectionView: UICollectionView = {
+    lazy var postsCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
-        let spacing: CGFloat = 3 // Новый spacing = 3
-        layout.minimumInteritemSpacing = spacing
-        layout.minimumLineSpacing = spacing
-        layout.scrollDirection = .vertical
-        // Задаем отступы секции
-        layout.sectionInset = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10) // Новый отступ = 10
-        
+        layout.minimumLineSpacing = 3 // Меньше расстояние между строками
+        layout.minimumInteritemSpacing = 3 // Меньше расстояние между ячейками
+        layout.sectionInset = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0) // Убираем отступы секции
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView.translatesAutoresizingMaskIntoConstraints = false
-        collectionView.backgroundColor = .clear
+        collectionView.backgroundColor = .black
         collectionView.register(PostGridCell.self, forCellWithReuseIdentifier: PostGridCell.identifier)
-        collectionView.dataSource = self
-        collectionView.delegate = self // Устанавливаем delegate для FlowLayout
+        collectionView.register(LoadingFooterView.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter, withReuseIdentifier: "LoadingFooter")
         return collectionView
     }()
 
@@ -338,12 +332,34 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        // Устанавливаем фон основного view
         view.backgroundColor = .black
+        
+        // Явно задаем translatesAutoresizingMaskIntoConstraints
+        postsCollectionView.translatesAutoresizingMaskIntoConstraints = false
+        
         setupViews()
         setupConstraints()
-        setupBindings()
-        // Устанавливаем contentInset ПОСЛЕ настройки констрейнтов
-        setupContentInset()
+        bindViewModel()
+        
+        // Настройка делегатов
+        postsCollectionView.dataSource = self
+        postsCollectionView.delegate = self
+        postsCollectionView.prefetchDataSource = self
+        
+        // Проверка, является ли это профилем текущего пользователя
+        setupActionsForUserType()
+        
+        if viewModel.isCurrentUser {
+            setupCurrentUserTopBar()
+        } else {
+            setupOtherUserTopBar()
+        }
+        
+        // Загружаем данные, если это необходимо
+        if viewModel.userProfile == nil {
+            viewModel.fetchAllUserData()
+        }
     }
 
     // MARK: - Setup UI
@@ -408,22 +424,21 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
             topBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
             topBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
             topBarView.heightAnchor.constraint(equalToConstant: topBarHeight),
-            
+
             // Имя пользователя слева (с небольшим отступом от края панели)
             topBarUsernameLabel.leadingAnchor.constraint(equalTo: topBarView.leadingAnchor, constant: 4),
             topBarUsernameLabel.centerYAnchor.constraint(equalTo: topBarView.centerYAnchor),
-            // Ограничиваем ширину имени справа до кнопки настроек
-            topBarUsernameLabel.trailingAnchor.constraint(lessThanOrEqualTo: topBarSettingsButton.leadingAnchor, constant: -8),
-            
+
             // Кнопка настроек сразу справа от имени
             topBarSettingsButton.centerYAnchor.constraint(equalTo: topBarView.centerYAnchor),
             topBarSettingsButton.leadingAnchor.constraint(equalTo: topBarUsernameLabel.trailingAnchor, constant: 4),
             topBarSettingsButton.widthAnchor.constraint(equalToConstant: topBarButtonSize),
             topBarSettingsButton.heightAnchor.constraint(equalToConstant: topBarButtonSize),
-            
+
             // Кнопка сообщений справа
             topBarMessagesButton.centerYAnchor.constraint(equalTo: topBarView.centerYAnchor),
             topBarMessagesButton.trailingAnchor.constraint(equalTo: topBarView.trailingAnchor),
+            topBarMessagesButton.leadingAnchor.constraint(greaterThanOrEqualTo: topBarSettingsButton.trailingAnchor, constant: 8),
             topBarMessagesButton.widthAnchor.constraint(equalToConstant: topBarButtonSize),
             topBarMessagesButton.heightAnchor.constraint(equalToConstant: topBarButtonSize),
         ])
@@ -431,7 +446,7 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         // ScrollView и ContentWrapperView (ScrollView теперь начинается под topBarView с отступом)
         NSLayoutConstraint.activate([
             // Добавляем отступ 5pt
-            scrollView.topAnchor.constraint(equalTo: topBarView.bottomAnchor, constant: 5), 
+            scrollView.topAnchor.constraint(equalTo: topBarView.bottomAnchor, constant: 5),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
@@ -460,12 +475,12 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
             nameAndStatsContainer.centerYAnchor.constraint(equalTo: avatarImageView.centerYAnchor), // Центрируем по вертикали с аватаром
             nameAndStatsContainer.leadingAnchor.constraint(equalTo: avatarImageView.trailingAnchor, constant: padding + 13), // Было padding + 3
             nameAndStatsContainer.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding), // До правого края
-            
+
             // Добавляем констрейнт для равенства ширины spacer'ов
             spacer1.widthAnchor.constraint(equalTo: spacer2.widthAnchor),
             // Убираем равенство с spacer3
             // spacer2.widthAnchor.constraint(equalTo: spacer3.widthAnchor),
-            
+
             // Статус (под аватаром и статами)
             statusLabel.topAnchor.constraint(greaterThanOrEqualTo: avatarImageView.bottomAnchor, constant: padding + 5),
             statusLabel.topAnchor.constraint(greaterThanOrEqualTo: nameAndStatsContainer.bottomAnchor, constant: padding + 5), // Привязка к контейнеру
@@ -519,120 +534,85 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     
     // MARK: - Bindings
     
-    private func setupBindings() {
-        // Подписка на профиль пользователя
+    private func bindViewModel() {
+        // Подписываемся на изменения в профиле пользователя
         viewModel.$userProfile
-            .receive(on: DispatchQueue.main) // Обновляем UI в главном потоке
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] user in
                 guard let self = self, let user = user else { return }
-                
-                // Обновляем displayNameLabel и topBarUsernameLabel
-                self.displayNameLabel.text = user.username // Или user.displayName, если такое поле есть
-                self.topBarUsernameLabel.text = user.username
-                self.statusLabel.text = user.status ?? "" // Показываем статус или пусто
-                
-                // Обновляем статы (только Posts, Followers, Following)
-                self.updateStatStack(self.postsStatStack, value: "\(self.viewModel.userPosts.count)", label: "Posts")
-                self.updateStatStack(self.followersStatStack, value: "\(user.followerCount ?? 0)", label: "Followers")
-                // Убираем обновление Following
-                // self.updateStatStack(self.followingStatStack, value: "\(user.followingCount ?? 0)", label: "Following")
-                
-                print("Attempting to load avatar from URL: \(user.avatarURL ?? "nil")") 
-                
-                let placeholder = UIImage(systemName: "person.circle.fill")?.withTintColor(.darkGray, renderingMode: .alwaysOriginal)
-                
-                if let urlString = user.avatarURL, let url = URL(string: urlString) {
-                    self.avatarImageView.kf.indicatorType = .activity 
-                    self.avatarImageView.kf.setImage(
-                        with: url, 
-                        placeholder: placeholder, 
-                        options: [
-                            .transition(.fade(0.2)),
-                            .cacheOriginalImage,
-                            .onFailureImage(UIImage(named: "default_avatar")?.withTintColor(.darkGray))
-                        ],
-                        completionHandler: { result in
-                            switch result {
-                            case .success(let value):
-                                print("Kingfisher: Image loaded successfully from \(value.source.url?.absoluteString ?? "N/A")")
-                            case .failure(let error):
-                                print("Kingfisher Error: Failed to load image - \(error.localizedDescription)")
-                                self.avatarImageView.image = placeholder
-                                self.avatarImageView.contentMode = .scaleAspectFit // Может быть лучше для плейсхолдера
-                            }
-                        }
-                    )
-                } else {
-                    self.avatarImageView.image = placeholder
-                    self.avatarImageView.contentMode = .scaleAspectFit // Может быть лучше для плейсхолдера
-                }
-                
-                // Настраиваем кнопки в зависимости от isCurrentUser
-                self.configureActionButtons(isCurrentUser: self.viewModel.isCurrentUser)
-                // Настраиваем видимость кнопок в topBarView
-                self.configureTopBarButtons(isCurrentUser: self.viewModel.isCurrentUser)
+                self.setupUserProfile(with: user)
+                print("UserProfileFeedVC: Получен обновленный профиль пользователя")
             }
             .store(in: &cancellables)
         
-        // Подписка на общее количество лайков (НОВАЯ)
+        // Подписываемся на изменения в общем количестве лайков
         viewModel.$totalLikes
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] likes in
-                // Используем ?? 0 и форматируем?
-                self?.updateStatStack(self?.likesStatStack ?? UIStackView(), value: "\(likes ?? 0)", label: "Likes")
+            .sink { [weak self] totalLikes in
+                guard let self = self, let totalLikes = totalLikes else { return }
+                self.setupTotalLikes(count: totalLikes)
+                print("UserProfileFeedVC: Получено обновленное количество лайков")
             }
             .store(in: &cancellables)
         
-        // Подписка на состояние подписки (для чужого профиля)
-        viewModel.$isFollowing
-             .receive(on: DispatchQueue.main)
-             .sink { [weak self] isFollowing in
-                 guard let self = self, !self.viewModel.isCurrentUser else { return }
-                 self.configureFollowButton(isFollowing: isFollowing)
-             }
-             .store(in: &cancellables)
+        // Подписываемся на изменения в данных о прогрессе
+        viewModel.$progressData
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] progressData in
+                guard let self = self, let progressData = progressData else { return }
+                self.setupProgressData(progressData)
+                print("UserProfileFeedVC: Получены обновленные данные о прогрессе")
+            }
+            .store(in: &cancellables)
         
-        // Подписка на состояние загрузки (можно объединить isLoadingProfile и isLoadingProgress)
-        Publishers.CombineLatest(viewModel.$isLoadingProfile, viewModel.$isLoadingProgress)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] isLoadingProfile, isLoadingProgress in
-                let isLoading = isLoadingProfile || isLoadingProgress
-                // TODO: Показать/скрыть общий индикатор загрузки для шапки
-                print("Profile/Progress loading state: \(isLoading)")
-            }
-            .store(in: &cancellables)
-            
-        // Подписка на ошибки
-        viewModel.$errorMessage
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] errorMessage in
-                guard let message = errorMessage, !message.isEmpty else { return }
-                // TODO: Показать ошибку пользователю (например, в Alert)
-                print("Error: \(message)")
-                // Сбросить ошибку во ViewModel после показа?
-                // self?.viewModel.errorMessage = nil 
-            }
-            .store(in: &cancellables)
-            
-        // Подписка на посты пользователя
+        // Подписываемся на изменения в списке постов
         viewModel.$userPosts
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in // Нам не нужны сами посты здесь, просто сигнал к перезагрузке
-                print("Received new posts data. Reloading collection view...")
-                self?.postsCollectionView.reloadData()
-                // Обновляем счетчик постов в шапке
-                self?.updateStatStack(self?.postsStatStack ?? UIStackView(), value: "\(self?.viewModel.userPosts.count ?? 0)", label: "Posts")
+            .sink { [weak self] posts in
+                guard let self = self else { return }
+                print("UserProfileFeedVC: Получено \(posts.count) постов")
+                // Сначала обновляем высоту, потом перезагружаем данные
+                self.updateCollectionViewHeight(postCount: posts.count)
+                self.postsCollectionView.reloadData()
             }
             .store(in: &cancellables)
-            
-        // Подписка на состояние загрузки постов
+        
+        // Подписываемся на изменения в статусе подписки (если это не текущий пользователь)
+        if !viewModel.isCurrentUser {
+            viewModel.$isFollowing
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] isFollowing in
+                    guard let self = self else { return }
+                    self.updateFollowButton(isFollowing: isFollowing)
+                    print("UserProfileFeedVC: Статус подписки обновлен: \(isFollowing)")
+                }
+                .store(in: &cancellables)
+        }
+        
+        // Подписываемся на изменения состояния загрузки постов для обновления футера
         viewModel.$isLoadingPosts
-             .receive(on: DispatchQueue.main)
-             .sink { [weak self] isLoading in
-                 // TODO: Показать/скрыть индикатор загрузки для сетки постов
-                 print("Posts loading state: \(isLoading)")
-             }
-             .store(in: &cancellables)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isLoading in
+                guard let self = self else { return }
+                // Если изменилось состояние загрузки, нужно обновить размер футера
+                if let layout = self.postsCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+                    layout.invalidateLayout()
+                }
+                // Сделаем видимым индикатор загрузки, если загрузка идет
+                if isLoading {
+                    // Прокручиваем, чтобы показать индикатор загрузки, если загружаются дополнительные посты
+                    if !self.viewModel.userPosts.isEmpty {
+                        let bottomOffset = CGPoint(
+                            x: 0,
+                            y: self.postsCollectionView.contentSize.height - self.postsCollectionView.bounds.height + self.postsCollectionView.contentInset.bottom
+                        )
+                        if bottomOffset.y > 0 {
+                            self.postsCollectionView.setContentOffset(bottomOffset, animated: true)
+                        }
+                    }
+                }
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Button Configuration
@@ -723,48 +703,129 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
             return
         }
 
-        var selectedMediaItems: [MediaItem] = []
-        let dispatchGroup = DispatchGroup()
+        // Обрабатываем выбранные изображения по очереди и отправляем на кроп
+        processNextImage(from: results, at: 0, withCroppedImages: [], selectedAspectRatio: nil)
+    }
 
-        for result in results {
-            dispatchGroup.enter()
-            let provider = result.itemProvider
+    // MARK: - Helpers
 
-            if provider.canLoadObject(ofClass: UIImage.self) {
-                provider.loadObject(ofClass: UIImage.self) { [weak self] image, error in
-                    defer { dispatchGroup.leave() }
-                    if let image = image as? UIImage {
-                        print("Loaded image")
-                        selectedMediaItems.append(.image(image))
-                    } else if let error = error {
-                        print("Error loading image: \(error.localizedDescription)")
-                        // TODO: Показать ошибку пользователю?
-                    }
-                }
-            } else {
-                // Убрали обработку видео (UTType.movie/UTType.video)
-                print("Unsupported media type selected (expected image).")
-                // TODO: Показать сообщение пользователю?
-                dispatchGroup.leave()
-            }
-        }
+    private func presentMediaPicker() {
+        var config = PHPickerConfiguration()
+        config.filter = .images // Только изображения (убрали видео для упрощения)
+        config.selectionLimit = 10 // Ограничение на количество выбранных файлов
+        config.preferredAssetRepresentationMode = .current // Получаем наиболее подходящее представление
 
-        dispatchGroup.notify(queue: .main) { [weak self] in
-            print("Finished loading all media. Count: \(selectedMediaItems.count)")
-            if !selectedMediaItems.isEmpty {
-                // Вызываем метод координатора для показа экрана создания поста
-                // TODO: Убедиться, что координатор реализует showCreatePost
-                if let coordinator = self?.delegate as? CurrentUserProfileCoordinator {
-                     coordinator.showCreatePost(with: selectedMediaItems)
+        let picker = PHPickerViewController(configuration: config)
+        picker.delegate = self
+        present(picker, animated: true)
+    }
+    
+    // Рекурсивная функция для последовательной обработки выбранных изображений
+    private func processNextImage(from results: [PHPickerResult], at index: Int, withCroppedImages croppedImages: [MediaItem], selectedAspectRatio: CGFloat? = nil) {
+        // Проверяем, что мы не вышли за пределы массива
+        guard index < results.count else {
+            // Все изображения обработаны, можем показать экран создания поста
+            if !croppedImages.isEmpty {
+                if let coordinator = self.delegate as? CurrentUserProfileCoordinator {
+                    coordinator.showCreatePost(with: croppedImages)
                 } else {
                     print("Error: Delegate does not conform to expected coordinator type or is nil.")
-                    // TODO: Показать ошибку
                 }
-            } else {
-                print("No valid media items were loaded.")
-                // TODO: Показать сообщение пользователю?
             }
+            return
         }
+        
+        let result = results[index]
+        let provider = result.itemProvider
+        
+        // Только если провайдер может предоставить UIImage
+        if provider.canLoadObject(ofClass: UIImage.self) {
+            provider.loadObject(ofClass: UIImage.self) { [weak self] object, error in
+                guard let self = self else { return }
+                
+                DispatchQueue.main.async {
+                    if let error = error {
+                        print("Error loading image: \(error.localizedDescription)")
+                        // Переходим к следующему изображению, даже если это изображение не загрузилось
+                        self.processNextImage(from: results, at: index + 1, withCroppedImages: croppedImages, selectedAspectRatio: selectedAspectRatio)
+                        return
+                    }
+                    
+                    if let image = object as? UIImage {
+                        // Если это первое изображение или нет выбранного соотношения сторон, 
+                        // показываем экран кропа
+                        if index == 0 || selectedAspectRatio == nil {
+                            // Показываем экран кропа для изображения
+                            let cropViewController = ImageCropViewController(image: image, imageIndex: index)
+                            cropViewController.delegate = self
+                            
+                            // Передаем данные для сохранения контекста между вызовами
+                            cropViewController.originalResults = results
+                            cropViewController.originalIndex = index
+                            cropViewController.croppedImages = croppedImages
+                            
+                            self.present(cropViewController, animated: true)
+                        } else {
+                            // Для последующих изображений применяем автоматический кроп
+                            // с тем же соотношением сторон, что было выбрано для первого изображения
+                            print("Applying automatic crop with aspect ratio \(selectedAspectRatio!) to image at index \(index)")
+                            
+                            // Создаем кропнутое изображение с центрированием
+                            let croppedImage = self.autoCropImage(image, withAspectRatio: selectedAspectRatio!)
+                            
+                            // Добавляем результат в массив и переходим к следующему изображению
+                            var updatedCroppedImages = croppedImages
+                            updatedCroppedImages.append(.image(croppedImage))
+                            
+                            // Обрабатываем следующее изображение
+                            self.processNextImage(from: results, at: index + 1, withCroppedImages: updatedCroppedImages, selectedAspectRatio: selectedAspectRatio)
+                        }
+                    } else {
+                        // Если не удалось загрузить изображение, переходим к следующему
+                        self.processNextImage(from: results, at: index + 1, withCroppedImages: croppedImages, selectedAspectRatio: selectedAspectRatio)
+                    }
+                }
+            }
+        } else {
+            // Если провайдер не может предоставить UIImage, переходим к следующему
+            processNextImage(from: results, at: index + 1, withCroppedImages: croppedImages, selectedAspectRatio: selectedAspectRatio)
+        }
+    }
+
+    // Функция для автоматического кропа изображения с заданным соотношением сторон
+    private func autoCropImage(_ image: UIImage, withAspectRatio aspectRatio: CGFloat) -> UIImage {
+        let imageWidth = image.size.width
+        let imageHeight = image.size.height
+        let imageRatio = imageWidth / imageHeight
+        
+        // Размеры области кропа
+        var cropWidth: CGFloat
+        var cropHeight: CGFloat
+        
+        if imageRatio > aspectRatio {
+            // Изображение шире, чем требуемое соотношение
+            cropHeight = imageHeight
+            cropWidth = cropHeight * aspectRatio
+        } else {
+            // Изображение выше, чем требуемое соотношение
+            cropWidth = imageWidth
+            cropHeight = cropWidth / aspectRatio
+        }
+        
+        // Центрируем область кропа
+        let originX = (imageWidth - cropWidth) / 2
+        let originY = (imageHeight - cropHeight) / 2
+        
+        // Создаем CGRect для области кропа
+        let cropRect = CGRect(x: originX, y: originY, width: cropWidth, height: cropHeight)
+        
+        // Выполняем кроп
+        if let cgImage = image.cgImage?.cropping(to: cropRect) {
+            return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
+        }
+        
+        // Если что-то пошло не так, возвращаем исходное изображение
+        return image
     }
 
     // MARK: - CreatePostViewControllerDelegate
@@ -786,18 +847,142 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
 
     // MARK: - Helpers
 
-    private func presentMediaPicker() {
-        var config = PHPickerConfiguration()
-        config.filter = .any(of: [.images, .videos]) // Разрешаем фото и видео
-        config.selectionLimit = 10 // Ограничение на количество выбранных файлов (можно изменить)
-        config.preferredAssetRepresentationMode = .current // Получаем наиболее подходящее представление
+    // ... остальной код ...
 
-        let picker = PHPickerViewController(configuration: config)
-        picker.delegate = self
-        present(picker, animated: true)
+    // Метод для принудительного обновления данных в профиле
+    func refreshUserData() {
+        print("👤 UserProfileFeedVC: Принудительное обновление данных пользователя и постов")
+        viewModel.fetchAllUserData()
+        viewModel.fetchPosts(forceReload: true)
+        
+        // Перезагружаем коллекцию
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.postsCollectionView.reloadData()
+        }
+    }
+    
+    // Вызываем принудительное обновление данных при появлении экрана
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        print("👤 UserProfileFeedVC: viewWillAppear - запрашиваем обновление данных")
+        refreshUserData()
     }
 
-    // ... остальной код ...
+    // MARK: - UI Configuration Methods
+    
+    // Метод для настройки элементов интерфейса в зависимости от типа пользователя
+    private func setupActionsForUserType() {
+        configureActionButtons(isCurrentUser: viewModel.isCurrentUser)
+        configureTopBarButtons(isCurrentUser: viewModel.isCurrentUser)
+    }
+    
+    // Методы для настройки верхней панели
+    private func setupCurrentUserTopBar() {
+        topBarUsernameLabel.text = viewModel.userProfile?.username ?? "My Profile"
+        topBarSettingsButton.isHidden = false
+        topBarMessagesButton.isHidden = false
+    }
+    
+    private func setupOtherUserTopBar() {
+        topBarUsernameLabel.text = viewModel.userProfile?.username ?? "User Profile"
+        topBarSettingsButton.isHidden = true
+        topBarMessagesButton.isHidden = false
+    }
+    
+    // Методы для обновления данных профиля
+    private func setupUserProfile(with user: User) {
+        // Обновляем имя пользователя и другие текстовые поля
+        displayNameLabel.text = user.username
+        topBarUsernameLabel.text = user.username
+        statusLabel.text = user.status ?? ""
+        
+        // Обновляем статистику
+        updateStatStack(postsStatStack, value: "\(viewModel.userPosts.count)", label: "Posts")
+        updateStatStack(followersStatStack, value: "\(user.followerCount ?? 0)", label: "Followers")
+        
+        // Загружаем аватар
+        if let urlString = user.avatarURL, let url = URL(string: urlString) {
+            let placeholder = UIImage(systemName: "person.circle.fill")?.withTintColor(.darkGray, renderingMode: .alwaysOriginal)
+            
+            avatarImageView.kf.setImage(
+                with: url,
+                placeholder: placeholder,
+                options: [
+                    .transition(.fade(0.2)),
+                    .cacheOriginalImage
+                ],
+                completionHandler: { result in
+                    switch result {
+                    case .success:
+                        print("Аватар успешно загружен")
+                    case .failure(let error):
+                        print("Ошибка при загрузке аватара: \(error.localizedDescription)")
+                    }
+                }
+            )
+        } else {
+            avatarImageView.image = UIImage(systemName: "person.circle.fill")
+        }
+        
+        // Обновляем кнопки в зависимости от текущего пользователя
+        configureActionButtons(isCurrentUser: viewModel.isCurrentUser)
+    }
+    
+    private func setupTotalLikes(count: Int) {
+        updateStatStack(likesStatStack, value: "\(count)", label: "Likes")
+    }
+    
+    private func setupProgressData(_ progress: ProgressData) {
+        // Обновляем UI с прогрессом пользователя
+        // Например, обновление радарной диаграммы, если она есть
+        print("Обновлен прогресс пользователя: \(progress)")
+    }
+    
+    // Переименовываем метод для соответствия вызову в bindViewModel
+    private func updateFollowButton(isFollowing: Bool) {
+        configureFollowButton(isFollowing: isFollowing)
+    }
+
+    // НОВЫЙ МЕТОД: Рассчитывает и обновляет высоту CollectionView
+    private func updateCollectionViewHeight(postCount: Int) {
+        guard postCount > 0 else {
+            collectionViewHeightConstraint.constant = 0
+            return
+        }
+        
+        // Получаем размер ячейки (аналогично sizeForItemAt)
+        guard let layout = postsCollectionView.collectionViewLayout as? UICollectionViewFlowLayout else { return }
+        let spacing: CGFloat = 3
+        let itemsPerRow: CGFloat = 3
+        let totalSpacing = (itemsPerRow - 1) * spacing
+        let availableWidth = postsCollectionView.bounds.width - layout.sectionInset.left - layout.sectionInset.right - totalSpacing
+        
+        // Проверка на деление на ноль или отрицательную ширину
+        guard itemsPerRow > 0, availableWidth > 0 else { 
+             print("⚠️ updateCollectionViewHeight: Невозможно рассчитать ширину ячейки (itemsPerRow=\(itemsPerRow), availableWidth=\(availableWidth))")
+             collectionViewHeightConstraint.constant = 0 // Ставим 0, если расчет невозможен
+             return
+        }
+        
+        let itemWidth = availableWidth / itemsPerRow
+        let itemHeight = itemWidth * (16.0 / 9.0)
+        
+        // Рассчитываем количество рядов
+        let numberOfRows = ceil(CGFloat(postCount) / itemsPerRow)
+        
+        // Общая высота = (количество рядов * высота ячейки) + (количество_промежутков * расстояние)
+        let totalHeight = (numberOfRows * itemHeight) + (max(0, numberOfRows - 1) * spacing)
+        
+        print("📏 updateCollectionViewHeight: postCount=\(postCount), itemHeight=\(itemHeight), rows=\(numberOfRows), totalHeight=\(totalHeight)")
+        
+        // Обновляем констрейнт
+        collectionViewHeightConstraint.constant = totalHeight
+        
+        // Можно добавить анимацию изменения высоты
+        // UIView.animate(withDuration: 0.3) {
+        //     self.view.layoutIfNeeded()
+        // }
+    }
 }
 
 // MARK: - UICollectionViewDataSource
@@ -836,6 +1021,12 @@ extension UserProfileFeedViewController {
         let itemHeight = itemWidth * (16.0 / 9.0)
         return CGSize(width: itemWidth, height: itemHeight)
     }
+    
+    // Предоставляем размер для футера с индикатором загрузки
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForFooterInSection section: Int) -> CGSize {
+        // Показываем футер только если загружаются дополнительные посты и не достигнут конец
+        return viewModel.isLoadingPosts && !viewModel.isLastPageReached ? CGSize(width: collectionView.bounds.width, height: 50) : .zero
+    }
 }
 
 // MARK: - UICollectionViewDelegate
@@ -861,6 +1052,21 @@ extension UserProfileFeedViewController {
             print("UserProfileFeedViewController: ОШИБКА - не удалось получить координатора для навигации на UserPostScroll")
         }
     }
+    
+    // Добавляем метод для пагинации при прокрутке
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        guard !viewModel.isLoadingPosts, !viewModel.isLastPageReached else { return }
+        
+        let offsetY = scrollView.contentOffset.y
+        let contentHeight = scrollView.contentSize.height
+        let height = scrollView.frame.size.height
+        
+        // Загружаем больше постов, когда пользователь достиг 70% высоты контента
+        if offsetY > contentHeight - height * 1.3 {
+            print("📜 UserProfileFeedVC: Достигнут порог прокрутки, загружаем следующую страницу постов")
+            viewModel.loadMorePosts()
+        }
+    }
 }
 
 // MARK: - CreatePostViewControllerDelegate
@@ -868,12 +1074,18 @@ extension UserProfileFeedViewController {
 extension UserProfileFeedViewController {
 
     func didFinishCreatingPost(_ controller: CreatePostViewController) {
-        print("CreatePostViewController finished creating post.")
+        print("⭐ UserProfileFeedVC: Выполняется didFinishCreatingPost")
         controller.dismiss(animated: true) {
             // Обновляем все данные пользователя после создания поста
             // Убедитесь, что ваш ViewModel имеет этот метод или аналогичный
+            print("⭐ UserProfileFeedVC: Обновляем данные через fetchAllUserData()")
             self.viewModel.fetchAllUserData()
-            print("CreatePostViewController dismissed. (Finished & Reloading profile data)")
+            // Явно перезагружаем коллекцию
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                print("⭐ UserProfileFeedVC: Принудительное обновление коллекции постов")
+                self.postsCollectionView.reloadData()
+            }
+            print("⭐ UserProfileFeedVC: didFinishCreatingPost завершен")
         }
     }
 
@@ -946,5 +1158,148 @@ extension UserProfileFeedViewController {
         confirmAlert.addAction(confirmAction)
         
         present(confirmAlert, animated: true)
+    }
+}
+
+// Добавляем соответствие ImageCropViewControllerDelegate
+extension UserProfileFeedViewController: ImageCropViewControllerDelegate {
+    func imageCropViewController(_ controller: ImageCropViewController, didFinishCroppingImage image: UIImage) {
+        // Получаем соотношение сторон изображения для применения к остальным изображениям
+        let aspectRatio = image.size.width / image.size.height
+        print("Selected image aspect ratio: \(aspectRatio)")
+        
+        // Закрываем контроллер кропа
+        controller.dismiss(animated: true) { [weak self] in
+            guard let self = self else { return }
+            
+            // Получаем текущие результаты и обрабатываем следующее изображение
+            if let results = controller.originalResults, let currentIndex = controller.originalIndex {
+                var updatedCroppedImages = controller.croppedImages ?? []
+                // Добавляем кропнутое изображение в массив
+                updatedCroppedImages.append(.image(image))
+                
+                // Обрабатываем следующее изображение или завершаем процесс
+                if currentIndex + 1 < results.count {
+                    // Есть еще изображения для обработки - используем запомненное соотношение сторон
+                    self.processNextImage(from: results, at: currentIndex + 1, withCroppedImages: updatedCroppedImages, selectedAspectRatio: aspectRatio)
+                } else {
+                    // Все изображения обработаны, переходим к созданию поста
+                    if let coordinator = self.delegate as? CurrentUserProfileCoordinator {
+                        coordinator.showCreatePost(with: updatedCroppedImages)
+                    } else {
+                        print("Error: Delegate does not conform to expected coordinator type or is nil.")
+                    }
+                }
+            } else {
+                // Если по какой-то причине нет информации о результатах, показываем экран создания поста с этим одним изображением
+                if let coordinator = self.delegate as? CurrentUserProfileCoordinator {
+                    coordinator.showCreatePost(with: [.image(image)])
+                }
+            }
+        }
+    }
+    
+    func imageCropViewControllerDidCancel(_ controller: ImageCropViewController) {
+        // Закрываем контроллер кропа
+        controller.dismiss(animated: true) { [weak self] in
+            guard let self = self else { return }
+            
+            // Пользователь отменил обработку этого изображения, переходим к следующему или завершаем
+            if let results = controller.originalResults, let currentIndex = controller.originalIndex, let croppedImages = controller.croppedImages {
+                // Если у нас уже есть какие-то обработанные изображения, продолжаем с ними
+                if !croppedImages.isEmpty {
+                    self.processNextImage(from: results, at: currentIndex + 1, withCroppedImages: croppedImages, selectedAspectRatio: nil)
+                } else if currentIndex == 0 {
+                    // Если это было первое изображение и пользователь отменил его, отменяем весь процесс
+                    print("First image crop cancelled, aborting the whole process.")
+                } else {
+                    // Если это не первое изображение, продолжаем с тем, что уже имеем
+                    self.processNextImage(from: results, at: currentIndex + 1, withCroppedImages: croppedImages, selectedAspectRatio: nil)
+                }
+            } else {
+                // Если нет информации о результатах, просто завершаем процесс
+                print("Image crop cancelled and no previous images available.")
+            }
+        }
+    }
+}
+
+// MARK: - LoadingFooterView
+class LoadingFooterView: UICollectionReusableView {
+    static let identifier = "LoadingFooter"
+    
+    private let activityIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.hidesWhenStopped = true
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        return indicator
+    }()
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupUI()
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    private func setupUI() {
+        addSubview(activityIndicator)
+        
+        NSLayoutConstraint.activate([
+            activityIndicator.centerXAnchor.constraint(equalTo: centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+    }
+    
+    func startAnimating() {
+        activityIndicator.startAnimating()
+    }
+    
+    func stopAnimating() {
+        activityIndicator.stopAnimating()
+    }
+}
+
+// MARK: - UICollectionViewDataSourcePrefetching
+extension UserProfileFeedViewController {
+    func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+        // Если среди предзагружаемых индексов есть те, которые близки к концу,
+        // начинаем загрузку следующей страницы
+        let lastItemIndex = viewModel.userPosts.count - 1
+        let prefetchThreshold = 5 // За сколько ячеек до конца начинать предзагрузку
+        
+        let needsPrefetch = indexPaths.contains { $0.item > lastItemIndex - prefetchThreshold }
+        
+        if needsPrefetch && !viewModel.isLoadingPosts && !viewModel.isLastPageReached {
+            print("📜 UserProfileFeedVC: Предзагрузка следующей страницы постов")
+            viewModel.loadMorePosts()
+        }
+    }
+}
+
+// MARK: - UICollectionViewDataSource extension
+extension UserProfileFeedViewController {
+    // Добавляем метод для создания футера
+    func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
+        if kind == UICollectionView.elementKindSectionFooter {
+            guard let footerView = collectionView.dequeueReusableSupplementaryView(
+                ofKind: kind,
+                withReuseIdentifier: "LoadingFooter",
+                for: indexPath) as? LoadingFooterView else {
+                return UICollectionReusableView()
+            }
+            
+            if viewModel.isLoadingPosts {
+                footerView.startAnimating()
+            } else {
+                footerView.stopAnimating()
+            }
+            
+            return footerView
+        }
+        
+        return UICollectionReusableView()
     }
 }

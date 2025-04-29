@@ -79,12 +79,6 @@ final class CreatePostViewModel {
             return
         }
 
-        guard !caption.isEmpty else {
-            errorMessage = "Caption cannot be empty."
-            completion(nil)
-            return
-        }
-
         isSharing = true
         errorMessage = nil
 
@@ -119,7 +113,9 @@ final class CreatePostViewModel {
                 return
             }
             // Используем временное изображение для загрузки
-            _ = self.storageService.uploadImage(imageToUpload, directory: "posts") { result in
+            // Исправляем путь с "posts" на "post_images" для соответствия с StorageService
+            _ = self.storageService.uploadPostImage(imageToUpload) { result in
+                print("📱 CreatePostViewModel: Результат загрузки изображения: \(result)")
                 promise(result)
             }
         }
@@ -134,11 +130,21 @@ final class CreatePostViewModel {
 
             return Future<Void, Error> { promise in
                 // Передаем временные данные
-                self.postService.createPost(imageURL: mediaURLs.first ?? "", caption: self.caption) { error in
-                // self.postService.createPost(mediaURLs: mediaURLs, caption: self.caption, aspectRatio: self.selectedAspectRatio) { error in // <- Целевой вызов
+                // self.postService.createPost(imageURL: mediaURLs.first ?? "", caption: self.caption) { error in
+                
+                // Используем новый метод с передачей соотношения сторон
+                let mediaUrl = mediaURLs.first ?? ""
+                print("📱 CreatePostViewModel: Создаем пост с aspectRatio: \(self.selectedAspectRatio.rawValue)")
+                self.postService.createPostWithAspectRatio(
+                    imageURL: mediaUrl,
+                    caption: self.caption,
+                    aspectRatio: self.selectedAspectRatio.rawValue
+                ) { error in
                     if let error = error {
+                        print("📱 CreatePostViewModel: Ошибка создания поста: \(error.localizedDescription)")
                         promise(.failure(error))
                     } else {
+                        print("📱 CreatePostViewModel: Пост успешно создан")
                         promise(.success(()))
                     }
                 }
@@ -163,5 +169,13 @@ final class CreatePostViewModel {
         }
         .store(in: &cancellables)
         // --- КОНЕЦ ВРЕМЕННОЙ ЛОГИКИ ---
+    }
+
+    // Метод для установки кропнутого изображения
+    func setCroppedImage(_ image: UIImage, forIndex index: Int) {
+        guard index >= 0 && index < selectedMedia.count else { return }
+        // Заменяем исходное изображение кропнутым
+        selectedMedia[index] = .image(image)
+        print("📸 CreatePostViewModel: Установлено кропнутое изображение для индекса \(index)")
     }
 }

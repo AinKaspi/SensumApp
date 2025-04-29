@@ -27,6 +27,7 @@
 		B1686C392DBF7D200074FA46 /* Comment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1686C372DBF7D200074FA46 /* Comment.swift */; };
 		B1686C3A2DBF7D200074FA46 /* Exercise.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1686C382DBF7D200074FA46 /* Exercise.swift */; };
 		B1686C3C2DC0AC4A0074FA46 /* MediaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1686C3B2DC0AC4A0074FA46 /* MediaItem.swift */; };
+		B1686C482DC0F7C80074FA46 /* Inject in Frameworks */ = {isa = PBXBuildFile; productRef = B1686C472DC0F7C80074FA46 /* Inject */; };
 		B16E96222DBA6121005893D5 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B117CBD12DB6DFD200A696B9 /* AuthService.swift */; };
 		B1A4835E2DB6CD0000755E25 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = B1A4835D2DB6CD0000755E25 /* FirebaseAnalyticsOnDeviceConversion */; };
 		B1A483602DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */ = {isa = PBXBuildFile; productRef = B1A4835F2DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport */; };
@@ -114,11 +115,6 @@
 			path = Features;
 			sourceTree = "<group>";
 		};
-		B1686B4D2DBF47D60074FA46 /* Documentation */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Documentation;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -129,6 +125,7 @@
 				B1A483762DB6CD0000755E25 /* FirebaseFunctions in Frameworks */,
 				B1A4836E2DB6CD0000755E25 /* FirebaseDatabase in Frameworks */,
 				B1A6E6E62DA74B4500E9E9EB /* DGCharts in Frameworks */,
+				B1686C482DC0F7C80074FA46 /* Inject in Frameworks */,
 				B1A483862DB6CD0000755E25 /* FirebaseStorage in Frameworks */,
 				B1A483602DB6CD0000755E25 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */,
 				B1AE8A4D2DB6EEF20089728F /* GoogleSignInSwift in Frameworks */,
@@ -203,7 +200,6 @@
 		B14866602DA4351800C4A753 = {
 			isa = PBXGroup;
 			children = (
-				B1686B4D2DBF47D60074FA46 /* Documentation */,
 				B1AE8A642DB8E4F90089728F /* Common */,
 				B190B3022DB6CF86007376B9 /* Core */,
 				B1A6E6E92DA7F0F500E9E9EB /* ROADMAP.md */,
@@ -286,7 +282,6 @@
 				B134D83E2DBE50630014DB02 /* DI */,
 				B148666B2DA4351800C4A753 /* SensumApp */,
 				B148669E2DA43B8000C4A753 /* Features */,
-				B1686B4D2DBF47D60074FA46 /* Documentation */,
 			);
 			name = SensumApp;
 			productName = SensumApp;
@@ -323,6 +318,7 @@
 				B1A4835A2DB6CD0000755E25 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				B1AE8A492DB6EEF20089728F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				B1AE8A502DB7B65B0089728F /* XCRemoteSwiftPackageReference "Kingfisher" */,
+				B1686C462DC0F7C80074FA46 /* XCRemoteSwiftPackageReference "Inject" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B148666A2DA4351800C4A753 /* Products */;
@@ -620,6 +616,14 @@
 				minimumVersion = 5.1.0;
 			};
 		};
+		B1686C462DC0F7C80074FA46 /* XCRemoteSwiftPackageReference "Inject" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/krzysztofzablocki/Inject.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.2;
+			};
+		};
 		B1A4835A2DB6CD0000755E25 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
@@ -651,6 +655,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B10F64292DA992B80002F8FD /* XCRemoteSwiftPackageReference "Surge" */;
 			productName = Surge;
+		};
+		B1686C472DC0F7C80074FA46 /* Inject */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B1686C462DC0F7C80074FA46 /* XCRemoteSwiftPackageReference "Inject" */;
+			productName = Inject;
 		};
 		B1A4835D2DB6CD0000755E25 /* FirebaseAnalyticsOnDeviceConversion */ = {
 			isa = XCSwiftPackageProductDependency;

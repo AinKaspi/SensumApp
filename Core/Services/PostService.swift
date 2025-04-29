@@ -47,6 +47,9 @@ protocol PostServiceProtocol {
     // Новый протокол для комментов
     func fetchComments(for postId: String, completion: @escaping (Result<[Comment], Error>) -> Void)
     func addComment(_ text: String, for postId: String, completion: @escaping (Error?) -> Void)
+    
+    // Обновленный метод для создания поста с указанием соотношения сторон
+    func createPostWithAspectRatio(imageURL: String, caption: String?, aspectRatio: String, completion: @escaping (Error?) -> Void)
 }
 
 class PostService: PostServiceProtocol {
@@ -69,17 +72,24 @@ class PostService: PostServiceProtocol {
     
     // Обновляем метод создания поста
     func createPost(imageURL: String, caption: String?, completion: @escaping (Error?) -> Void) {
+        print("🔶 PostService: Начинаем создание поста")
         guard let currentUserID = authService.currentUserID else {
+            print("❌ PostService: Ошибка - пользователь не авторизован")
             completion(NSError(domain: "PostService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])) 
             return
         }
         
+        print("🔶 PostService: Получаем данные пользователя \(currentUserID)")
         // 1. Получаем данные текущего пользователя для денормализации
         userProfileService.fetchUserProfile(userID: currentUserID) { [weak self] result in
-            guard let self = self else { return }
+            guard let self = self else {
+                print("❌ PostService: Ошибка - self потерян")
+                return
+            }
             
             switch result {
             case .success(let user):
+                print("🔶 PostService: Получены данные пользователя. username: \(user.username), avatarURL: \(user.avatarURL ?? "nil")")
                 // Создаем MediaItemDTO
                 let mediaItemDTO = MediaItemDTO(type: .image, url: imageURL)
                 
@@ -96,21 +106,24 @@ class PostService: PostServiceProtocol {
                     authorUsername: user.username, // <-- Денормализация
                     authorAvatarURL: user.avatarURL) // <-- Денормализация
                 
+                print("🔶 PostService: Создан объект Post, сохраняем в Firestore")
                 // 3. Сохраняем пост в Firestore
                 do {
                     _ = try self.postsCollection.addDocument(from: newPost) { error in
                         if let error = error {
-                            print("PostService Error (Create - Firestore Add): \(error.localizedDescription)")
+                            print("❌ PostService Error (Create - Firestore Add): \(error.localizedDescription)")
+                        } else {
+                            print("✅ PostService: Пост успешно сохранен в Firestore")
                         }
                         completion(error)
                     }
                 } catch let error {
-                    print("PostService Error (Encoding Post): \(error.localizedDescription)")
+                    print("❌ PostService Error (Encoding Post): \(error.localizedDescription)")
                     completion(error)
                 }
                 
             case .failure(let error):
-                print("PostService Error (Create - Fetching User Profile): \(error.localizedDescription)")
+                print("❌ PostService Error (Create - Fetching User Profile): \(error.localizedDescription)")
                 completion(error) // Ошибка получения профиля = ошибка создания поста
             }
         }
@@ -347,6 +360,65 @@ class PostService: PostServiceProtocol {
                     print("PostService: Комментарий успешно добавлен к посту \(postId)")
                 }
                 completion(error) // Вызываем completion в любом случае
+            }
+        }
+    }
+    
+    // Обновленный метод для создания поста с указанием соотношения сторон
+    func createPostWithAspectRatio(imageURL: String, caption: String?, aspectRatio: String, completion: @escaping (Error?) -> Void) {
+        print("🔶 PostService: Начинаем создание поста с aspectRatio: \(aspectRatio)")
+        guard let currentUserID = authService.currentUserID else {
+            print("❌ PostService: Ошибка - пользователь не авторизован")
+            completion(NSError(domain: "PostService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])) 
+            return
+        }
+        
+        print("🔶 PostService: Получаем данные пользователя \(currentUserID)")
+        // 1. Получаем данные текущего пользователя для денормализации
+        userProfileService.fetchUserProfile(userID: currentUserID) { [weak self] result in
+            guard let self = self else {
+                print("❌ PostService: Ошибка - self потерян")
+                return
+            }
+            
+            switch result {
+            case .success(let user):
+                print("🔶 PostService: Получены данные пользователя. username: \(user.username), avatarURL: \(user.avatarURL ?? "nil")")
+                // Создаем MediaItemDTO
+                let mediaItemDTO = MediaItemDTO(type: .image, url: imageURL)
+                
+                // 2. Создаем объект Post с данными автора
+                let newPost = Post(
+                    userID: currentUserID,
+                    mediaItems: [mediaItemDTO], // Используем массив из одного MediaItemDTO
+                    feedAspectRatio: aspectRatio, // Используем переданное соотношение сторон
+                    gridThumbnailURL: imageURL, // Используем то же изображение для миниатюры
+                    caption: caption,
+                    createdAt: Timestamp(),
+                    likeCount: 0,
+                    commentCount: 0,
+                    authorUsername: user.username, // <-- Денормализация
+                    authorAvatarURL: user.avatarURL) // <-- Денормализация
+                
+                print("🔶 PostService: Создан объект Post с aspectRatio \(aspectRatio), сохраняем в Firestore")
+                // 3. Сохраняем пост в Firestore
+                do {
+                    _ = try self.postsCollection.addDocument(from: newPost) { error in
+                        if let error = error {
+                            print("❌ PostService Error (Create - Firestore Add): \(error.localizedDescription)")
+                        } else {
+                            print("✅ PostService: Пост успешно сохранен в Firestore")
+                        }
+                        completion(error)
+                    }
+                } catch let error {
+                    print("❌ PostService Error (Encoding Post): \(error.localizedDescription)")
+                    completion(error)
+                }
+                
+            case .failure(let error):
+                print("❌ PostService Error (Create - Fetching User Profile): \(error.localizedDescription)")
+                completion(error) // Ошибка получения профиля = ошибка создания поста
             }
         }
     }

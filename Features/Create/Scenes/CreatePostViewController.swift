@@ -34,23 +34,11 @@ class CreatePostViewController: UIViewController {
         return collectionView
     }()
 
-    // Добавляем View для предпросмотра кадрирования
-    private lazy var cropPreviewView: UIView = {
-        let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        view.backgroundColor = .darkGray // Для наглядности
-        view.clipsToBounds = true
-        // Добавим imageView внутрь для отображения контента
-        view.addSubview(previewImageView)
-        return view
-    }()
-
-    private lazy var previewImageView: UIImageView = {
-        let imageView = UIImageView()
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.contentMode = .scaleAspectFill // Заполняем превью
-        imageView.clipsToBounds = true
-        return imageView
+    // Добавляем ImageCropView вместо previewImageView
+    private lazy var imageCropView: ImageCropView = {
+        let cropView = ImageCropView()
+        cropView.translatesAutoresizingMaskIntoConstraints = false
+        return cropView
     }()
 
     // Добавляем кнопки/контролы для выбора соотношения сторон
@@ -74,7 +62,7 @@ class CreatePostViewController: UIViewController {
         textView.textColor = .label
         textView.backgroundColor = .secondarySystemBackground
         textView.layer.cornerRadius = 5
-        textView.text = "Write a caption..."
+        textView.text = "Write a caption... (optional)"
         textView.textColor = .placeholderText
         textView.delegate = self
         return textView
@@ -121,8 +109,7 @@ class CreatePostViewController: UIViewController {
     private func setupNavigationBar() {
         title = "New Post"
         navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .cancel, target: self, action: #selector(cancelTapped))
-        // Изначально кнопка "Share" может быть доступна, но мы будем управлять ее состоянием через биндинг
-        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Share", style: .done, target: self, action: #selector(shareTapped))
+        navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(shareTapped))
 
         navigationController?.isNavigationBarHidden = false
         let appearance = UINavigationBarAppearance()
@@ -135,34 +122,35 @@ class CreatePostViewController: UIViewController {
     }
 
     private func setupViews() {
-        // Убираем старый imageView
-        // view.addSubview(imageView)
-        view.addSubview(cropPreviewView) // Добавляем превью
-        view.addSubview(aspectRatioSegmentedControl) // Добавляем сегментный контрол
-        view.addSubview(mediaCollectionView) // Добавляем коллекцию медиа
+        view.backgroundColor = .black
+        
+        // Настраиваем навигационную панель
+        title = "New Post"
+        navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .cancel, target: self, action: #selector(cancelTapped))
+        navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(shareTapped))
+        
+        // Добавляем основные элементы на view
+        view.addSubview(imageCropView) // Заменили previewImageView на imageCropView
+        view.addSubview(aspectRatioSegmentedControl)
+        view.addSubview(mediaCollectionView)
         view.addSubview(captionTextView)
         view.addSubview(activityIndicatorView)
     }
 
     private func setupConstraints() {
-        let previewHeightMultiplier = PostAspectRatio.square.ratio // Начальное соотношение 1:1
+        // Используем aspectRatio = 1.0 для начального соотношения 1:1
+        let cropViewHeightMultiplier = PostAspectRatio.square.ratio
 
         NSLayoutConstraint.activate([
-            // Превью кадрирования сверху
-            cropPreviewView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
-            cropPreviewView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            cropPreviewView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            // Высота превью зависит от ширины и соотношения сторон (будет обновляться)
-            cropPreviewView.heightAnchor.constraint(equalTo: cropPreviewView.widthAnchor, multiplier: previewHeightMultiplier),
-
-            // ImageView внутри превью
-            previewImageView.topAnchor.constraint(equalTo: cropPreviewView.topAnchor),
-            previewImageView.leadingAnchor.constraint(equalTo: cropPreviewView.leadingAnchor),
-            previewImageView.trailingAnchor.constraint(equalTo: cropPreviewView.trailingAnchor),
-            previewImageView.bottomAnchor.constraint(equalTo: cropPreviewView.bottomAnchor),
+            // ImageCropView сверху
+            imageCropView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
+            imageCropView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            imageCropView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            // Высота зависит от соотношения сторон (будет обновляться)
+            imageCropView.heightAnchor.constraint(equalTo: imageCropView.widthAnchor, multiplier: cropViewHeightMultiplier),
 
             // Сегментный контрол под превью
-            aspectRatioSegmentedControl.topAnchor.constraint(equalTo: cropPreviewView.bottomAnchor, constant: 10),
+            aspectRatioSegmentedControl.topAnchor.constraint(equalTo: imageCropView.bottomAnchor, constant: 10),
             aspectRatioSegmentedControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
             aspectRatioSegmentedControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
 
@@ -187,41 +175,38 @@ class CreatePostViewController: UIViewController {
     // MARK: - Bindings
 
     private func setupBindings() {
-        // Привязка текста из TextView к caption в ViewModel
-        captionTextView.textPublisher
-            // Пропускаем начальное значение плейсхолдера при первой загрузке
-            .dropFirst(captionTextView.textColor == .placeholderText ? 1 : 0)
-            // Удаляем начальные/конечные пробелы и новые строки
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .sink { [weak self] text in
-                // Не обновляем ViewModel, если это плейсхолдер
-                if self?.captionTextView.textColor != .placeholderText {
-                    self?.viewModel.caption = text
-                }
-            }
-            .store(in: &cancellables)
-
-        // Наблюдение за состоянием загрузки
-        viewModel.$isSharing
-            .receive(on: DispatchQueue.main) // Обновляем UI в главном потоке
-            .sink { [weak self] isSharing in
-                self?.navigationItem.rightBarButtonItem?.isEnabled = !isSharing
-                self?.captionTextView.isEditable = !isSharing
-                self?.navigationItem.leftBarButtonItem?.isEnabled = !isSharing // Блокируем Cancel тоже
-                if isSharing {
-                    self?.activityIndicatorView.startAnimating()
-                } else {
-                    self?.activityIndicatorView.stopAnimating()
-                }
-            }
-            .store(in: &cancellables)
-
-        // Наблюдение за ошибками
-        viewModel.$errorMessage
-            .compactMap { $0 } // Пропускаем nil
+        // Привязываем аспектное соотношение
+        viewModel.$selectedAspectRatio
             .receive(on: DispatchQueue.main)
+            .sink { [weak self] aspectRatio in
+                guard let self = self else { return }
+                self.aspectRatioSegmentedControl.selectedSegmentIndex = PostAspectRatio.allCases.firstIndex(of: aspectRatio) ?? 0
+                self.imageCropView.aspectRatio = aspectRatio.ratio
+            }
+            .store(in: &cancellables)
+        
+        // Привязываем выбранный индекс медиа
+        viewModel.$selectedMediaIndex
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] index in
+                self?.updatePreviewImage(at: index)
+            }
+            .store(in: &cancellables)
+        
+        // Привязываем состояние загрузки
+        viewModel.$isSharing
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isSharing in
+                self?.updateSharingState(isSharing: isSharing)
+            }
+            .store(in: &cancellables)
+        
+        // Привязываем сообщения об ошибках
+        viewModel.$errorMessage
+            .receive(on: DispatchQueue.main)
+            .compactMap { $0 }
             .sink { [weak self] errorMessage in
-                self?.showAlert(message: errorMessage)
+                self?.showAlert(title: "Error", message: errorMessage)
             }
             .store(in: &cancellables)
     }
@@ -234,6 +219,13 @@ class CreatePostViewController: UIViewController {
 
     @objc private func shareTapped() {
         view.endEditing(true)
+        
+        // Получаем текущее выбранное и кропнутое изображение
+        if let croppedImage = getCurrentCroppedImage() {
+            viewModel.setCroppedImage(croppedImage, forIndex: viewModel.selectedMediaIndex)
+        }
+        
+        // Отправляем пост
         viewModel.sharePost { [weak self] error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
@@ -249,35 +241,32 @@ class CreatePostViewController: UIViewController {
         guard selectedIndex >= 0 && selectedIndex < PostAspectRatio.allCases.count else { return }
         let selectedAspectRatio = PostAspectRatio.allCases[selectedIndex]
         viewModel.selectedAspectRatio = selectedAspectRatio
-        // Обновление соотношения сторон превью произойдет через биндинг
     }
 
     // MARK: - Helpers
 
     private func updatePreviewImage(at index: Int) {
         guard index >= 0 && index < viewModel.selectedMedia.count else {
-            previewImageView.image = nil // Очищаем, если индекс невалиден
+            // Нет изображения для показа
             return
         }
-        // TODO: Получить полноразмерное изображение или кешированную версию из ViewModel
-        // Пока просто используем то, что есть в selectedMedia (это могут быть thumbnails)
+        
         let media = viewModel.selectedMedia[index]
         switch media {
         case .image(let image):
-            previewImageView.image = image
-        // case .video(let avAsset): // TODO: Handle video preview (e.g., first frame)
-        //     previewImageView.image = getThumbnailFrom(video: avAsset)
+            imageCropView.setImage(image)
         default:
-             previewImageView.image = nil // Placeholder for video or other types
+            // Пока не поддерживаем другие типы медиа
+            break
         }
     }
 
     private func updateCropPreviewAspectRatio() {
         let aspectRatio = viewModel.selectedAspectRatio.ratio
         // Находим существующий constraint высоты и обновляем его multiplier
-        if let heightConstraint = cropPreviewView.constraints.first(where: { $0.firstAttribute == .height }) {
+        if let heightConstraint = imageCropView.constraints.first(where: { $0.firstAttribute == .height }) {
             NSLayoutConstraint.deactivate([heightConstraint])
-            let newHeightConstraint = cropPreviewView.heightAnchor.constraint(equalTo: cropPreviewView.widthAnchor, multiplier: aspectRatio)
+            let newHeightConstraint = imageCropView.heightAnchor.constraint(equalTo: imageCropView.widthAnchor, multiplier: aspectRatio)
             NSLayoutConstraint.activate([newHeightConstraint])
             // Анимируем изменение высоты
             UIView.animate(withDuration: 0.3) {
@@ -285,8 +274,23 @@ class CreatePostViewController: UIViewController {
             }
         } else {
             // Если constraint не найден (не должно случиться при правильной настройке)
-            let newHeightConstraint = cropPreviewView.heightAnchor.constraint(equalTo: cropPreviewView.widthAnchor, multiplier: aspectRatio)
+            let newHeightConstraint = imageCropView.heightAnchor.constraint(equalTo: imageCropView.widthAnchor, multiplier: aspectRatio)
             NSLayoutConstraint.activate([newHeightConstraint])
+        }
+    }
+
+    private func getCurrentCroppedImage() -> UIImage? {
+        return imageCropView.getCroppedImage()
+    }
+
+    private func updateSharingState(isSharing: Bool) {
+        navigationItem.rightBarButtonItem?.isEnabled = !isSharing
+        captionTextView.isEditable = !isSharing
+        navigationItem.leftBarButtonItem?.isEnabled = !isSharing // Блокируем Cancel тоже
+        if isSharing {
+            activityIndicatorView.startAnimating()
+        } else {
+            activityIndicatorView.stopAnimating()
         }
     }
 
@@ -343,11 +347,14 @@ extension CreatePostViewController: UITextViewDelegate {
     }
 
     func textViewDidEndEditing(_ textView: UITextView) {
-        if textView.text.isEmpty {
-            textView.text = "Write a caption..."
+        if textView.text.isEmpty || textView.text == "Write a caption... (optional)" {
+            textView.text = "Write a caption... (optional)"
             textView.textColor = .placeholderText
-            // Если текст пуст, установим caption в ViewModel как пустую строку
+            // Если текст пуст или это плейсхолдер, устанавливаем caption в ViewModel как пустую строку
             viewModel.caption = ""
+        } else {
+            // Если есть реальный текст, сохраняем его
+            viewModel.caption = textView.text
         }
     }
 

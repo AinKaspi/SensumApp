@@ -173,8 +173,10 @@ extension UserProfileContainerViewController: TopMenuViewDelegate {
         case .person: 
              if currentChildVC is UserProfileFeedViewController { return }
              // ViewModel уже создан при инициализации lazy var
-             // Можно добавить обновление данных, если нужно: personFeedVC.viewModel.fetchAllUserData()
+             // Принудительно обновляем данные
              displayChildViewController(personFeedVC)
+             // Принудительно обновляем посты при переключении на эту вкладку
+             personFeedVC.refreshUserData()
              // Сообщаем TopMenuView об изменении
              topMenuView.setSelectedSegment(.person, animated: true)
              

@@ -47,32 +47,58 @@ class PostGridCell: UICollectionViewCell {
     }
     
     func configure(with post: Post) {
-        // Загружаем изображение поста из gridThumbnailURL или первый mediaItem
-        // Сначала проверяем, есть ли превью для сетки
-        if let url = URL(string: post.gridThumbnailURL), !post.gridThumbnailURL.isEmpty {
+        var targetUrl: URL?
+        let postId = post.id ?? "N/A" // Получаем ID поста для логов
+
+        // Пытаемся получить URL
+        let gridUrlString = post.gridThumbnailURL // Доступ напрямую
+        if !gridUrlString.isEmpty, let url = URL(string: gridUrlString) { // Убрали if let для строки
+            targetUrl = url
+            print("⚙️ PostGridCell [\(postId)]: Используем gridThumbnailURL: \(gridUrlString)")
+        } else if let firstMediaItem = post.mediaItems.first {
+            let mediaUrlString = firstMediaItem.url // Доступ напрямую
+            if !mediaUrlString.isEmpty, let url = URL(string: mediaUrlString) { // Убрали if let для строки
+                targetUrl = url
+                print("⚙️ PostGridCell [\(postId)]: Используем firstMediaItem URL: \(mediaUrlString)")
+            }
+        }
+        
+        // Если URL не был найден после обеих проверок
+        if targetUrl == nil {
+            print("⚠️ PostGridCell [\(postId)]: Не найден валидный URL.")
+            // Устанавливаем плейсхолдер и выходим
+            self.postImageView.image = UIImage(systemName: "photo.fill")?.withTintColor(.gray, renderingMode: .alwaysOriginal)
+            self.postImageView.contentMode = .scaleAspectFit // Может быть лучше для плейсхолдера
+            return
+        }
+
+        // Если URL найден, пытаемся загрузить через Kingfisher
+        if let url = targetUrl {
+            postImageView.contentMode = .scaleAspectFill // Возвращаем нужный contentMode
             postImageView.kf.indicatorType = .activity
+            let placeholder = UIImage(systemName: "photo") // Простой плейсхолдер на время загрузки
             postImageView.kf.setImage(
                 with: url,
+                placeholder: placeholder,
                 options: [
                     .transition(.fade(0.2)),
-                    .cacheOriginalImage
-                ]
+                    .cacheOriginalImage,
+                    .retryStrategy(DelayRetryStrategy(maxRetryCount: 2, retryInterval: .seconds(2))) // Добавим стратегию повтора
+                ],
+                completionHandler: { result in
+                    switch result {
+                    case .success(let value):
+                        // value.source.url показывает URL, который ФАКТИЧЕСКИ использовал Kingfisher
+                        print("✅ PostGridCell [\(postId)]: Kingfisher УСПЕШНО загрузил: \(value.source.url?.absoluteString ?? "N/A")")
+                    case .failure(let error):
+                        // Логируем конкретную ошибку Kingfisher
+                        print("❌ PostGridCell [\(postId)]: Kingfisher ОШИБКА для URL \(url.absoluteString). Ошибка: \(error.localizedDescription)")
+                        // Можно установить изображение ошибки
+                        self.postImageView.image = UIImage(systemName: "exclamationmark.triangle.fill")?.withTintColor(.systemRed, renderingMode: .alwaysOriginal)
+                        self.postImageView.contentMode = .scaleAspectFit
+                    }
+                }
             )
-        } 
-        // Если нет превью, используем первый элемент из mediaItems
-        else if let firstMediaItem = post.mediaItems.first, 
-                let url = URL(string: firstMediaItem.url) {
-            postImageView.kf.indicatorType = .activity
-            postImageView.kf.setImage(
-                with: url,
-                options: [
-                    .transition(.fade(0.2)),
-                    .cacheOriginalImage
-                ]
-            )
-        } else {
-            postImageView.image = UIImage(systemName: "photo") // Placeholder
-            postImageView.tintColor = .gray
         }
     }
 } 

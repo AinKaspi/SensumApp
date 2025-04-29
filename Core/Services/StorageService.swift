@@ -69,34 +69,45 @@ class StorageService: StorageServiceProtocol {
     
     // MARK: - Post Images
     func uploadPostImage(_ image: UIImage, completion: @escaping (Result<URL, Error>) -> Void) {
+        print("🔷 StorageService: Начинаем загрузку изображения поста")
         // Генерируем уникальное имя файла
         let filename = UUID().uuidString + ".jpg"
         // Указываем путь в Storage (например, папка "post_images")
         let storageRef = storage.reference().child("post_images").child(filename)
+        print("🔷 StorageService: Путь для загрузки: post_images/\(filename)")
         
         // Конвертируем UIImage в Data (с сжатием)
         guard let imageData = image.jpegData(compressionQuality: 0.75) else {
+            print("❌ StorageService: Ошибка конвертации изображения в JPEG")
             completion(.failure(NSError(domain: "StorageService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to JPEG data"])))
             return
         }
+        print("🔷 StorageService: Изображение сжато, размер данных: \(imageData.count) байт")
+        
+        // Создаем метаданные (тип контента)
+        let metadata = StorageMetadata()
+        metadata.contentType = "image/jpeg"
         
         // Загружаем данные
-        storageRef.putData(imageData, metadata: nil) { metadata, error in
+        print("🔷 StorageService: Начинаем загрузку данных в Firebase Storage")
+        storageRef.putData(imageData, metadata: metadata) { metadata, error in
             if let error = error {
-                print("StorageService Error (Upload Post Image): \(error.localizedDescription)")
+                print("❌ StorageService Error (Upload Post Image): \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
             
+            print("🔷 StorageService: Данные загружены, получаем URL для скачивания")
             // Получаем URL для скачивания
             storageRef.downloadURL { url, error in
                 if let error = error {
-                    print("StorageService Error (Get Download URL for Post): \(error.localizedDescription)")
+                    print("❌ StorageService Error (Get Download URL for Post): \(error.localizedDescription)")
                     completion(.failure(error))
                 } else if let url = url {
-                    print("StorageService: Post image uploaded successfully. URL: \(url)")
+                    print("✅ StorageService: Изображение успешно загружено. URL: \(url)")
                     completion(.success(url))
                 } else {
+                    print("❌ StorageService: Не удалось получить URL загруженного изображения")
                     completion(.failure(NSError(domain: "StorageService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to get download URL"])))
                 }
             }
