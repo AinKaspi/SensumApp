@@ -11,8 +11,8 @@ protocol UserProfileFeedViewControllerDelegate: AnyObject {
     func didTapFollowButton() // (Будет использоваться, когда isCurrentUser=false)
     func didTapMessageButton() // (Будет использоваться, когда isCurrentUser=false)
     func didRequestSignOut() // Новый метод
-    // Добавляем делегат для новой кнопки
-    func didTapNewProgramButton()
+    // Удаляем делегат для кнопки New Program
+    // func didTapNewProgramButton()
 }
 
 // Обновляем: используем PHPickerViewControllerDelegate и добавляем CreatePostViewControllerDelegate
@@ -29,6 +29,42 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     // TODO: Добавить ViewModel для загрузки данных профиля и постов
 
     // MARK: - UI Elements
+    
+    // Новая верхняя панель
+    private lazy var topBarView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        // view.backgroundColor = .blue // Для отладки
+        return view
+    }()
+    
+    private lazy var topBarUsernameLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .systemFont(ofSize: 18, weight: .semibold)
+        label.textColor = .white
+        label.text = "username"
+        return label
+    }()
+    
+    private lazy var topBarSettingsButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setImage(UIImage(systemName: "gearshape"), for: .normal)
+        button.tintColor = .white
+        button.addTarget(self, action: #selector(topBarSettingsButtonTapped), for: .touchUpInside)
+        return button
+    }()
+    
+    private lazy var topBarMessagesButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        // TODO: Использовать иконку с индикатором? Или кастомную view?
+        button.setImage(UIImage(systemName: "message"), for: .normal) 
+        button.tintColor = .white
+        button.addTarget(self, action: #selector(topBarChatsButtonTapped), for: .touchUpInside)
+        return button
+    }()
     
     // Добавляем ScrollView
     private let scrollView: UIScrollView = {
@@ -59,7 +95,7 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         imageView.translatesAutoresizingMaskIntoConstraints = false
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = 40 // Примерный радиус (половина ширины/высоты)
+        imageView.layer.cornerRadius = 55 // Увеличиваем радиус
         imageView.backgroundColor = .lightGray // Placeholder
         // TODO: Загрузка изображения из viewModel.userProfile.avatarURL
         imageView.image = UIImage(systemName: "person.circle.fill") // Placeholder
@@ -72,13 +108,13 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         let valueLabel = UILabel()
         valueLabel.font = .systemFont(ofSize: 16, weight: .semibold)
         valueLabel.textColor = .white
-        valueLabel.textAlignment = .center
+        valueLabel.textAlignment = .left
         valueLabel.text = value
         
         let textLabel = UILabel()
         textLabel.font = .systemFont(ofSize: 12)
         textLabel.textColor = .lightGray
-        textLabel.textAlignment = .center
+        textLabel.textAlignment = .left
         textLabel.text = label
         
         let stack = UIStackView(arrangedSubviews: [valueLabel, textLabel])
@@ -90,25 +126,47 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     private lazy var postsStatStack: UIStackView = createStatLabel(label: "Posts")
     private lazy var followersStatStack: UIStackView = createStatLabel(label: "Followers")
     private lazy var followingStatStack: UIStackView = createStatLabel(label: "Following")
-    private lazy var rankStatStack: UIStackView = createStatLabel(label: "Rank")
-    private lazy var levelStatStack: UIStackView = createStatLabel(label: "Level")
+    
+    // Создаем spacer views для statsStackView
+    private func createSpacerView() -> UIView {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return view
+    }
+    private lazy var spacer1 = createSpacerView()
+    private lazy var spacer2 = createSpacerView()
     
     private lazy var statsStackView: UIStackView = {
-        let stack = UIStackView(arrangedSubviews: [postsStatStack, followersStatStack, followingStatStack, rankStatStack, levelStatStack])
+        // Убираем subviews из инициализатора, будем добавлять в setupViews
+        let stack = UIStackView() 
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.axis = .horizontal
-        stack.distribution = .fillEqually
-        stack.spacing = 5
+        stack.distribution = .fill // Используем fill, чтобы spacer могли растягиваться
+        stack.spacing = 0 // Убираем фиксированный spacing
         return stack
     }()
     
-    // Имя и Статус
-    private lazy var usernameLabel: UILabel = {
+    // Контейнер для имени и статов (для центрирования)
+    private lazy var nameAndStatsContainer: UIStackView = {
+        let stack = UIStackView()
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.axis = .vertical
+        // Увеличиваем зазор между именем и статами
+        stack.spacing = 8 // Было 4
+        stack.alignment = .fill // Новое: заставляем дочерние view растягиваться
+        return stack
+    }()
+    
+    // Имя пользователя (Display Name)
+    private lazy var displayNameLabel: UILabel = { // Переименовываем usernameLabel
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.font = .systemFont(ofSize: 16, weight: .semibold)
+        // Увеличиваем шрифт еще немного
+        label.font = .systemFont(ofSize: 22, weight: .bold) // Было 20
         label.textColor = .white
-        label.text = "Username"
+        label.text = "Display Name" // Меняем плейсхолдер
         return label
     }()
 
@@ -139,9 +197,11 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         button.setTitle("Edit Profile", for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
         button.setTitleColor(.white, for: .normal)
-        button.backgroundColor = .darkGray // Цвет как в макете?
-        button.layer.cornerRadius = 6
-        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+        button.backgroundColor = .black // Новый фон
+        button.layer.cornerRadius = 10
+        button.contentEdgeInsets = UIEdgeInsets(top: 10, left: 12, bottom: 10, right: 12) // Было top/bottom 6
+        button.layer.borderWidth = 1
+        button.layer.borderColor = UIColor.white.cgColor
         button.addTarget(self, action: #selector(editProfileTapped), for: .touchUpInside)
         // TODO: Скрывать/показывать в зависимости от viewModel.isCurrentUser
         return button
@@ -154,25 +214,13 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         button.setTitle("New Post", for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
         button.setTitleColor(.white, for: .normal)
-        button.backgroundColor = .systemBlue // Другой цвет для отличия
-        button.layer.cornerRadius = 6
-        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+        button.backgroundColor = .black // Новый фон
+        button.layer.cornerRadius = 10
+        button.contentEdgeInsets = UIEdgeInsets(top: 10, left: 12, bottom: 10, right: 12) // Было top/bottom 6
+        button.layer.borderWidth = 1
+        button.layer.borderColor = UIColor.white.cgColor
         button.addTarget(self, action: #selector(newPostButtonTapped), for: .touchUpInside)
         // TODO: Показывать только если isCurrentUser?
-        return button
-    }()
-    
-    // Добавляем кнопку New Program
-    private lazy var newProgramButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.setTitle("New Program", for: .normal)
-        button.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
-        button.setTitleColor(.white, for: .normal)
-        button.backgroundColor = .systemGreen // Другой цвет
-        button.layer.cornerRadius = 6
-        button.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
-        button.addTarget(self, action: #selector(newProgramButtonTapped), for: .touchUpInside)
         return button
     }()
     
@@ -215,6 +263,7 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     }()
     
     // --- Переключатель Контента --- 
+    /*
     private lazy var contentSegmentedControl: UISegmentedControl = {
         let items = ["Posts", "Programs"]
         let control = UISegmentedControl(items: items)
@@ -227,6 +276,7 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         control.addTarget(self, action: #selector(segmentedControlChanged), for: .valueChanged)
         return control
     }()
+    */
     
     // --- Сетка Постов ---
     private lazy var postsCollectionView: UICollectionView = {
@@ -245,7 +295,8 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         return collectionView
     }()
 
-    // Добавляем Placeholder View для вкладки Programs
+    // Удаляем Placeholder View для вкладки Programs
+    /*
     private lazy var programsPlaceholderView: UIView = {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
@@ -263,6 +314,7 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         view.isHidden = true // Скрыт по умолчанию
         return view
     }()
+    */
 
     // Add missing UI elements
     private lazy var activityIndicator: UIActivityIndicatorView = {
@@ -301,6 +353,12 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
 
     // MARK: - Setup UI
     private func setupViews() {
+        // Добавляем topBarView НАД scrollView
+        view.addSubview(topBarView)
+        topBarView.addSubview(topBarUsernameLabel)
+        topBarView.addSubview(topBarSettingsButton)
+        topBarView.addSubview(topBarMessagesButton)
+        
         view.addSubview(scrollView)
         scrollView.addSubview(contentWrapperView)
 
@@ -308,21 +366,33 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         contentWrapperView.addSubview(profileHeaderView)
         // Элементы ДОЛЖНЫ добавляться в profileHeaderView, а не напрямую в contentWrapperView
         profileHeaderView.addSubview(avatarImageView)
-        profileHeaderView.addSubview(statsStackView)
-        profileHeaderView.addSubview(usernameLabel)
         profileHeaderView.addSubview(statusLabel)
         profileHeaderView.addSubview(actionButtonsStackView)
+        
+        // Добавляем контейнер с именем и статами
+        profileHeaderView.addSubview(nameAndStatsContainer)
+        // Добавляем имя и статы в их контейнер
+        nameAndStatsContainer.addArrangedSubview(displayNameLabel)
+        nameAndStatsContainer.addArrangedSubview(statsStackView)
+        
+        // Добавляем элементы и spacer'ы в statsStackView
+        statsStackView.addArrangedSubview(postsStatStack)
+        statsStackView.addArrangedSubview(spacer1)
+        statsStackView.addArrangedSubview(followersStatStack)
+        statsStackView.addArrangedSubview(spacer2)
+        statsStackView.addArrangedSubview(followingStatStack)
+        
         // Добавляем кнопки в стек
         configureActionButtons(isCurrentUser: self.viewModel.isCurrentUser) // Этот метод добавит кнопки в actionButtonsStackView
 
-        // Добавляем Segmented Control в contentWrapperView
-        contentWrapperView.addSubview(contentSegmentedControl)
+        // Удаляем Segmented Control
+        // contentWrapperView.addSubview(contentSegmentedControl)
 
         // Добавляем CollectionView в contentWrapperView ПОД шапкой
         contentWrapperView.addSubview(postsCollectionView)
 
-        // Добавляем Placeholder View для вкладки Programs
-        contentWrapperView.addSubview(programsPlaceholderView)
+        // Удаляем Placeholder View
+        // contentWrapperView.addSubview(programsPlaceholderView)
 
         // Добавляем индикатор загрузки и сообщение об ошибке поверх всего scrollView
         view.addSubview(activityIndicator)
@@ -331,12 +401,42 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
 
     private func setupConstraints() {
         let padding: CGFloat = 16
-        let statsSpacing: CGFloat = 5
-        let avatarSize: CGFloat = 80 // Явно задаем размер аватара
+        let topBarHeight: CGFloat = 44 // Высота верхней панели
+        let topBarButtonSize: CGFloat = 30 // Размер иконок вверху
+        // let statsSpacing: CGFloat = 5 // Не используется напрямую
+        // let avatarSize: CGFloat = 100 // Старый размер
+        let avatarSize: CGFloat = 110 // Новый увеличенный размер
 
-        // ScrollView и ContentWrapperView
+        // Констрейнты для topBarView
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            topBarView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            topBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: padding),
+            topBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -padding),
+            topBarView.heightAnchor.constraint(equalToConstant: topBarHeight),
+            
+            // Имя пользователя слева (с небольшим отступом от края панели)
+            topBarUsernameLabel.leadingAnchor.constraint(equalTo: topBarView.leadingAnchor, constant: 4),
+            topBarUsernameLabel.centerYAnchor.constraint(equalTo: topBarView.centerYAnchor),
+            // Ограничиваем ширину имени справа до кнопки настроек
+            topBarUsernameLabel.trailingAnchor.constraint(lessThanOrEqualTo: topBarSettingsButton.leadingAnchor, constant: -8),
+            
+            // Кнопка настроек сразу справа от имени
+            topBarSettingsButton.centerYAnchor.constraint(equalTo: topBarView.centerYAnchor),
+            topBarSettingsButton.leadingAnchor.constraint(equalTo: topBarUsernameLabel.trailingAnchor, constant: 4),
+            topBarSettingsButton.widthAnchor.constraint(equalToConstant: topBarButtonSize),
+            topBarSettingsButton.heightAnchor.constraint(equalToConstant: topBarButtonSize),
+            
+            // Кнопка сообщений справа
+            topBarMessagesButton.centerYAnchor.constraint(equalTo: topBarView.centerYAnchor),
+            topBarMessagesButton.trailingAnchor.constraint(equalTo: topBarView.trailingAnchor),
+            topBarMessagesButton.widthAnchor.constraint(equalToConstant: topBarButtonSize),
+            topBarMessagesButton.heightAnchor.constraint(equalToConstant: topBarButtonSize),
+        ])
+
+        // ScrollView и ContentWrapperView (ScrollView теперь начинается под topBarView с отступом)
+        NSLayoutConstraint.activate([
+            // Добавляем отступ 5pt
+            scrollView.topAnchor.constraint(equalTo: topBarView.bottomAnchor, constant: 5), 
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
@@ -348,36 +448,34 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
             contentWrapperView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor) // Ширина равна ширине scrollView
         ])
 
-        // Элементы в profileHeaderView
+        // Элементы в profileHeaderView (НОВАЯ ВЕРСТКА)
         NSLayoutConstraint.activate([
             profileHeaderView.topAnchor.constraint(equalTo: contentWrapperView.topAnchor),
             profileHeaderView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor),
             profileHeaderView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor),
-            // Нижний край profileHeaderView будет определяться его содержимым
+            // Нижний край profileHeaderView будет определяться низом actionButtonsStackView
 
-            // Аватар
+            // Аватар (слева)
             avatarImageView.topAnchor.constraint(equalTo: profileHeaderView.topAnchor, constant: padding),
             avatarImageView.leadingAnchor.constraint(equalTo: profileHeaderView.leadingAnchor, constant: padding),
-            avatarImageView.widthAnchor.constraint(equalToConstant: avatarSize), // Явная ширина
-            avatarImageView.heightAnchor.constraint(equalToConstant: avatarSize), // Явная высота
+            avatarImageView.widthAnchor.constraint(equalToConstant: avatarSize), // Новый размер
+            avatarImageView.heightAnchor.constraint(equalToConstant: avatarSize), // Новый размер
 
-            // Стек статов
-            statsStackView.centerYAnchor.constraint(equalTo: avatarImageView.centerYAnchor),
-            statsStackView.leadingAnchor.constraint(equalTo: avatarImageView.trailingAnchor, constant: padding),
-            statsStackView.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding),
-            statsStackView.heightAnchor.constraint(lessThanOrEqualTo: avatarImageView.heightAnchor), // Ограничиваем высоту статов
+            // Констрейнты для nameAndStatsContainer
+            nameAndStatsContainer.centerYAnchor.constraint(equalTo: avatarImageView.centerYAnchor), // Центрируем по вертикали с аватаром
+            nameAndStatsContainer.leadingAnchor.constraint(equalTo: avatarImageView.trailingAnchor, constant: padding + 10), // Было padding + 5
+            nameAndStatsContainer.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding), // До правого края
+            
+            // Добавляем констрейнт для равенства ширины spacer'ов
+            spacer1.widthAnchor.constraint(equalTo: spacer2.widthAnchor),
+            
+            // Статус (под аватаром и статами)
+            statusLabel.topAnchor.constraint(greaterThanOrEqualTo: avatarImageView.bottomAnchor, constant: padding),
+            statusLabel.topAnchor.constraint(greaterThanOrEqualTo: nameAndStatsContainer.bottomAnchor, constant: padding),
+            statusLabel.leadingAnchor.constraint(equalTo: profileHeaderView.leadingAnchor, constant: padding),
+            statusLabel.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding),
 
-            // Имя пользователя
-            usernameLabel.topAnchor.constraint(equalTo: avatarImageView.bottomAnchor, constant: padding * 0.75),
-            usernameLabel.leadingAnchor.constraint(equalTo: profileHeaderView.leadingAnchor, constant: padding),
-            usernameLabel.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding),
-
-            // Статус
-            statusLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 4),
-            statusLabel.leadingAnchor.constraint(equalTo: usernameLabel.leadingAnchor),
-            statusLabel.trailingAnchor.constraint(equalTo: usernameLabel.trailingAnchor),
-
-            // Стек кнопок действий
+            // Стек кнопок действий (под статусом)
             actionButtonsStackView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: padding),
             actionButtonsStackView.leadingAnchor.constraint(equalTo: profileHeaderView.leadingAnchor, constant: padding),
             actionButtonsStackView.trailingAnchor.constraint(equalTo: profileHeaderView.trailingAnchor, constant: -padding),
@@ -385,14 +483,9 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
             profileHeaderView.bottomAnchor.constraint(equalTo: actionButtonsStackView.bottomAnchor, constant: padding)
         ])
 
-        // Сегментный контрол и CollectionView
+        // Обновляем констрейнты CollectionView (верх привязан к низу profileHeaderView)
         NSLayoutConstraint.activate([
-            contentSegmentedControl.topAnchor.constraint(equalTo: profileHeaderView.bottomAnchor, constant: padding),
-            contentSegmentedControl.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor, constant: padding),
-            contentSegmentedControl.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor, constant: -padding),
-
-            // CollectionView
-            postsCollectionView.topAnchor.constraint(equalTo: contentSegmentedControl.bottomAnchor, constant: padding),
+            postsCollectionView.topAnchor.constraint(equalTo: profileHeaderView.bottomAnchor, constant: padding), 
             postsCollectionView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor),
             postsCollectionView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor),
             // Важно: Привязываем низ CollectionView к низу contentWrapperView
@@ -402,31 +495,15 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
             collectionViewHeightConstraint
         ])
 
-        // Placeholder для Programs
-        NSLayoutConstraint.activate([
-            programsPlaceholderView.topAnchor.constraint(equalTo: contentSegmentedControl.bottomAnchor, constant: padding),
-            programsPlaceholderView.leadingAnchor.constraint(equalTo: contentWrapperView.leadingAnchor),
-            programsPlaceholderView.trailingAnchor.constraint(equalTo: contentWrapperView.trailingAnchor),
-            programsPlaceholderView.bottomAnchor.constraint(equalTo: contentWrapperView.bottomAnchor, constant: -padding) // Также привязываем к низу
-        ])
-
-        // Кнопка выхода (если она нужна вне хедера)
-        // Если кнопка выхода должна быть всегда видна внизу, ее нужно добавлять в view, а не в scrollView
-        // Если она должна скроллиться, то ее место в contentWrapperView
-        // Пока оставим ее привязку к низу contentWrapperView для скроллинга
-        // NSLayoutConstraint.activate([
-        //     signOutButton.topAnchor.constraint(greaterThanOrEqualTo: postsCollectionView.bottomAnchor, constant: padding * 2), // Отступ сверху
-        //     signOutButton.centerXAnchor.constraint(equalTo: contentWrapperView.centerXAnchor),
-        //     signOutButton.bottomAnchor.constraint(equalTo: contentWrapperView.bottomAnchor, constant: -padding * 2) // Отступ снизу
-        // ])
-
         // Индикатор загрузки и ошибка (поверх scrollView)
         NSLayoutConstraint.activate([
             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            // Сдвигаем индикатор ниже topBarView
+            activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: topBarHeight / 2),
 
             errorLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            errorLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            // errorLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor), // Старая позиция
+            errorLabel.topAnchor.constraint(equalTo: activityIndicator.bottomAnchor, constant: 10), // Под индикатором
             errorLabel.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: padding),
             errorLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -padding)
         ])
@@ -435,10 +512,11 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     // Новый метод для установки contentInset
     private func setupContentInset() {
         // Рассчитываем отступ: Высота TopMenu (55) + Отступ TopMenu от Safe Area (15) + Дополнительный зазор (10)
-        let topInset: CGFloat = 55.0 + 15.0 + 10.0 // Итого = 80
-        scrollView.contentInset = UIEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
-        scrollView.scrollIndicatorInsets = UIEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
-        // Начальное смещение ставим в 0, чтобы не было пустого места сверху при первой загрузке
+        // let topInset: CGFloat = 55.0 + 15.0 + 10.0 // Итого = 80 - Убираем
+        // Обнуляем contentInset, т.к. scrollView теперь начинается под topBarView
+        scrollView.contentInset = .zero 
+        scrollView.scrollIndicatorInsets = .zero
+        // Начальное смещение ставим в 0
         scrollView.contentOffset = CGPoint(x: 0, y: 0)
     }
     
@@ -451,14 +529,15 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
             .sink { [weak self] user in
                 guard let self = self, let user = user else { return }
                 
-                self.usernameLabel.text = user.username
+                // Обновляем displayNameLabel и topBarUsernameLabel
+                self.displayNameLabel.text = user.username // Или user.displayName, если такое поле есть
+                self.topBarUsernameLabel.text = user.username
                 self.statusLabel.text = user.status ?? "" // Показываем статус или пусто
                 
-                // Обновляем статы
-                // TODO: Форматировать большие числа (1000 -> 1K)
-                self.updateStatStack(self.postsStatStack, value: "0", label: "Posts") // Пока посты не грузим
-                self.updateStatStack(self.followersStatStack, value: "\(user.followerCount)", label: "Followers")
-                self.updateStatStack(self.followingStatStack, value: "\(user.followingCount)", label: "Following")
+                // Обновляем статы (только Posts, Followers, Following)
+                self.updateStatStack(self.postsStatStack, value: "\(self.viewModel.userPosts.count)", label: "Posts")
+                self.updateStatStack(self.followersStatStack, value: "\(user.followerCount ?? 0)", label: "Followers")
+                self.updateStatStack(self.followingStatStack, value: "\(user.followingCount ?? 0)", label: "Following")
                 
                 print("Attempting to load avatar from URL: \(user.avatarURL ?? "nil")") 
                 
@@ -492,17 +571,8 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
                 
                 // Настраиваем кнопки в зависимости от isCurrentUser
                 self.configureActionButtons(isCurrentUser: self.viewModel.isCurrentUser)
-            }
-            .store(in: &cancellables)
-        
-        // Подписка на прогресс пользователя (ProgressData)
-        viewModel.$progressData
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] progress in
-                guard let self = self, let progress = progress else { return }
-                // Обновляем статы из ProgressData
-                self.updateStatStack(self.rankStatStack, value: progress.rank, label: "Rank")
-                self.updateStatStack(self.levelStatStack, value: "\(progress.level)", label: "Level")
+                // Настраиваем видимость кнопок в topBarView
+                self.configureTopBarButtons(isCurrentUser: self.viewModel.isCurrentUser)
             }
             .store(in: &cancellables)
         
@@ -560,15 +630,20 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     
     // MARK: - Button Configuration
     
+    // Настраивает видимость кнопок в topBarView
+    private func configureTopBarButtons(isCurrentUser: Bool) {
+        topBarSettingsButton.isHidden = !isCurrentUser
+        topBarMessagesButton.isHidden = false // Кнопка чатов всегда видна
+    }
+    
     // Настраивает кнопки в actionButtonsStackView
     private func configureActionButtons(isCurrentUser: Bool) {
         // Очищаем стек перед добавлением
         actionButtonsStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
         if isCurrentUser {
-            actionButtonsStackView.addArrangedSubview(editProfileButton)
             actionButtonsStackView.addArrangedSubview(newPostButton)
-            actionButtonsStackView.addArrangedSubview(newProgramButton)
+            actionButtonsStackView.addArrangedSubview(editProfileButton)
             signOutButton.isHidden = false
         } else {
             // Для чужого профиля добавляем Follow и Message
@@ -620,13 +695,6 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         presentImagePicker()
     }
     
-    // Добавляем action для New Program
-    @objc private func newProgramButtonTapped() {
-        print("New Program button tapped - Action Placeholder")
-        // Вызываем делегата, когда будет реализована навигация
-         delegate?.didTapNewProgramButton()
-    }
-    
     // Добавляем actions для Follow/Message
     @objc private func followButtonTapped() {
         viewModel.followButtonTapped() // Вызываем метод ViewModel
@@ -634,23 +702,6 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     
     @objc private func messageButtonTapped() {
         delegate?.didTapMessageButton() // Уведомляем координатора
-    }
-    
-    // Добавляем action для Segmented Control
-    @objc private func segmentedControlChanged(_ sender: UISegmentedControl) {
-        let selectedIndex = sender.selectedSegmentIndex
-        print("Segmented control changed to index: \(selectedIndex)")
-        
-        // Показываем/скрываем CollectionView или Placeholder
-        if selectedIndex == 0 { // Posts
-            postsCollectionView.isHidden = false
-            programsPlaceholderView.isHidden = true
-            // TODO: Возможно, нужно перезагрузить посты?
-        } else { // Programs
-            postsCollectionView.isHidden = true
-            programsPlaceholderView.isHidden = false
-            // TODO: Загрузить и отобразить программы тренировок
-        }
     }
     
     // MARK: - Image Picker Logic
@@ -828,3 +879,18 @@ extension UserProfileFeedViewController {
     }
 
 } // Конец extension
+
+// MARK: - Actions for Top Bar
+extension UserProfileFeedViewController {
+    @objc private func topBarSettingsButtonTapped() {
+        print("Top bar settings button tapped")
+        // TODO: Реализовать переход на экран настроек (через делегата/координатора)
+        // delegate?.didTapSettingsButton()
+    }
+    
+    @objc private func topBarChatsButtonTapped() {
+        print("Top bar chats/notifications button tapped")
+        // TODO: Реализовать переход к списку чатов/уведомлений (через делегата/координатора)
+        // delegate?.didTapChatsButton()
+    }
+}
