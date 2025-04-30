@@ -282,13 +282,17 @@ extension UserPostScrollViewController {
         let calculatedSize = cell.contentView.systemLayoutSizeFitting(
             CGSize(width: targetWidth, height: UIView.layoutFittingCompressedSize.height),
             withHorizontalFittingPriority: .required, // Ширина должна быть ТОЧНО targetWidth
-            verticalFittingPriority: .fittingSizeLevel  // Высота должна соответствовать содержимому
+            verticalFittingPriority: .fittingSizeLevel // Высота должна соответствовать содержимому
         )
 
-        print("UserPostScrollVC [sizeForItemAt \(indexPath.item)]: Calculated size = \(calculatedSize)")
+        // Учитываем высоту pageControl, если он будет виден
+        let pageControlHeight: CGFloat = (post.mediaItems.count > 1) ? 24.0 : 0 // 20 (высота) + 4 (отступ сверху)
+        let finalHeight = max(1, calculatedSize.height) + pageControlHeight
+
+        print("UserPostScrollVC [sizeForItemAt \(indexPath.item)]: Calculated H = \(calculatedSize.height), PageControl H = \(pageControlHeight), Final H = \(finalHeight)")
 
         // 7. Возвращаем рассчитанный размер
-        return CGSize(width: targetWidth, height: max(1, calculatedSize.height))
+        return CGSize(width: targetWidth, height: finalHeight)
     }
     
     // Метод для установки размера футера

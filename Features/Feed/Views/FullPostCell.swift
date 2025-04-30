@@ -36,6 +36,37 @@ class FullPostCell: UICollectionViewCell {
     private var captionBottomConstraint: NSLayoutConstraint?
     private var commentsButtonBottomConstraint: NSLayoutConstraint?
 
+    // === НОВЫЕ ЭЛЕМЕНТЫ для МЕДИА ===
+    private lazy var mediaCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        layout.minimumLineSpacing = 0
+        layout.minimumInteritemSpacing = 0
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        collectionView.isPagingEnabled = true
+        collectionView.showsHorizontalScrollIndicator = false
+        collectionView.backgroundColor = .black // Фон контейнера
+        collectionView.register(MediaItemCell.self, forCellWithReuseIdentifier: MediaItemCell.identifier)
+        collectionView.dataSource = self // Установим DataSource
+        collectionView.delegate = self   // Установим Delegate
+        return collectionView
+    }()
+
+    private lazy var pageControl: UIPageControl = {
+        let pageControl = UIPageControl()
+        pageControl.translatesAutoresizingMaskIntoConstraints = false
+        pageControl.hidesForSinglePage = true
+        pageControl.currentPageIndicatorTintColor = .white
+        pageControl.pageIndicatorTintColor = .lightGray
+        pageControl.isUserInteractionEnabled = false // Не кликабельный
+        return pageControl
+    }()
+
+    // Данные для mediaCollectionView
+    private var mediaItems: [MediaItemDTO] = []
+    // === КОНЕЦ НОВЫХ ЭЛЕМЕНТОВ ===
+
     // MARK: - UI Elements
 
     // -- Header --
@@ -111,16 +142,7 @@ class FullPostCell: UICollectionViewCell {
         return button
     }()
 
-    // -- Post Image --
-    private lazy var postImageView: UIImageView = {
-        let imageView = UIImageView()
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.contentMode = .scaleAspectFill
-        imageView.clipsToBounds = true
-        // Убираем фон
-        imageView.backgroundColor = .black 
-        return imageView
-    }()
+    // -- Post Image --> ЗАМЕНЕН на mediaCollectionView --
 
     // -- Actions and Stats Row --
     private lazy var actionsAndStatsStackView: UIStackView = {
@@ -235,12 +257,11 @@ class FullPostCell: UICollectionViewCell {
 
     private func setupViews() {
         contentView.addSubview(authorAvatarImageView)
-        // Используем StackView для имени и кнопки Follow
         contentView.addSubview(usernameAndFollowStackView)
-        contentView.addSubview(postImageView)
-        // Добавляем footerStackView вместо отдельных элементов
+        // Добавляем mediaCollectionView и pageControl
+        contentView.addSubview(mediaCollectionView)
+        contentView.addSubview(pageControl)
         contentView.addSubview(footerStackView)
-        // Добавляем новый actionsAndStatsStackView
         contentView.addSubview(actionsAndStatsStackView)
 
         // Добавляем саб-стеки и кнопку Share ВНУТРЬ actionsAndStatsStackView
@@ -282,15 +303,19 @@ class FullPostCell: UICollectionViewCell {
             usernameAndFollowStackView.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -padding), // Не прижимаем к правому краю жестко
             usernameAndFollowStackView.centerYAnchor.constraint(equalTo: authorAvatarImageView.centerYAnchor),
             
-            // Post Image
-            postImageView.topAnchor.constraint(equalTo: authorAvatarImageView.bottomAnchor, constant: padding),
-            postImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            postImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            // УДАЛЯЕМ активацию дефолтного констрейнта
-            // defaultAspectRatioConstraint,
+            // Media Collection View (Занимает место postImageView)
+            mediaCollectionView.topAnchor.constraint(equalTo: authorAvatarImageView.bottomAnchor, constant: padding),
+            mediaCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            mediaCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            // Констрейнт соотношения сторон будет применяться к mediaCollectionView в configure
 
-            // Actions and Stats Stack View (Под картинкой)
-            actionsAndStatsStackView.topAnchor.constraint(equalTo: postImageView.bottomAnchor, constant: buttonSpacing), // Отступ от картинки
+            // Page Control (Под mediaCollectionView)
+            pageControl.topAnchor.constraint(equalTo: mediaCollectionView.bottomAnchor, constant: 4), // Небольшой отступ сверху
+            pageControl.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            pageControl.heightAnchor.constraint(equalToConstant: 20), // Стандартная высота
+
+            // Actions and Stats Stack View (Под PageControl)
+            actionsAndStatsStackView.topAnchor.constraint(equalTo: pageControl.bottomAnchor, constant: buttonSpacing - 4), // Отступ от pageControl (немного уменьшен)
             actionsAndStatsStackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             actionsAndStatsStackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
 
@@ -320,8 +345,8 @@ class FullPostCell: UICollectionViewCell {
         }
         
         // Сбрасываем содержимое
-        postImageView.kf.cancelDownloadTask()
-        postImageView.image = nil
+        // postImageView.kf.cancelDownloadTask()
+        // postImageView.image = nil
         // Сбрасываем делегатов и indexPath
         delegate = nil
         indexPath = nil
@@ -340,6 +365,12 @@ class FullPostCell: UICollectionViewCell {
             constraint.isActive = false
         }
         imageAspectRatioConstraint = nil
+
+        // Сбрасываем mediaCollectionView?
+        // mediaCollectionView.reloadData() // Не нужно, т.к. данные установятся в configure
+        pageControl.currentPage = 0
+        pageControl.numberOfPages = 0
+        mediaItems = []
     }
 
     // MARK: - Configuration
@@ -351,10 +382,9 @@ class FullPostCell: UICollectionViewCell {
         print("FullPostCell: Начало конфигурации с постом ID=\(post.id ?? "nil"), indexPath: \(indexPath)")
 
         // --- Сброс состояния --- 
-        postImageView.image = nil
+        // postImageView.image = nil
         isCaptionExpanded = false
         fullCaption = post.caption ?? ""
-        // Деактивируем и удаляем предыдущий констрейнт
         if let constraint = imageAspectRatioConstraint {
             constraint.isActive = false
         }
@@ -377,39 +407,31 @@ class FullPostCell: UICollectionViewCell {
             authorAvatarImageView.image = UIImage(systemName: "person.circle.fill")?.withTintColor(.lightGray)
         }
 
-        // --- Настройка изображения и Aspect Ratio --- 
+        // --- Настройка Media Collection View и Page Control --- 
         var aspectRatio: CGFloat = 1.0 // Дефолтное соотношение 1:1
-        var imageURL: URL? = nil
-
+        self.mediaItems = post.mediaItems // Сохраняем медиа для DataSource
+        
         // ---> НОВАЯ ЛОГИКА: Используем post.feedAspectRatio <--- 
         aspectRatio = aspectRatioMultiplier(from: post.feedAspectRatio) // Используем хелпер
         print("FullPostCell [\(indexPath.item)]: Используем aspectRatio \(aspectRatio) из post.feedAspectRatio ('\(post.feedAspectRatio)')")
-        
-        // Получаем URL первого медиа элемента (предполагаем, что он основной для ленты)
-        if let firstMediaItem = post.mediaItems.first, let url = URL(string: firstMediaItem.url) {
-            imageURL = url
-        } else {
-            // Если нет media item, пробуем grid thumbnail (хотя он 9:16)
-            imageURL = URL(string: post.gridThumbnailURL)
-            if imageURL == nil {
-                 print("FullPostCell [\(indexPath.item)]: ОШИБКА - URL изображения поста отсутствует")
-                 postImageView.image = UIImage(systemName: "photo")?.withTintColor(.darkGray)
-            }
-        }
         
         // --- ОТЛАДКА --- 
         print("FullPostCell [\(indexPath.item)]: Итоговый aspectRatio для констрейнта: \(aspectRatio)")
         
         // Устанавливаем констрейнт соотношения сторон ПЕРЕД загрузкой
+        // Применяем его к mediaCollectionView!
         setupAspectRatioConstraint(ratio: aspectRatio)
         
-        // Загружаем изображение, если есть URL
-        if let url = imageURL {
-            loadPostImage(from: url) // УДАЛЯЕМ передачу indexPath и completion
-        } else {
-            // Если URL нет, просто устанавливаем placeholder
-             postImageView.image = UIImage(systemName: "photo")?.withTintColor(.darkGray)
-        }
+        // Настраиваем pageControl
+        pageControl.numberOfPages = mediaItems.count
+        pageControl.currentPage = 0
+        // Скрываем, если страница одна
+        pageControl.isHidden = mediaItems.count <= 1
+
+        // Перезагружаем данные mediaCollectionView
+        mediaCollectionView.reloadData()
+        // Сбрасываем скролл в начало, если ячейка переиспользуется
+        mediaCollectionView.setContentOffset(.zero, animated: false)
         
         // --- Настройка Footer --- 
         likeButton.isSelected = post.isLiked
@@ -429,12 +451,11 @@ class FullPostCell: UICollectionViewCell {
     
     // Новый метод для установки констрейнта соотношения сторон
     private func setupAspectRatioConstraint(ratio: CGFloat) {
-        // Убедимся, что старый констрейнт удален
         if let existingConstraint = imageAspectRatioConstraint {
             existingConstraint.isActive = false
         }
-        // Создаем новый констрейнт
-        let constraint = postImageView.heightAnchor.constraint(equalTo: postImageView.widthAnchor, multiplier: max(0.1, ratio)) // Ограничиваем минимальный ratio
+        // Создаем новый констрейнт для mediaCollectionView
+        let constraint = mediaCollectionView.heightAnchor.constraint(equalTo: mediaCollectionView.widthAnchor, multiplier: max(0.1, ratio))
         constraint.priority = .required // ВАЖНО: Делаем приоритет обязательным (1000)
         constraint.isActive = true
         self.imageAspectRatioConstraint = constraint
@@ -479,17 +500,17 @@ class FullPostCell: UICollectionViewCell {
     }
 
     // Вспомогательный метод для загрузки изображения поста (упрощен)
-    private func loadPostImage(from url: URL) {
-        postImageView.kf.indicatorType = .activity
-        let placeholderImage = UIImage(systemName: "photo")?.withTintColor(.darkGray)
-        
-        postImageView.kf.setImage(
-            with: url,
-            placeholder: placeholderImage,
-            options: [.transition(.fade(0.2))]
-            // УДАЛЯЕМ completionHandler, так как ratio устанавливается до загрузки
-        )
-    }
+    // private func loadPostImage(from url: URL) {
+    //     postImageView.kf.indicatorType = .activity
+    //     let placeholderImage = UIImage(systemName: "photo")?.withTintColor(.darkGray)
+    //     
+    //     postImageView.kf.setImage(
+    //         with: url,
+    //         placeholder: placeholderImage,
+    //         options: [.transition(.fade(0.2))]
+    //         // УДАЛЯЕМ completionHandler, так как ratio устанавливается до загрузки
+    //     )
+    // }
 
     // MARK: - Actions
 
@@ -633,7 +654,7 @@ class FullPostCell: UICollectionViewCell {
         if let indexPath = indexPath {
             print("--- LayoutSubviews for Cell [\(indexPath.item)] ---")
             print("  contentView frame: \(contentView.frame)")
-            print("  postImageView frame: \(postImageView.frame)")
+            print("  mediaCollectionView frame: \(mediaCollectionView.frame)")
             print("    imageAspectRatioConstraint: \(imageAspectRatioConstraint?.multiplier ?? -1)")
             print("  likeCountLabel frame: \(likeCountLabel.frame)")
             print("  captionLabel frame: \(captionLabel.frame)")
@@ -643,5 +664,41 @@ class FullPostCell: UICollectionViewCell {
             print("    commentsButtonBottomConstraint active: \(commentsButtonBottomConstraint?.isActive ?? false)")
             print("------------------------------------------")
         }
+    }
+}
+
+// MARK: - UICollectionViewDataSource (для mediaCollectionView)
+extension FullPostCell: UICollectionViewDataSource {
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return mediaItems.count
+    }
+
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: MediaItemCell.identifier, for: indexPath) as? MediaItemCell else {
+            fatalError("Unable to dequeue MediaItemCell")
+        }
+        let mediaURL = URL(string: mediaItems[indexPath.item].url)
+        cell.configure(with: mediaURL)
+        return cell
+    }
+}
+
+// MARK: - UICollectionViewDelegate (для mediaCollectionView)
+extension FullPostCell: UICollectionViewDelegate {
+    // Обновляем pageControl при смене страницы
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        // Убедимся, что это скролл именно mediaCollectionView
+        guard scrollView == mediaCollectionView else { return }
+        
+        let pageIndex = round(scrollView.contentOffset.x / scrollView.frame.width)
+        pageControl.currentPage = Int(pageIndex)
+    }
+}
+
+// MARK: - UICollectionViewDelegateFlowLayout (для mediaCollectionView)
+extension FullPostCell: UICollectionViewDelegateFlowLayout {
+    // Размер ячейки равен размеру mediaCollectionView
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        return collectionView.bounds.size
     }
 } 
