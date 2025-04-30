@@ -1,6 +1,10 @@
 import UIKit
 import Combine
 
+protocol PostReviewViewControllerDelegate: AnyObject {
+    func postReviewDidFinishSuccessfully()
+}
+
 // TODO: Возможно, нужен делегат для обработки закрытия или ошибки
 
 /// Финальный экран для просмотра обрезанных изображений, добавления подписи и публикации поста.
@@ -10,6 +14,9 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
     // Используем существующий CreatePostViewModel, адаптированный для нового флоу
     private var viewModel: CreatePostViewModel
     private var cancellables = Set<AnyCancellable>()
+    
+    // Делегат для уведомления координатора об успешном завершении
+    weak var delegate: PostReviewViewControllerDelegate?
 
     // MARK: - UI Elements
 
@@ -110,7 +117,6 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
         setupCollectionView()
         setupTextView()
         setupKeyboardHandling()
-        setupDismissKeyboardGesture()
     }
 
     deinit {
@@ -156,14 +162,15 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
             // previewCollectionView.bottomAnchor.constraint(equalTo: captionTextView.topAnchor, constant: -15),
 
             // Поле для подписи
-            // Привязываем верх captionTextView к низу collectionView
             captionTextView.topAnchor.constraint(equalTo: previewCollectionView.bottomAnchor, constant: 15),
             captionTextView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 15),
             captionTextView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -15),
-            captionTextView.heightAnchor.constraint(equalToConstant: 120),
+            // Удаляем фиксированную высоту
+            // captionTextView.heightAnchor.constraint(equalToConstant: 120),
+            // Привязываем низ captionTextView к верху кнопки Share
+            captionTextView.bottomAnchor.constraint(equalTo: shareButton.topAnchor, constant: -20),
 
             // Кнопка Share
-            shareButton.topAnchor.constraint(greaterThanOrEqualTo: captionTextView.bottomAnchor, constant: 20),
             shareButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 15),
             shareButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -15),
             // Убираем привязку низа к safeArea, будем управлять ею динамически
@@ -190,6 +197,7 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
     
     private func setupTextView() {
         captionTextView.delegate = self
+        addDoneButtonToTextView()
     }
     
     // MARK: - Keyboard Handling
@@ -244,17 +252,24 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
         }
     }
     
-    // MARK: - Dismiss Keyboard Gesture
-    
-    private func setupDismissKeyboardGesture() {
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
-        tapGesture.cancelsTouchesInView = false // Позволяет другим элементам получать тапы
-        view.addGestureRecognizer(tapGesture)
-    }
-    
-    @objc private func dismissKeyboard() {
-        view.endEditing(true)
-    }
+    // MARK: - Input Accessory View for TextView
+   
+   private func addDoneButtonToTextView() {
+       let toolbar = UIToolbar(frame: CGRect(x: 0, y: 0, width: view.frame.size.width, height: 50))
+       toolbar.barStyle = .default
+       let flexSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+       let doneButton = UIBarButtonItem(title: "Done", style: .done, target: self, action: #selector(dismissKeyboard))
+       
+       toolbar.items = [flexSpace, doneButton]
+       toolbar.sizeToFit()
+       
+       captionTextView.inputAccessoryView = toolbar
+   }
+   
+   // Селектор для кнопки Done в toolbar
+   @objc private func dismissKeyboard() {
+       view.endEditing(true)
+   }
     
     // MARK: - Bindings
 
@@ -281,7 +296,7 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
     // MARK: - Actions
 
     @objc private func shareTapped() {
-        print("Share tapped")
+        print("🔵 Share button was definitely tapped!")
         // 1. Получаем текст подписи
         let caption = (captionTextView.text == "Add description...") ? nil : captionTextView.text
         viewModel.caption = caption ?? ""
@@ -292,8 +307,8 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
                  guard let self = self else { return }
                  if error == nil {
                      print("✅ PostReviewVC: Пост успешно опубликован!")
-                     // TODO: Закрыть весь флоу создания поста (возможно, через делегата/координатора)
-                     self.dismissFlow() 
+                     // Уведомляем делегата (координатора) об успехе
+                     self.delegate?.postReviewDidFinishSuccessfully()
                  } else {
                      // Ошибка уже показана через binding к $errorMessage
                      print("❌ PostReviewVC: Ошибка публикации поста: \(error!.localizedDescription)")
@@ -327,8 +342,11 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
     private func dismissFlow() {
         // TODO: Реализовать корректное закрытие всего флоу
         // Либо через координатора, либо dismiss до root, если все было модально
-        presentingViewController?.presentingViewController?.dismiss(animated: true)
-        // Или self.navigationController?.popToRootViewController(animated: true)
+        // Эта логика теперь должна быть в координаторе, который реализует PostReviewViewControllerDelegate
+        print("⚠️ dismissFlow() called directly. Should be handled by coordinator via delegate.")
+        // Как временная мера, оставляем старое поведение
+        // presentingViewController?.presentingViewController?.dismiss(animated: true)
+        self.navigationController?.popToRootViewController(animated: true) // Попробуем pop, если мы в стеке
     }
 }
 

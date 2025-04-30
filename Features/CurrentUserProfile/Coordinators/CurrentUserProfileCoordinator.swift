@@ -8,7 +8,8 @@ import AVFoundation // Добавляем для AVAsset
 // Добавляем EditProfileViewModelDelegate
 // Раскомментируем UserPostScrollViewControllerDelegate
 // Удаляем CreatePostViewControllerDelegate, добавляем PostMediaSelectionDelegate и PostCropViewControllerDelegate
-class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerDelegate, EditProfileViewControllerDelegate, EditProfileViewModelDelegate, UserPostScrollViewControllerDelegate, PostMediaSelectionDelegate, PostCropViewControllerDelegate {
+// Добавляем PostReviewViewControllerDelegate
+class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerDelegate, EditProfileViewControllerDelegate, EditProfileViewModelDelegate, UserPostScrollViewControllerDelegate, PostMediaSelectionDelegate, PostCropViewControllerDelegate, PostReviewViewControllerDelegate {
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
     
@@ -171,6 +172,7 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
          // Он сам создаст ViewModel
          let vc = PostReviewViewController(items: items, aspectRatio: aspectRatio)
          // TODO: Установить делегата для обработки закрытия?
+         vc.delegate = self // <-- Устанавливаем делегата
          
          // Показываем экран (push)
          navigationController.pushViewController(vc, animated: true)
@@ -332,6 +334,26 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
     func postCropDidCancel() {
         // Просто закрываем модальный экран кропа
         navigationController.dismiss(animated: true)
+    }
+
+    // MARK: - PostReviewViewControllerDelegate
+    
+    func postReviewDidFinishSuccessfully() {
+        print("✅ Coordinator: Post review finished successfully. Navigating back to profile.")
+        // Возвращаемся к корневому контроллеру (UserProfileFeedViewController)
+        navigationController.popToRootViewController(animated: true)
+        // Снова скрываем навбар для экрана профиля
+        navigationController.isNavigationBarHidden = true
+        
+        // Опционально: Обновить данные профиля после публикации
+        // Можно отправить NotificationCenter.default.post(name: .didCreateNewPost, object: nil)
+        // Или получить ссылку на VC и вызвать обновление явно, как это делалось раньше
+        if let profileVC = navigationController.viewControllers.first as? UserProfileFeedViewController {
+            print("Coordinator: Triggering profile refresh after successful post.")
+            profileVC.viewModel?.fetchAllUserData() // Вызываем обновление данных
+        } else {
+            print("Coordinator: Warning - Could not find UserProfileFeedViewController to refresh.")
+        }
     }
 
 }

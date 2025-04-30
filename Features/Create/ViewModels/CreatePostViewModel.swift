@@ -147,12 +147,15 @@ final class CreatePostViewModel {
     /// Uploads the selected media to storage and creates a new post document in Firestore.
     /// - Parameter completion: A closure called upon completion, containing an optional error.
     func sharePost(completion: @escaping (Error?) -> Void) {
+        print("🏁 sharePost: Starting...") // <-- Лог 1: Начало
         guard !editableMedia.isEmpty else {
             errorMessage = "Please select at least one image."
+            print("🏁 sharePost: Error - No media selected.") // <-- Лог ошибки
             completion(nil)
             return
         }
 
+        print("🏁 sharePost: Generating final images...") // <-- Лог 2: Перед генерацией
         isSharing = true
         errorMessage = nil
 
@@ -191,114 +194,120 @@ final class CreatePostViewModel {
             
             errorMessage = "Failed to prepare images for upload: \(errorDescription)"
             isSharing = false
+            print("🏁 sharePost: Error - Failed to generate final images or count mismatch.") // <-- Лог ошибки
             completion(completionError) // Передаем оригинальную ошибку или nil
             return
          }
          
-        print("✅ Generated \(finalImagesToUpload.count) final images for upload using manual/auto crop.")
-        
-        // 2. Загружаем все ИЗОБРАЖЕНИЯ параллельно (без изменений)
-        let uploadPublishers = finalImagesToUpload.enumerated().map { index, image in
-            Future<URL, Error> { [weak self] promise in
-                guard let self = self else {
-                    promise(.failure(NSError(domain: "CreatePostViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "ViewModel deallocated"])))
-                    return
-                }
-                _ = self.storageService.uploadPostImage(image) { result in
-                     print("📱 CreatePostViewModel: Результат загрузки изображения [\(index)]: \(result)")
-                     promise(result)
-                }
-            }
-        }
-        
-        // 3. Генерируем 9:16 миниатюру для gridThumbnailURL (из ПЕРВОГО кропнутого изображения)
-        guard let firstFinalImage = finalImagesToUpload.first else {
-            errorMessage = "Cannot generate thumbnail, no final images available."
-            isSharing = false
-            completion(NSError(domain: "CreatePostViewModel", code: -11, userInfo: [NSLocalizedDescriptionKey: "First final image is missing"])) 
-            return
-        }
-        
-        let thumbnailImage = autoCropImage(firstFinalImage, withTargetAspectRatio: 9.0 / 16.0) // Используем автокроп для миниатюры
-        guard let thumb = thumbnailImage else {
-            errorMessage = "Failed to generate 9:16 thumbnail."
-            isSharing = false
-            completion(NSError(domain: "CreatePostViewModel", code: -12, userInfo: [NSLocalizedDescriptionKey: "Failed to generate thumbnail"])) 
-            return
-        }
-        print("🖼️ CreatePostViewModel: Сгенерирована миниатюра 9:16 из первого кропнутого изображения.")
-        
-        let thumbnailUploadPublisher = Future<URL, Error> { [weak self] promise in
-            guard let self = self else {
-                 promise(.failure(NSError(domain: "CreatePostViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "ViewModel deallocated"])))
-                 return
-             }
-             print("⏳ CreatePostViewModel: Загрузка сгенерированной миниатюры 9:16...")
-             _ = self.storageService.uploadPostImage(thumb) { result in // Загружаем 'thumb'
-                 print("📱 CreatePostViewModel: Результат загрузки миниатюры 9:16: \(result)")
-                 promise(result)
+        print("🏁 sharePost: ✅ Generated \(finalImagesToUpload.count) final images.") // <-- Лог 3: Успешная генерация
+         
+         // 2. Загружаем все ИЗОБРАЖЕНИЯ параллельно (без изменений)
+         let uploadPublishers = finalImagesToUpload.enumerated().map { index, image in
+             Future<URL, Error> { [weak self] promise in
+                 guard let self = self else {
+                     promise(.failure(NSError(domain: "CreatePostViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "ViewModel deallocated"])))
+                     return
+                 }
+                 _ = self.storageService.uploadPostImage(image) { result in
+                      print("📱 CreatePostViewModel: Результат загрузки изображения [\(index)]: \(result)")
+                      promise(result)
+                 }
              }
          }
+         
+         // 3. Генерируем 9:16 миниатюру для gridThumbnailURL (из ОРИГИНАЛА ПЕРВОГО изображения)
+         guard let firstOriginalImage = editableMedia.first?.originalImage else {
+             errorMessage = "Cannot generate thumbnail, no final images available."
+             isSharing = false
+             completion(NSError(domain: "CreatePostViewModel", code: -11, userInfo: [NSLocalizedDescriptionKey: "First original image is missing"])) 
+             return
+         }
+         
+         let thumbnailImage = autoCropImage(firstOriginalImage, withTargetAspectRatio: 9.0 / 16.0) // Используем автокроп для миниатюры
+         guard let thumb = thumbnailImage else {
+             errorMessage = "Failed to generate 9:16 thumbnail."
+             isSharing = false
+             completion(NSError(domain: "CreatePostViewModel", code: -12, userInfo: [NSLocalizedDescriptionKey: "Failed to generate thumbnail"])) 
+             return
+         }
+         print("🏁 sharePost: ✅ Generated 9:16 thumbnail from first original image.") // <-- Лог 4: Успешная генерация миниатюры
+         
+         print("🏁 sharePost: Setting up upload publishers...") // <-- Лог 5: Перед Combine
+         let thumbnailUploadPublisher = Future<URL, Error> { [weak self] promise in
+             guard let self = self else {
+                  promise(.failure(NSError(domain: "CreatePostViewModel", code: -1, userInfo: [NSLocalizedDescriptionKey: "ViewModel deallocated"])))
+                  return
+              }
+              print("⏳ CreatePostViewModel: Загрузка сгенерированной миниатюры 9:16...")
+              _ = self.storageService.uploadPostImage(thumb) { result in // Загружаем 'thumb'
+                  print("📱 CreatePostViewModel: Результат загрузки миниатюры 9:16: \(result)")
+                  promise(result)
+              }
+          }
 
-        // 4. Объединяем загрузку основных изображений и миниатюры (без изменений)
-        Publishers.Zip(Publishers.MergeMany(uploadPublishers).collect(), thumbnailUploadPublisher)
-            .flatMap { [weak self] (uploadedURLs, gridThumbnailURL) -> AnyPublisher<Void, Error> in
-                guard let self = self else {
-                    return Fail(error: NSError(domain: "CreatePostViewModel", code: -2, userInfo: [NSLocalizedDescriptionKey: "ViewModel deallocated"])) .eraseToAnyPublisher()
-                }
+         // 4. Объединяем загрузку основных изображений и миниатюры (без изменений)
+         Publishers.Zip(Publishers.MergeMany(uploadPublishers).collect(), thumbnailUploadPublisher)
+             .flatMap { [weak self] (uploadedURLs, gridThumbnailURL) -> AnyPublisher<Void, Error> in
+                 print("🏁 sharePost: Uploads finished. Preparing DTOs...") // <-- Лог 6: Загрузка завершена
+                 guard let self = self else {
+                     return Fail(error: NSError(domain: "CreatePostViewModel", code: -2, userInfo: [NSLocalizedDescriptionKey: "ViewModel deallocated"])) .eraseToAnyPublisher()
+                 }
 
-                // Формируем MediaItemDTO
-                let mediaItemDTOs = uploadedURLs.map { url in
-                    // TODO: Добавить реальные width/height, если они известны
-                    MediaItemDTO(type: .image, url: url.absoluteString, width: nil, height: nil) 
-                }
-                
-                guard !mediaItemDTOs.isEmpty else {
-                     return Fail(error: NSError(domain: "CreatePostViewModel", code: -5, userInfo: [NSLocalizedDescriptionKey: "Failed to create MediaItemDTOs"])) .eraseToAnyPublisher()
-                }
+                 // Формируем MediaItemDTO
+                 let mediaItemDTOs = uploadedURLs.map { url in
+                     // TODO: Добавить реальные width/height, если они известны
+                     MediaItemDTO(type: .image, url: url.absoluteString, width: nil, height: nil) 
+                 }
+                 
+                 guard !mediaItemDTOs.isEmpty else {
+                      return Fail(error: NSError(domain: "CreatePostViewModel", code: -5, userInfo: [NSLocalizedDescriptionKey: "Failed to create MediaItemDTOs"])) .eraseToAnyPublisher()
+                 }
 
-                // Определяем feedAspectRatio для всего поста (по первому элементу)
-                let feedAspectRatio = self.postAspectRatio.rawValue
+                 // Определяем feedAspectRatio для всего поста (по первому элементу)
+                 print("🏁 sharePost: Creating post in Firestore...") // <-- Лог 7: Перед записью в Firestore
+                 let feedAspectRatio = self.postAspectRatio.rawValue
 
-                return Future<Void, Error> { promise in
-                    print("📱 CreatePostViewModel: Создаем пост с aspectRatio: \(feedAspectRatio), gridThumbnail: \(gridThumbnailURL.absoluteString)")
-                    
-                    // Вызываем НОВЫЙ метод сервиса
-                    self.postService.createPost(
-                        mediaItems: mediaItemDTOs,
-                        feedAspectRatio: feedAspectRatio, // Используем соотношение первого элемента
-                        gridThumbnailURL: gridThumbnailURL.absoluteString,
-                        caption: self.caption
-                    ) { error in
-                        if let error = error {
-                            print("📱 CreatePostViewModel: Ошибка создания поста (v2): \(error.localizedDescription)")
-                            promise(.failure(error))
-                        } else {
-                            print("✅ CreatePostViewModel: Пост (v2) успешно создан через новый метод сервиса")
-                            promise(.success(()))
-                        }
-                    }
-                }
-                .eraseToAnyPublisher()
-            }
-            .sink { [weak self] completionResult in
-                guard let self = self else { return }
-                self.isSharing = false
+                 return Future<Void, Error> { promise in
+                     print("📱 CreatePostViewModel: Создаем пост с aspectRatio: \(feedAspectRatio), gridThumbnail: \(gridThumbnailURL.absoluteString)")
+                     
+                     // Вызываем НОВЫЙ метод сервиса
+                     self.postService.createPost(
+                         mediaItems: mediaItemDTOs,
+                         feedAspectRatio: feedAspectRatio, // Используем соотношение первого элемента
+                         gridThumbnailURL: gridThumbnailURL.absoluteString,
+                         caption: self.caption
+                     ) { error in
+                         if let error = error {
+                             print("📱 CreatePostViewModel: Ошибка создания поста (v2): \(error.localizedDescription)")
+                             promise(.failure(error))
+                         } else {
+                             print("🏁 sharePost: ✅ Firestore post created successfully.") // <-- Лог 8: Успешная запись
+                             promise(.success(()))
+                         }
+                     }
+                 }
+                 .eraseToAnyPublisher()
+             }
+             .receive(on: DispatchQueue.main) // Убедимся, что sink выполняется на главном потоке
+             .sink { [weak self] completionResult in
+                 print("🏁 sharePost: Combine pipeline finished with completion: \(completionResult)") // <-- Лог 9: Завершение Combine
+                 guard let self = self else { return }
+                 self.isSharing = false
 
-                switch completionResult {
-                case .finished:
-                    print("Post shared successfully.")
-                    NotificationCenter.default.post(name: .didCreateNewPost, object: nil)
-                    completion(nil)
-                case .failure(let error):
-                    print("Error sharing post: \(error.localizedDescription)")
-                    self.errorMessage = "Failed to share post. Please try again. (Error: \(error.localizedDescription))"
-                    completion(error)
-                }
-            } receiveValue: { _ in
-            }
-            .store(in: &cancellables)
-        // --- КОНЕЦ ОБНОВЛЕННОЙ ЛОГИКИ ---
+                 switch completionResult {
+                 case .finished:
+                     print("🏁 sharePost: Success completion.")
+                     NotificationCenter.default.post(name: .didCreateNewPost, object: nil)
+                     completion(nil)
+                 case .failure(let error):
+                     print("🏁 sharePost: Failure completion: \(error.localizedDescription)")
+                     self.errorMessage = "Failed to share post. Please try again. (Error: \(error.localizedDescription))"
+                     completion(error)
+                 }
+             } receiveValue: { _ in
+             }
+             .store(in: &cancellables)
+         // --- КОНЕЦ ОБНОВЛЕННОЙ ЛОГИКИ ---
     }
 
     // Метод для установки кропнутого изображения (теперь обновляет finalImage)
@@ -363,71 +372,67 @@ final class CreatePostViewModel {
         }
     }
     
-    // НОВЫЙ хелпер: Кроп изображения по заданным параметрам масштаба и смещения
     // Оставляем private, так как используется только внутри generateCroppedImage
     private func cropImageManually(originalImage: UIImage, targetAspectRatio: CGFloat, zoomScale: CGFloat, contentOffset: CGPoint) -> UIImage? {
         
-        print("📐 Cropping manually with AR: \(targetAspectRatio), Zoom: \(zoomScale), Offset: \(contentOffset)") // Доп. лог
+        print("📐 Cropping manually with AR: \(targetAspectRatio), Zoom: \(zoomScale), Offset: \(contentOffset)")
         let originalSize = originalImage.size
         
-        // 1. Определяем размер видимой области (crop box) на основе targetAspectRatio
-        // Это аналог bounds ImageCropView
-        // Предполагаем, что crop box вписывается в какой-то максимальный размер (например, ширину экрана, но тут у нас его нет)
-        // Для простоты, давайте считать, что crop box имеет ширину, равную ширине картинки при минимальном зуме
-        // (т.е. когда картинка максимально вписана в aspect ratio)
+        // 1. Оцениваем размер рамки кропа (Crop Frame / ScrollView Bounds)
+        // Мы не знаем точные bounds из ImageCropView, но можем оценить их,
+        // зная targetAspectRatio и предполагая стандартную ширину экрана.
+        // Это не идеально, но должно быть достаточно близко.
+        let assumedViewWidth = UIScreen.main.bounds.width // Или другое значение, если известно
+        let assumedViewHeight = UIScreen.main.bounds.height // Не используется напрямую, но для контекста
         
-        var viewBoxWidth: CGFloat
-        var viewBoxHeight: CGFloat
-        
-        if originalSize.width / originalSize.height > targetAspectRatio { // Картинка шире, чем рамка
-            viewBoxHeight = originalSize.height
-            viewBoxWidth = viewBoxHeight * targetAspectRatio
-        } else { // Картинка выше или такая же
-            viewBoxWidth = originalSize.width
-            viewBoxHeight = viewBoxWidth / targetAspectRatio
+        var estimatedCropFrameWidth: CGFloat
+        var estimatedCropFrameHeight: CGFloat
+        let heightBasedOnWidth = assumedViewWidth / targetAspectRatio
+
+        // Логика из ImageCropView.updateConstraintsForAspectRatio для расчета размера контейнера
+        if heightBasedOnWidth <= assumedViewHeight { //TODO: Проверить эту логику, может зависеть от реальной высоты VC
+            estimatedCropFrameWidth = assumedViewWidth
+            estimatedCropFrameHeight = heightBasedOnWidth
+        } else {
+            // Если высота ограничивает, расчет другой (нужна высота VC)
+            // Пока упростим: предположим, что ширина всегда ограничивает для оценки
+            estimatedCropFrameWidth = assumedViewWidth
+            estimatedCropFrameHeight = heightBasedOnWidth
+             // В реальном сценарии, если высота лимитирует:
+             // estimatedCropFrameHeight = assumedViewHeight - top_bottom_margins
+             // estimatedCropFrameWidth = estimatedCropFrameHeight * targetAspectRatio
         }
-        // Эти размеры соответствуют размеру ScrollView в ImageCropView при zoomScale = 1.0 и минимальном содержании
-        // Но нам нужен размер видимой области при *текущем* zoomScale. 
-        // Логика ImageCropView сложнее, она зависит от layoutSubviews. 
-        
-        // --- УПРОЩЕННЫЙ ПОДХОД (может быть неточным) ---
-        // Попробуем воспроизвести логику из ImageCropView.croppedImage(), зная zoom и offset
-        
-        // Размер imageView при текущем зуме
-        let imageViewWidth = originalSize.width / zoomScale
-        let imageViewHeight = originalSize.height / zoomScale
-        
-        // Размер видимой области (приблизительно, т.к. мы не знаем реальный bounds cropView)
-        // Давайте предположим, что видимая область равна размеру картинки, поделенному на зум,
-        // но ограниченному соотношением сторон. Это НЕ совсем верно.
-        // TODO: Нужен более точный способ расчета видимого прямоугольника, возможно, передавать bounds CropView?
-        
-        // Возьмем размеры viewBox как размер видимой части
-        let visibleRectWidth = viewBoxWidth / zoomScale
-        let visibleRectHeight = viewBoxHeight / zoomScale
-        
-        // Рассчитываем cropRect в координатах оригинального изображения
-        let cropX = contentOffset.x * (originalSize.width / imageViewWidth) // scale = original / imageViewSize
-        let cropY = contentOffset.y * (originalSize.height / imageViewHeight)
-        let cropWidth = visibleRectWidth * (originalSize.width / imageViewWidth)
-        let cropHeight = visibleRectHeight * (originalSize.height / imageViewHeight)
-        
-        let cropRect = CGRect(x: cropX, y: cropY, width: cropWidth, height: cropHeight)
-        
-        // Проверка валидности cropRect
-        guard cropRect.origin.x >= 0, cropRect.origin.y >= 0,
-              cropRect.maxX <= originalSize.width + 0.001, // Допуск на погрешность float
-              cropRect.maxY <= originalSize.height + 0.001 else {
-            print("⚠️ cropImageManually: Invalid cropRect calculated: \(cropRect) for original size \(originalSize)")
+        print("   -> Estimated Crop Frame Size (ScrollView Bounds): (\(estimatedCropFrameWidth), \(estimatedCropFrameHeight))")
+        let estimatedCropFrameSize = CGSize(width: estimatedCropFrameWidth, height: estimatedCropFrameHeight)
+
+        // 2. Рассчитываем cropRect в координатах оригинального изображения
+        let cropRectX = contentOffset.x / zoomScale
+        let cropRectY = contentOffset.y / zoomScale
+        // Используем РАЗМЕР РАМКИ НА ЭКРАНЕ, деленный на зум
+        let cropRectWidth = estimatedCropFrameSize.width / zoomScale
+        let cropRectHeight = estimatedCropFrameSize.height / zoomScale
+
+        let cropRect = CGRect(x: cropRectX, y: cropRectY, width: cropRectWidth, height: cropRectHeight)
+
+        // 3. Проверка валидности cropRect
+        let validationRect = CGRect(origin: .zero, size: originalSize)
+        // Округляем значения для более надежного сравнения
+        let roundedCropRect = CGRect(x: round(cropRect.origin.x * 100) / 100,
+                                     y: round(cropRect.origin.y * 100) / 100,
+                                     width: round(cropRect.size.width * 100) / 100,
+                                     height: round(cropRect.size.height * 100) / 100)
+
+        guard validationRect.contains(roundedCropRect) else {
+            print("⚠️ cropImageManually: Invalid cropRect calculated: \(roundedCropRect) for original size \(originalSize)")
             // Фоллбек на автокроп при невалидном rect
             return autoCropImage(originalImage, withTargetAspectRatio: targetAspectRatio)
         }
 
-        print("📐 Calculated manual cropRect: \(cropRect)")
+        print("📐 Calculated manual cropRect (validated): \(roundedCropRect)")
         
-        // Выполняем кроп
-        guard let cgImage = originalImage.cgImage?.cropping(to: cropRect) else {
-            print("⚠️ cropImageManually: Failed to crop CGImage with rect: \(cropRect)")
+        // 4. Выполняем кроп
+        guard let cgImage = originalImage.cgImage?.cropping(to: roundedCropRect) else {
+            print("⚠️ cropImageManually: Failed to crop CGImage with rect: \(roundedCropRect)")
             return autoCropImage(originalImage, withTargetAspectRatio: targetAspectRatio) // Фоллбек
         }
 

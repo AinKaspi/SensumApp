@@ -7,6 +7,7 @@
 
 import UIKit
 import FirebaseCore
+import FirebaseAppCheck
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -16,7 +17,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
         
-        // Конфигурируем Firebase
+        // --- Настройка Firebase App Check --- //
+        #if DEBUG // Используем Debug Provider только в DEBUG сборках
+        let providerFactory = AppCheckDebugProviderFactory()
+        AppCheck.setAppCheckProviderFactory(providerFactory)
+        print("🔒 AppCheck: Using DEBUG provider factory.")
+        #else // В RELEASE сборках используем стандартный DeviceCheck/AppAttest
+        // let providerFactory = YourAppCheckProviderFactory() // Замени на свою Release фабрику
+        // AppCheck.setAppCheckProviderFactory(providerFactory)
+        // print("🔒 AppCheck: Using RELEASE provider factory.")
+        // Пока оставляем так, App Check будет использовать стандартные провайдеры, если они настроены
+        #endif
+        
+        // Конфигурируем Firebase ПОСЛЕ настройки App Check
         FirebaseApp.configure()
         
         return true
