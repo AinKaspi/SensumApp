@@ -7,8 +7,6 @@ protocol FullPostCellDelegate: AnyObject {
     func didTapFollowButton(in cell: FullPostCell)
     func didTapLikeButton(in cell: FullPostCell)
     func didTapCommentButton(in cell: FullPostCell)
-    func didTapShareButton(in cell: FullPostCell)
-    // func didTapBookmarkButton(in cell: FullPostCell) // Удалено
     func didTapViewAllComments(in cell: FullPostCell)
     // УДАЛЯЕМ делегат для toggle caption, он больше не нужен для обновления layout
     // func fullPostCellDidToggleCaption(_ cell: FullPostCell, at indexPath: IndexPath)
@@ -124,14 +122,44 @@ class FullPostCell: UICollectionViewCell {
         return imageView
     }()
 
+    // -- Actions and Stats Row --
+    private lazy var actionsAndStatsStackView: UIStackView = {
+        let stackView = UIStackView()
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .horizontal
+        stackView.spacing = 12 // Увеличиваем отступ МЕЖДУ группами
+        stackView.alignment = .center
+        return stackView
+    }()
+
     // -- Action Buttons --
-    private lazy var likeButton: UIButton = createActionButton(systemName: "heart")
-    private lazy var commentButton: UIButton = createActionButton(systemName: "message")
-    private lazy var shareButton: UIButton = createActionButton(systemName: "paperplane")
+    private lazy var likeButton: UIButton = createActionButton(systemName: "heart", selector: #selector(likeButtonTapped))
+    private lazy var commentButton: UIButton = createActionButton(systemName: "message", selector: #selector(commentButtonTapped))
+    // УДАЛЯЕМ shareButton
+    // private lazy var shareButton: UIButton = createActionButton(systemName: "paperplane", selector: #selector(shareButtonTapped))
+
+    // -- Sub-Stacks for Actions/Stats --
+    private lazy var likeStackView: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [likeButton, likeCountLabel])
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .horizontal
+        stackView.spacing = 4 // Маленький отступ внутри группы лайков
+        stackView.alignment = .center
+        return stackView
+    }()
+
+    private lazy var commentStackView: UIStackView = {
+        let stackView = UIStackView(arrangedSubviews: [commentButton, commentCountLabel])
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .horizontal
+        stackView.spacing = 4 // Маленький отступ внутри группы комментов
+        stackView.alignment = .center
+        return stackView
+    }()
 
     // -- Footer Stack --
     private lazy var footerStackView: UIStackView = {
-        let stackView = UIStackView(arrangedSubviews: [likeCountLabel, captionLabel, viewAllCommentsButton])
+        let stackView = UIStackView(arrangedSubviews: [captionLabel, viewAllCommentsButton])
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.axis = .vertical
         stackView.spacing = 4 // Уменьшаем отступ для более компактного вида
@@ -150,6 +178,19 @@ class FullPostCell: UICollectionViewCell {
         label.backgroundColor = .clear
         // Не даем этому лейблу сжиматься по вертикали
         label.setContentCompressionResistancePriority(.required, for: .vertical)
+        return label
+    }()
+
+    // Новый лейбл для счетчика комментов
+    private lazy var commentCountLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.textColor = .white
+        label.backgroundColor = .clear
+        // Не даем сжиматься, чтобы текст был виден
+        label.setContentCompressionResistancePriority(.required, for: .horizontal)
+        label.setContentHuggingPriority(.required, for: .horizontal)
         return label
     }()
 
@@ -197,12 +238,19 @@ class FullPostCell: UICollectionViewCell {
         // Используем StackView для имени и кнопки Follow
         contentView.addSubview(usernameAndFollowStackView)
         contentView.addSubview(postImageView)
-        // Добавляем кнопки действий
-        contentView.addSubview(likeButton)
-        contentView.addSubview(commentButton)
-        contentView.addSubview(shareButton)
         // Добавляем footerStackView вместо отдельных элементов
         contentView.addSubview(footerStackView)
+        // Добавляем новый actionsAndStatsStackView
+        contentView.addSubview(actionsAndStatsStackView)
+
+        // Добавляем саб-стеки и кнопку Share ВНУТРЬ actionsAndStatsStackView
+        // Spacer нужен, чтобы разнести кнопку Share вправо
+        let spacer = UIView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        actionsAndStatsStackView.addArrangedSubview(likeStackView)
+        actionsAndStatsStackView.addArrangedSubview(commentStackView)
+        actionsAndStatsStackView.addArrangedSubview(spacer) // Растягивающийся spacer
     }
 
     private func setupConstraints() {
@@ -241,24 +289,13 @@ class FullPostCell: UICollectionViewCell {
             // УДАЛЯЕМ активацию дефолтного констрейнта
             // defaultAspectRatioConstraint,
 
-            // Action Buttons (Под картинкой)
-            likeButton.topAnchor.constraint(equalTo: postImageView.bottomAnchor, constant: buttonSpacing),
-            likeButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
-            likeButton.widthAnchor.constraint(equalToConstant: buttonSize),
-            likeButton.heightAnchor.constraint(equalToConstant: buttonSize),
+            // Actions and Stats Stack View (Под картинкой)
+            actionsAndStatsStackView.topAnchor.constraint(equalTo: postImageView.bottomAnchor, constant: buttonSpacing), // Отступ от картинки
+            actionsAndStatsStackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
+            actionsAndStatsStackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
 
-            commentButton.leadingAnchor.constraint(equalTo: likeButton.trailingAnchor, constant: buttonSpacing),
-            commentButton.centerYAnchor.constraint(equalTo: likeButton.centerYAnchor),
-            commentButton.widthAnchor.constraint(equalToConstant: buttonSize),
-            commentButton.heightAnchor.constraint(equalToConstant: buttonSize),
-
-            shareButton.leadingAnchor.constraint(equalTo: commentButton.trailingAnchor, constant: buttonSpacing),
-            shareButton.centerYAnchor.constraint(equalTo: likeButton.centerYAnchor),
-            shareButton.widthAnchor.constraint(equalToConstant: buttonSize),
-            shareButton.heightAnchor.constraint(equalToConstant: buttonSize),
-            
-            // Footer Stack View
-            footerStackView.topAnchor.constraint(equalTo: likeButton.bottomAnchor, constant: footerPadding), // Отступ от кнопок
+            // Footer Stack View (Теперь под actionsAndStatsStackView)
+            footerStackView.topAnchor.constraint(equalTo: actionsAndStatsStackView.bottomAnchor, constant: footerPadding), // Отступ от строки статов
             footerStackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             footerStackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
             footerStackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -footerPadding) // Привязываем низ стека к низу ячейки
@@ -376,8 +413,11 @@ class FullPostCell: UICollectionViewCell {
         
         // --- Настройка Footer --- 
         likeButton.isSelected = post.isLiked
-        likeCountLabel.text = "\(post.likeCount) likes"
-
+        likeCountLabel.text = "\(post.likeCount)"
+        commentCountLabel.text = "\(post.commentCount)"
+ 
+        // Больше ничего не скрываем, всегда показываем 0
+ 
         // Комментарии и настройка нижнего констрейнта
         configureFooter(commentCount: post.commentCount)
 
@@ -462,22 +502,14 @@ class FullPostCell: UICollectionViewCell {
     }
 
     // Вспомогательный метод для создания кнопок (добавляем таргеты)
-    private func createActionButton(systemName: String) -> UIButton {
+    private func createActionButton(systemName: String, selector: Selector) -> UIButton {
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
-        let config = UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
+        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .regular)
         button.setImage(UIImage(systemName: systemName, withConfiguration: config), for: .normal)
         button.setImage(UIImage(systemName: systemName + ".fill", withConfiguration: config), for: .selected) // Для Like/Bookmark
         button.tintColor = .white
         
-        // Определяем селектор в зависимости от systemName (можно сделать элегантнее)
-        let selector: Selector
-        switch systemName {
-            case "heart": selector = #selector(likeButtonTapped)
-            case "message": selector = #selector(commentButtonTapped)
-            case "paperplane": selector = #selector(shareButtonTapped)
-            default: selector = #selector(actionButtonTapped) // Общий обработчик по умолчанию
-        }
         button.addTarget(self, action: selector, for: .touchUpInside)
         return button
     }
@@ -492,10 +524,6 @@ class FullPostCell: UICollectionViewCell {
     
     @objc private func commentButtonTapped() {
         delegate?.didTapCommentButton(in: self)
-    }
-    
-    @objc private func shareButtonTapped() {
-        delegate?.didTapShareButton(in: self)
     }
     
     @objc private func viewAllCommentsTapped() {
