@@ -307,11 +307,11 @@
     *   [ ] `-` Навигация: При тапе на ячейку -> `coordinator.showPostCrop`. При нажатии "Next" -> `coordinator.showPostReview`. При нажатии "Add More+" -> ? (Возврат к пикеру?).
     *   [ ] `-` Делегат: Определить протокол для возврата результата (например, `PostMediaSelectionDelegate`).
 
-**[ ] `[TASK.NCP.3]` Создание `PostCropViewController` (Экран 3 - Кроп):**
-    *   [ ] `-` UI: Кнопки навигации ("Back/Close", "Done"), заголовок "Crop", `ImageCropView`, сетка третей на `ImageCropView`.
-    *   [ ] `-` Логика: Принимает `EditableMediaItem` и `PostAspectRatio`. Настраивает `ImageCropView` (устанавливает `image`, `aspectRatio`, загружает `manualZoomScale`/`manualContentOffset` если есть).
-    *   [ ] `-` При нажатии "Done": Сохраняет текущие `currentZoomScale`/`currentContentOffset` из `ImageCropView` в `EditableMediaItem`, вызывает метод делегата `didFinishCropping(updatedItem)`, закрывается.
-    *   [ ] `-` Делегат: Определить протокол `PostCropViewControllerDelegate { func didFinishCropping(item: EditableMediaItem) }`.
+**[~] `[TASK.NCP.3]` Создание `PostCropViewController` (Экран 3 - Кроп):**
+    *   [x] `-` UI: Кнопки навигации ("Back/Close", "Done"), заголовок "Crop", `ImageCropView`, сетка третей на `ImageCropView`. *(UI элементы есть, ImageCropView готов, но сам VC не создан)*.
+    *   [~] `-` Логика: Принимает `EditableMediaItem` и `PostAspectRatio`. Настраивает `ImageCropView` (устанавливает `image`, `aspectRatio`, загружает `manualZoomScale`/`manualContentOffset` если есть). *(Логика в ImageCropView готова, передача параметров через координатор не реализована)*.
+    *   [~] `-` При нажатии "Done": Сохраняет текущие `currentZoomScale`/`currentContentOffset` из `ImageCropView` в `EditableMediaItem`, вызывает метод делегата `didFinishCropping(updatedItem)`, закрывается. *(Логика сохранения в ImageCropView есть, вызов делегата и закрытие не реализованы)*.
+    *   [ ] `-` Делегат: Определить протокол `PostCropViewControllerDelegate { func didFinishCropping(item: EditableMediaItem) }`. *(Не реализовано)*.
 
 **[ ] `[TASK.NCP.4]` Создание `PostReviewViewController` (Экран 4 - Ревью и Паблиш):**
     *   [ ] `-` UI: Кнопки навигации ("Back", "Share"), заголовок "New Post", карусель `UICollectionView` для *финальных* превью, `UITextView` для подписи.

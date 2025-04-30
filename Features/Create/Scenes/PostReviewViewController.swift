@@ -65,6 +65,9 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
         return indicator
     }()
 
+    // Констрейнт для управления положением кнопки Share
+    private var shareButtonBottomConstraint: NSLayoutConstraint?
+
     // MARK: - Initialization
 
     // Принимаем массив EditableMediaItem и выбранное соотношение
@@ -106,6 +109,13 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
         setupBindings()
         setupCollectionView()
         setupTextView()
+        setupKeyboardHandling()
+        setupDismissKeyboardGesture()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        print("PostReviewViewController deinit")
     }
 
     // MARK: - Setup
@@ -156,13 +166,18 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
             shareButton.topAnchor.constraint(greaterThanOrEqualTo: captionTextView.bottomAnchor, constant: 20),
             shareButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 15),
             shareButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -15),
-            shareButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -15),
+            // Убираем привязку низа к safeArea, будем управлять ею динамически
+            // shareButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -15),
             shareButton.heightAnchor.constraint(equalToConstant: 50),
             
             // Индикатор активности
             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
+        
+        // Сохраняем констрейнт низа кнопки Share для дальнейшего управления
+        shareButtonBottomConstraint = shareButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -15)
+        shareButtonBottomConstraint?.isActive = true
     }
     
     private func setupCollectionView() {
@@ -177,6 +192,72 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
         captionTextView.delegate = self
     }
     
+    // MARK: - Keyboard Handling
+
+    private func setupKeyboardHandling() {
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(keyboardWillShow(notification:)),
+                                               name: UIResponder.keyboardWillShowNotification,
+                                               object: nil)
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(keyboardWillHide(notification:)),
+                                               name: UIResponder.keyboardWillHideNotification,
+                                               object: nil)
+    }
+    
+    @objc private func keyboardWillShow(notification: NSNotification) {
+        guard let userInfo = notification.userInfo,
+              let keyboardFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+              let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval else {
+            return
+        }
+        
+        let keyboardHeight = keyboardFrame.height
+        let safeAreaBottomInset = view.safeAreaInsets.bottom
+        
+        // Новая константа для нижнего констрейнта кнопки
+        // Поднимаем кнопку над клавиатурой, сохраняя исходный отступ 15 от верха клавиатуры
+        let newConstant = -(keyboardHeight - safeAreaBottomInset + 15)
+        
+        // Анимируем изменение констрейнта
+        view.layoutIfNeeded() // Сначала применяем текущий layout
+        shareButtonBottomConstraint?.constant = newConstant
+        UIView.animate(withDuration: duration) {
+            self.view.layoutIfNeeded() // Анимируем к новому состоянию
+        }
+    }
+
+    @objc private func keyboardWillHide(notification: NSNotification) {
+        guard let userInfo = notification.userInfo,
+              let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval else {
+            return
+        }
+
+        // Возвращаем кнопку на исходную позицию (15 от нижнего края safe area)
+        let originalConstant: CGFloat = -15
+        
+        // Анимируем изменение констрейнта
+        view.layoutIfNeeded()
+        shareButtonBottomConstraint?.constant = originalConstant
+        UIView.animate(withDuration: duration) {
+            self.view.layoutIfNeeded()
+        }
+    }
+    
+    // MARK: - Dismiss Keyboard Gesture
+    
+    private func setupDismissKeyboardGesture() {
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        tapGesture.cancelsTouchesInView = false // Позволяет другим элементам получать тапы
+        view.addGestureRecognizer(tapGesture)
+    }
+    
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
+    }
+    
+    // MARK: - Bindings
+
     private func setupBindings() {
         // Привязываем состояние загрузки к UI
         viewModel.$isSharing

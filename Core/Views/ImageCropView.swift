@@ -146,7 +146,8 @@ class ImageCropView: UIView {
     // Слой для затемнения области вне кропа
     private let dimmingOverlayView: UIView = {
         let view = UIView()
-        view.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        // Уменьшаем непрозрачность затемнения
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.4)
         view.translatesAutoresizingMaskIntoConstraints = false
         view.isUserInteractionEnabled = false
         return view
@@ -188,7 +189,8 @@ class ImageCropView: UIView {
     // MARK: - Setup
 
     private func setupView() {
-        backgroundColor = .black
+        // Меняем фон на прозрачный, чтобы было видно нижележащий контент через dimming view
+        backgroundColor = .clear 
         clipsToBounds = true // Обрезаем все, что выходит за границы ImageCropView
 
         // 1. ContainerView (рамка кропа, дочерний self)
@@ -233,6 +235,7 @@ class ImageCropView: UIView {
             dimmingOverlayView.trailingAnchor.constraint(equalTo: trailingAnchor),
             dimmingOverlayView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
+        // Возвращаем маску
         dimmingOverlayView.layer.mask = overlayMaskLayer
 
         // 5. Grid Overlay (поверх Dimming, привязана к ContainerView)
