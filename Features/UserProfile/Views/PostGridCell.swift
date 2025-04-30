@@ -54,12 +54,12 @@ class PostGridCell: UICollectionViewCell {
         let gridUrlString = post.gridThumbnailURL // Доступ напрямую
         if !gridUrlString.isEmpty, let url = URL(string: gridUrlString) { // Убрали if let для строки
             targetUrl = url
-            print("⚙️ PostGridCell [\(postId)]: Используем gridThumbnailURL: \(gridUrlString)")
+            
         } else if let firstMediaItem = post.mediaItems.first {
             let mediaUrlString = firstMediaItem.url // Доступ напрямую
             if !mediaUrlString.isEmpty, let url = URL(string: mediaUrlString) { // Убрали if let для строки
                 targetUrl = url
-                print("⚙️ PostGridCell [\(postId)]: Используем firstMediaItem URL: \(mediaUrlString)")
+                
             }
         }
         
@@ -87,9 +87,9 @@ class PostGridCell: UICollectionViewCell {
                 ],
                 completionHandler: { result in
                     switch result {
-                    case .success(let value):
+                    case .success(_): break
                         // value.source.url показывает URL, который ФАКТИЧЕСКИ использовал Kingfisher
-                        print("✅ PostGridCell [\(postId)]: Kingfisher УСПЕШНО загрузил: \(value.source.url?.absoluteString ?? "N/A")")
+                        
                     case .failure(let error):
                         // Логируем конкретную ошибку Kingfisher
                         print("❌ PostGridCell [\(postId)]: Kingfisher ОШИБКА для URL \(url.absoluteString). Ошибка: \(error.localizedDescription)")

@@ -1,348 +1,70 @@
-# Полный Roadmap Проекта SensumApp (Версия 1.9 - Включая скролл постов в Таб 2 Person)
+# SensumApp Roadmap (v2.0)
+
+## Phase 1: MVP Core Features
+
+### Theme: User Profile & Feed Grid ([P1.PROF])
+*   `[X]` [P1.PROF.1] Create `UserProfileFeedViewController` (Basic Structure, UI).
+    *   _Что:_ Создать основной экран профиля пользователя с местом для аватара, имени, статистики и сетки постов.
+    *   _Зачем:_ Это главный экран, где пользователь видит свою (или чужую) информацию и свои публикации.
+*   `[X]` [P1.PROF.2] Implement `UserProfileFeedViewModel` (Data Loading: Profile, Posts).
+    *   _Что:_ Написать логику для загрузки данных пользователя (имя, аватар, статистика) и списка его постов с сервера (Firebase).
+    *   _Зачем:_ Чтобы экран профиля мог отображать актуальную информацию.
+*   `[X]` [P1.PROF.3] Connect Profile VC & VM (Display User Info, Post Grid).
+    *   _Что:_ Связать экран профиля с его логикой, чтобы загруженные данные отображались (имя, аватар, счетчики) и чтобы миниатюры постов появлялись в сетке.
+    *   _Зачем:_ Чтобы пользователь видел свой профиль и свои посты.
+*   `[X]` [P1.PROF.4] Implement Post Grid Cell (`PostGridCell`).
+    *   _Что:_ Создать ячейку для отображения миниатюры поста в сетке на экране профиля.
+    *   _Зачем:_ Чтобы сетка постов на экране профиля могла показывать картинки.
+*   `[X]` [P1.PROF.5] Implement Basic Navigation (from Grid to Post Scroll).
+    *   _Что:_ Сделать так, чтобы при нажатии на миниатюру поста в сетке открывался экран с этим постом на весь экран (`UserPostScrollViewController`).
+    *   _Зачем:_ Чтобы пользователь мог посмотреть пост целиком.
+*   `[X]` [P1.PROF.6] Implement Pull-to-Refresh for Profile/Posts.
+    *   _Что:_ Добавить возможность потянуть экран профиля вниз, чтобы обновить информацию (данные профиля и посты).
+    *   _Зачем:_ Чтобы пользователь мог легко обновить данные, не перезаходя в приложение.
+*   `[X]` [P1.PROF.7] Implement Infinite Scrolling (Pagination) for Post Grid.
+    *   _Что:_ Сделать так, чтобы при прокрутке сетки постов вниз подгружались более старые посты, если они есть.
+    *   _Зачем:_ Чтобы пользователь мог просмотреть всю историю своих постов, а не только последние несколько.
+
+### Theme: Post Creation Flow ([P1.NCP] - New Create Post)
+*   `[X]` [P1.NCP.1] Implement Media Picker (`PHPickerViewController`).
+    *   _Что:_ Реализовать выбор фото (и видео в будущем) из галереи телефона для создания поста.
+    *   _Зачем:_ Чтобы пользователь мог выбрать контент для публикации.
+*   `[X]` [P1.NCP.2] Create `PostMediaSelectionViewController` (Select Aspect Ratio).
+    *   _Что:_ Создать экран, где пользователь может выбрать формат (соотношение сторон, например, квадрат 1:1 или вертикальный 9:16) для своего поста.
+    *   _Зачем:_ Чтобы посты выглядели единообразно в ленте и соответствовали задумке пользователя.
+*   `[~]` [P1.NCP.3] Create `PostCropViewController` & `ImageCropView` (Crop selected media).
+    *   _Что:_ Создать экран и компонент (`ImageCropView`), где пользователь может кадрировать (вырезать нужную часть) выбранное фото под выбранный формат. `ImageCropView` готов, VC частично.
+    *   _Зачем:_ Чтобы пользователь мог точно настроить, как будет выглядеть его фото в посте.
+*   `[X]` [P1.NCP.4] Create `PostReviewViewController` (Add caption, tags, final check).
+    *   _Что:_ Создать экран, где пользователь может добавить описание (текст) к посту, отметить других пользователей или добавить хэштеги перед публикацией.
+    *   _Зачем:_ Чтобы пользователь мог добавить контекст к своему посту и завершить его создание.
+*   `[X]` [P1.NCP.5] Implement `CreatePostViewModel` (Handle cropping, uploading, Firestore save).
+    *   _Что:_ Написать логику, которая обрабатывает кадрирование, загружает фото/видео в хранилище (Firebase Storage) и сохраняет информацию о посте (описание, ссылка на медиа, автор и т.д.) в базу данных (Firestore).
+    *   _Зачем:_ Чтобы пост фактически опубликовался и сохранился на сервере.
+*   `[X]` [P1.NCP.6] Implement Navigation Flow (Media Picker -> Select Aspect -> Crop -> Review -> Publish).
+    *   _Что:_ Настроить переходы между экранами выбора медиа, выбора формата, кадрирования и добавления описания, а также возврат в профиль после публикации.
+    *   _Зачем:_ Чтобы процесс создания поста был логичным и последовательным для пользователя.
+
+### Theme: Post Scrolling Feed ([P1.FEEDSCROLL])
+*   `[ ]` [P1.FEEDSCROLL.1] Fix dynamic cell height in post scroll view (`FullPostCell` + `UserPostScrollViewController`).
+    *   _Что:_ Исправить отображение постов на экране прокрутки (`UserPostScrollViewController`). Сейчас они могут обрезаться или иметь лишнее пустое место, так как высота поста (картинка + текст) рассчитывается неправильно.
+    *   _Зачем:_ Чтобы каждый пост в ленте занимал ровно столько места, сколько нужно, и лента выглядела аккуратно.
+*   `[ ]` [P1.FEEDSCROLL.2] Improve/verify pagination in post scroll view.
+    *   _Что:_ Улучшить подгрузку старых постов при прокрутке ленты вниз. Нужно убедиться, что посты загружаются достаточно быстро и заранее, чтобы пользователь не упирался в конец ленты и не ждал долго.
+    *   _Зачем:_ Чтобы просмотр длинной ленты постов был плавным и без задержек.
+*   `[ ]` [P1.FEEDSCROLL.3] Add animation for caption expand/collapse in post scroll view.
+    *   _Что:_ Добавить плавную анимацию при разворачивании/сворачивании описания под постом в ленте.
+    *   _Зачем:_ Чтобы изменение высоты поста при показе/скрытии текста выглядело красиво, а не происходило резко.
+*   `[ ]` [P1.FEEDSCROLL.4] Implement user-facing error display in post scroll view.
+    *   _Что:_ Показывать пользователю понятное сообщение об ошибке, если не удалось загрузить посты в ленте (например, из-за проблем с интернетом).
+    *   _Зачем:_ Чтобы пользователь понимал, что произошло, если посты не загружаются, а не просто видел пустой экран.
+*   `[ ]` [P1.FEEDSCROLL.5] Review `UserPostScrollViewModel` logic.
+    *   _Что:_ Проверить код (`UserPostScrollViewModel`), отвечающий за загрузку и управление данными для ленты постов.
+    *   _Зачем:_ Чтобы убедиться, что загрузка постов, включая подгрузку старых (пагинацию), работает правильно и эффективно.
 
 ---
-
-## Текущая Задача: Рефакторинг Системы Постов [TASK.APS] (ЗАВЕРШЕНЫ ОСНОВНЫЕ ПУНКТЫ)
-
-**Цель:** Реализовать создание и отображение постов с поддержкой каруселей, индивидуального выбора формата (1:1, 9:16, 1.91:1) и кропа для каждого изображения, генерацией 9:16 миниатюр для сетки профиля и динамическим отображением в ленте.
-
-**Подзадачи:**
-
-1.  **[x] `[TASK.APS.1]` Обновить Enum `PostAspectRatio`:** Заменить "16:9" на "1.91:1", скорректировать `ratio`. (Сделано: "4:5" -> "9:16").
-2.  **[-] `[TASK.APS.2]` Рефакторинг `ImageCropViewController`:** (Пропущено/Устарело, т.к. флоу меняется в TASK.NCP)
-    *   [-] `-` Обновить `UISegmentedControl` на "1:1", "9:16", "1.91:1".
-    *   [-] `-` Изменить делегат `ImageCropViewControllerDelegate` для передачи `aspectRatioString`.
-    *   [-] `-` Обновить вызов делегата в `doneButtonTapped`.
-3.  **[x] `[TASK.APS.3]` Рефакторинг `CreatePostViewModel`:** (Сделано)
-    *   [x] `-` Определить структуру `EditableMediaItem` для хранения оригинала, кропа, соотношения сторон.
-    *   [x] `-` Заменить `@Published var selectedMedia: [MediaItem]` на `@Published var editableMedia: [EditableMediaItem]`.
-    *   [x] `-` Обновить логику инициализации и управления `editableMedia`.
-    *   [x] `-` Переписать `sharePost`:
-        *   [x] `-` Индивидуальный кроп каждого `EditableMediaItem` (включая ручной).
-        *   [x] `-` Параллельная загрузка финальных изображений.
-        *   [x] `-` Определение `feedAspectRatio` поста (по первому элементу - *уточнение: будет изменено в NCP*).
-        *   [x] `-` Генерация 9:16 кропа первого фото для `gridThumbnail`.
-        *   [x] `-` Загрузка `gridThumbnail`.
-        *   [x] `-` Формирование `[MediaItemDTO]`.
-        *   [x] `-` Вызов нового `PostService.createPost(...)`.
-4.  **[x] `[TASK.APS.4]` Рефакторинг `CreatePostViewController`:** (Сделано)
-    *   [x] `-` Адаптировать UI для работы с `editableMedia` из ViewModel.
-    *   [x] `-` Обновить логику выбора миниатюры (`didSelectItemAt`) для загрузки `EditableMediaItem` в `imageCropView`.
-    *   [x] `-` Обновить логику `aspectRatioChanged` для изменения соотношения **только текущего** `EditableMediaItem`.
-    *   [x] `-` Реализовать сохранение параметров кропа из `imageCropView` обратно в **текущий** `EditableMediaItem` при смене фокуса/перед `shareTapped`.
-5.  **[ ] `[TASK.APS.5]` Проверить `PostService.createPost(...)`:** Убедиться, что он корректно сохраняет `mediaItems`, `feedAspectRatio`, `gridThumbnailURL`.
-6.  **[ ] `[TASK.APS.6]` Рефакторинг Отображения `Feed`:**
-    *   [ ] `-` `FeedCell`: Поддержка карусели (`mediaItems.count > 1`). Динамическая высота медиа-контейнера по `post.feedAspectRatio`.
-    *   [ ] `-` `FeedViewController`: Включить self-sizing / динамический расчет высоты ячеек.
-7.  **[ ] `[TASK.APS.7]` Рефакторинг Отображения `Person` (Скролл):**
-    *   [ ] `-` Найти `UserPostScrollViewController` / Cell.
-    *   [ ] `-` `Cell`: Поддержка карусели. Динамическая высота медиа-контейнера по `post.feedAspectRatio`.
-8.  **[ ] `[TASK.APS.8]` Проверить Отображение `Person` (Сетка):**
-    *   [ ] `-` `PostGridCell`: Убедиться, что используется `post.gridThumbnailURL` и формат 9:16.
-
----
-
-**Дата:** 24 апреля 2025 г.
-
-**Общее Видение:** Создать уникальное iOS-приложение (Social Fitness RPG) с 5 основными разделами (Feed, Person, Leveling, Progress, Store), отображающее логотип "DOJO", предоставляющее систему уведомлений и обмен сообщениями. Приложение мотивирует пользователей через комбинацию социального взаимодействия (лента рекомендаций, профили), AI-анализа фитнес-упражнений (MediaPipe) и продвинутых RPG-механик (XP, уровни, аттрибуты, ранги, бонусы).
-
-**Использование:** Отмечайте выполненные задачи, заменяя `[ ]` на `[x]`. Используйте `[~]` для частично выполненных задач. Используйте ID задач (`[P1.FND.1]`) при обсуждении с AI.
-
-**Ключевые Разделы (Табы) и Темы:**
-
-1.  Feed (Таб 1): Лента рекомендаций, просмотр профилей других.
-2.  **Person (Таб 2): Профиль текущего пользователя (включая просмотр своей ленты постов).**
-3.  Leveling (Таб 3): Выбор/выполнение упражнений, AI-анализ, XP, прокачка аттрибутов.
-4.  Progress (Таб 4): Статистика, отслеживание RPG-элементов, достижения.
-5.  Store (Таб 5): Внутриигровой магазин.
-6.  Просмотр Профиля Другого Пользователя: Функционал и UI (Card, Person, Stats).
-7.  Программы Тренировок: Создание, управление и просмотр программ.
-8.  RPG Механики: Уровни, XP, Ранги, Аттрибуты, Бонусы.
-9.  Общее Ядро (Core): Аутентификация, сервисы, модели.
-10. Техническая Основа и UI: Архитектура, зависимости, производительность, общие элементы UI.
-11. Уведомления (Notifications): Система оповещений.
-12. Обмен Сообщениями (Messaging): Функционал чата.
-
----
-
-## Фаза 1: MVP (Социальный Фитнес RPG - Основа)
-
-**Цель Фазы 1:** Запустить базовое приложение: регистрация/вход, выполнение 1 упражнения с AI-анализом + расчет XP/уровня, просмотр простейшей ленты и своего профиля (уровень/XP), базовая навигация с логотипом.
-
-### Тема: Техническая Основа и UI [FND]
-- [~] `[P1.FND.1]` Настройка структуры проекта, архитектуры (Координаторы, MVVM), зависимостей (CocoaPods: MediaPipe, Charts). *(Структура, MVVM+Coords, MediaPipe есть. Charts не интегрированы)*.
-- [x] `[P1.FND.2]` Настройка Firebase/Google Cloud (`GoogleService-Info.plist`).
-- [x] `[P1.FND.3]` Реализация основной структуры UI: `UITabBarController` (5 табов), `UINavigationController` для каждого таба.
-- [~] `[P1.FND.4]` Реализация базовой `UINavigationBar` с логотипом "DOJO". *(Логотип реализован в кастомном TopMenuView в FeedViewController, не в стандартном UINavigationBar)*.
-
-### Тема: UI Исправления (Фаза 1) [UIFIX]
-- [x] `[P1.UIFIX.1]` Исправлено отображение логотипа DOJO в FeedViewController (полная ширина topBar).
-- [x] `[P1.UIFIX.2]` Исправлено масштабирование аватара (`.scaleAspectFill`) и ширина нижней панели (100%) в UserProfileCardViewController.
-- [x] `[P1.UIFIX.3]` Исправлен layout (смещение контента) в UserProfileFeedViewController (констрейнт ширины для contentWrapperView).
-- [x] `[P1.UIFIX.4]` Исправлен layout (позиционирование) в UserProfileStatsViewController (констрейнты для containerView).
-- [x] `[P1.UIFIX.5]` Исправлен layout в табе Person (использует UserProfileFeedViewController, исправленный в P1.UIFIX.3).
-
-### Тема: Общее Ядро (Core) [COR]
-- [x] `[P1.COR.1]` Определение базовых Моделей Данных: `User`, `Post`, `Exercise`, `ProgressData` (с полями `level`, `currentXP`, `xpToNextLevel`, `rank`, `attributes: [Attribute]`). *(Модели User, Post, Exercise, ProgressData, Attribute определены)*.
-- [x] `[P1.COR.2]` Реализация базовых Core Services (протоколы + начальная имплементация): `AuthService`, `UserProfileService`, `PostService`, `StorageService`, `ProgressService`. *(Auth, UserProfile, Post, Storage, Progress реализованы. Конфликт с DataManager устранен. `FollowService` из Фазы 2 также реализован)*. 
-- [x] `[P1.COR.3]` Реализация `AuthCoordinator` и сценариев Регистрации / Входа (VC, VM, вызовы `AuthService`).
-
-### Тема: RPG Механики [RPG]
-- [x] `[P1.RPG.1]` Реализация расчета Ранга в `ProgressService`: `func calculateRank(level: Int) -> String` (логика E-R+). Инициализация ранга при регистрации/загрузке. *(Функция `calculateRank` реализована в ProgressService)*.
-
-### Тема: Feed (Таб 1) [FED]
-- [x] `[P1.FED.1]` Реализация `FeedCoordinator`.
-- [~] `[P1.FED.2]` Реализация `FeedViewController` (вертикальный список `UICollectionView`/`UITableView`). *(Используется UITableView)*.
-- [x] `[P1.FED.3]` Реализация базовой **бесконечной прокрутки** (пагинации) в `FeedViewController`. *(Реализовано в PostService, FeedViewModel, FeedViewController)*.
-- [x] `[P1.FED.4]` Реализация `FeedViewModel` (загрузка постов через `PostService`). *(Реализована загрузка с пагинацией)*.
-- [x] `[P1.FED.5]` Реализация `PostCell` (отображение фото, мини-аватарки, имени автора). Зависит от `Post`.
-- [x] `[P1.FED.6]` Навигация из `FeedViewController` на **экран-заглушку** Профиля Другого Пользователя (при тапе на авторе). Зависит от `UserProfileCoordinator`. *(Реализована обработка тапа и вызов координатора)*.
-
-### Тема: Person (Таб 2 - Свой Профиль) [PSN]
-- [x] `[P1.PSN.1]` Реализация `PersonCoordinator` (или `CurrentUserProfileCoordinator`).
-- [x] `[P1.PSN.2]` Реализация `PersonViewController` (отображение Имени пользователя, Уровня и XP). *(Реализовано в UserProfileFeedVC/UserProfileCardVC)*.
-- [x] `[P1.PSN.3]` Реализация `PersonViewModel` (загрузка данных через `UserProfileService`, `ProgressService`). Зависит от `User`, `ProgressData`. *(Реализовано в UserProfileFeedViewModel с использованием UserProfileService и ProgressService)*.
-
-### Тема: Leveling (Таб 3 - Тренировки) [LVL]
-- [x] `[P1.LVL.1]` Реализация `LevelingCoordinator`.
-- [x] `[P1.LVL.2]` Реализация `ExerciseSelectionViewController` / `ViewModel` (выбор 1 упражнения, например Приседания). Зависит от `Exercise`. *(Используются моковые данные)*.
-- [x] `[P1.LVL.3]` Реализация `ExerciseExecutionViewController` / `ViewModel`: Интеграция камеры, `PoseLandmarkerHelper` (использует MediaPipe), `PoseOverlayView`.
-- [x] `[P1.LVL.4]` Реализация базового анализатора (`SquatAnalyzer3D`, реализует `ExerciseAnalyzerProtocol`) для подсчета повторений.
-- [x] `[P1.LVL.5]` Расчет базового XP (без бонусов) и вызов `ProgressService.addXP()`, который обновит `level`, `xp`, `rank`. Зависит от `[P1.RPG.1]`. *(Расчет XP и вызов ProgressService.addXP() реализованы в ExerciseExecutionViewModel)*.
-
-### Тема: Progress (Таб 4 - Статистика) [PRG]
-- [x] `[P1.PRG.1]` Реализация `ProgressCoordinator`.
-- [x] `[P1.PRG.2]` Реализация `ProgressViewController` / `ViewModel` (отображение Уровня, шкалы XP, Ранга). Зависит от `ProgressData`, `[P1.RPG.1]`. *(UI и ViewModel реализованы)*.
-
-### Тема: Store (Таб 5 - Магазин) [STR]
-- [x] `[P1.STR.1]` Реализация `StoreCoordinator`.
-- [x] `[P1.STR.2]` Реализация `StoreViewController` (UI-заглушка).
-
-### Тема: Создание Контента [CNT]
-- [x] `[P1.CNT.1]` Реализация `CreatePostViewController` / `ViewModel` (создание текстового поста для наполнения ленты). Зависит от `PostService`. *(Реализовано создание поста с изображением)*.
-
----
-
-## Фаза 2: Расширение и Улучшение (Post-MVP)
-
-**Цель Фазы 2:** Улучшить все MVP-фичи, реализовать полноценный просмотр профиля другого пользователя (Card/Person/Stats), детализировать экран собственного профиля (Таб 2) **включая скролл-ленту постов**, добавить социальные функции (подписки, комменты, лайки), медиа-контент, базовые уведомления, базовый магазин и начать прокачку аттрибутов.
-
-### Тема: Техническая Основа и UI [FND]
-- [ ] `[P2.FND.1]` Оптимизация производительности (загрузка ленты, изображений).
-- [ ] `[P2.FND.2]` Написание Unit-тестов (для Services, ViewModels).
-- [x] `[P2.FND.3]` Добавление/Настройка библиотеки `Charts` (DGCharts) через CocoaPods/SPM. Зависимость для `[P2.UPO.5]`. *(Добавлено и используется)*.
-
-### Тема: Feed (Таб 1) [FED]
-- [~] `[P2.FED.1]` Реализация Верхней Панели (аналог Stories): Горизонтальный `UICollectionView` в `FeedViewController`, загрузка данных пользователей (`UserService`/`PostService`), навигация на профиль `[P2.UPO.1]`. *(UICollectionView в хедере таблицы, StoryCell, навигация реализованы. Загрузка данных и обводка - TODO)*.
-- [~] `[P2.FED.2]` Улучшение `PostCell`/`FullPostCell`: Добавить UI для Лайков, Комментариев, Текста поста + кнопка "more". *(UI лайков, комментариев, share, счетчик лайков, показ полного текста/more добавлены в PostCell. Скругление картинки есть)*.
-    - [x] `- [x]` Добавить отображение полного текста поста и кнопку "more". *(Реализовано)*.
-    - [ ] `- [ ]` Реализовать UI для `FullPostCell`.
-- [x] `[P2.FED.3]` Реализация логики Лайков: UI обновление + вызов `PostService.likePost()`. *(Реализовано в ViewModel/ViewController с оптимистичным обновлением)*.
-- [x] `[P2.FED.4]` Навигация на экран Комментариев `[P2.SOC.2]` при тапе на иконку/счетчик. *(Реализовано)*.
-- [ ] `[P2.FED.5]` Обеспечение плавной прокрутки `FeedViewController` (верхняя панель + лента).
-- [ ] `[P2.FED.6]` **UI/UX Рефайнмент Ленты:** Приведение UI к макетам (шрифты, точные отступы, градиентная обводка сторис, расположение элементов в PostCell).
-
-### Тема: Person (Таб 2 - Свой Профиль) [PSN]
-- [x] `[P2.PSN.1]` Улучшение `PersonViewController`: Реализация Заголовка (Аватар, Counts, Имя, @id - по аналогии с `[P2.UPO.4]`). *(Реализовано в UserProfileFeedViewController)*.
-- [~] `[P2.PSN.2]` Добавление Кнопок Действий: "New post" (-> `[P1.CNT.1]`), "New program" (UI заглушка -> `[P3.PRG.4]`). *(UI кнопок "New Post" и "New Program" добавлены)*.
-- [~] `[P2.PSN.3]` Добавление Переключателя Контента: Табы "Posts" / "Programs" (UI заглушка -> `[P3.PRG.5]`). *(UISegmentedControl добавлен. Логика для "Programs" отсутствует)*.
-- [x] `[P2.PSN.4]` Отображение Сетки Постов пользователя (при выборе таба "Posts"). *(Реализовано в UserProfileFeedViewController)*.
-    - [x] `- [x]` Реализация обработки нажатия (tap) на пост в сетке.
-    - [x] `- [x]` Навигация на экран `UserPostScrollViewController` `[P2.PSN.7]`, передача UserID (текущего пользователя) и ID нажатого поста. *(Навигация вызывается, сам экран UserPostScrollViewController не реализован)*.
-- [x] `[P2.PSN.5]` Отображение RPG Элементов (Ранг, Уровень, XP). *(Уровень/XP/Ранг отображаются в UserProfileFeedViewController)*.
-- [x] `[P2.PSN.6]` Реализация Экрана Редактирования Профиля (Аватар, Имя, ID, Био). Зависит от `UserProfileService`. *(Реализованы VC, VM, навигация; использует UserProfileService, StorageService)*.
-- [x] `[P2.PSN.7]` **Реализация `UserPostScrollViewController` (Лента постов пользователя):** *(Реализован VC с UICollectionView и FullPostCell. Поддерживает пагинацию, лайки, навигацию на комменты/автора)*.
-    - [ ] Использование `UICollectionView` / `UITableView` для вертикальной прокрутки постов.
-    - [ ] Использование ячейки, аналогичной `FullPostCell` из `Feed`, для отображения: Фото, Текст поста (caption), Иконки/счетчики Лайков, Иконки/счетчики Комментариев.
-    - [ ] Реализация "бесконечной" прокрутки вниз для загрузки более старых постов пользователя.
-    - [ ] Начальная позиция скролла должна быть на посте, с которого перешли.
-    - [ ] Подключение логики Лайков (`[P2.FED.3]`).
-    - [x] Навигация на экран Комментариев (`[P2.SOC.2]`) при нажатии на иконку/счетчик комментариев.
-- [x] `[P2.PSN.8]` **Реализация `UserPostScrollViewModel`:** *(Реализован VM с загрузкой постов пользователя, пагинацией и лайками)*.
-    - [ ] Загрузка постов для конкретного UserID через `PostService`.
-    - [ ] Обработка пагинации для загрузки старых постов.
-    - [ ] Передача ID начального поста для позиционирования.
-    - [ ] Управление источником данных для `UserPostScrollViewController`.
-
-### Тема: Leveling (Таб 3 - Тренировки) [LVL]
-- [ ] `[P2.LVL.1]` Добавление 2-3 новых упражнений (`Exercise`) и их Анализаторов (`ExerciseAnalyzerProtocol`).
-- [ ] `[P2.LVL.2]` Улучшение Анализаторов (обратная связь по технике).
-- [x] `[P2.LVL.3]` Использование `KalmanFilter3D`, `MotionManager` (если нужно). *(Используются в ExerciseExecutionViewModel)*.
-- [ ] `[P2.LVL.4]` Улучшение `PoseOverlayView`. *(Файл не анализировался)*.
-- [x] `[P2.RPG.1]` **RPG Механика (Аттрибуты - Прокачка):** Определение маппинга "упражнение -> аттрибут(ы)", реализация логики увеличения аттрибутов в `ProgressService` после `[P1.LVL.5]`. *(Реализовано)*.
-
-### Тема: Progress (Таб 4 - Статистика) [PRG]
-- [ ] `[P2.PRG.1]` Реализация `ProgressCoordinator`.
-- [ ] `[P2.PRG.2]` Реализация `ProgressViewController` / `ViewModel` (отображение Уровня, шкалы XP, Ранга). Зависит от `ProgressData`, `[P1.RPG.1]`. *(UI и ViewModel реализованы)*.
-
-### Тема: Store (Таб 5 - Магазин) [STR]
-- [ ] `[P2.STR.1]` Реализация базового UI `StoreViewController`.
-- [ ] `[P2.STR.2]` Интеграция StoreKit: Покупка 1-2 non-consumable IAP.
-
-### Тема: Социальное Ядро и Контент [SOC]
-- [x] `[P2.SOC.1]` Реализация Системы Подписок (`FollowService`, UI в профилях). *(FollowService и логика в VM/VC есть. Кнопка Follow/Following работает)*.
-- [x] `[P2.SOC.2]` Реализация Комментариев: Экран `CommentsViewController`, `CommentsViewModel`, `CommentCell`, `Comment` model, обновление `PostService`. *(Базовая реализация завершена)*.
-- [x] `[P2.SOC.3]` Загрузка Медиа к Постам: Обновление `CreatePostViewController`, использование `StorageService`. *(Реализовано в флоу создания поста)*.
-- [~] `[P2.SOC.4]` Отображение Медиа в `PostCell`, `FullPostCell`, `PostGridCell`. *(В PostCell и PostGridCell реализовано. FullPostCell не проверен)*.
-
-### Тема: Просмотр Профиля Другого Пользователя [UPO]
-- [x] `[P2.UPO.1]` Реализация `UserProfileContainerViewController` (управляет Card/Person/Stats). Навигация из `[P1.FED.6]`. *(Реализован, но с TODO. Навигация из P1.FED.6 отсутствует)*.
-- [x] `[P2.UPO.2]` Настройка Top Navigation Bar в `UserProfileContainerViewController` (Назад, Меню Card/Person/Stats, Настройки/Опции). *(Реализовано через TopMenuView)*.
-- [x] `[P2.UPO.3]` Реализация `UserProfileCardViewController` ("Card" таб): Фон, Аватар, Имя, Follow кнопка, Статус/Био, Уровень, XP бар. Зависит от `UserProfileService`, `ProgressService`, `FollowService`. *(Реализовано с UserProfileCardViewModel)*.
-- [x] `[P2.UPO.4]` Реализация `UserProfileFeedViewController` ("Person" таб): Заголовок (Аватар, Counts, Имя, @id, кнопки Follow, Message[UI], Program[UI]), Контент (Табы, Сетка постов). Зависит от `UserProfileService`, `FollowService`, `PostService`. *(Заголовок, сетка, кнопки Follow/Message реализованы. Кнопка Program отсутствует. Контент ограничен 86% ширины)*.
-- [x] `[P2.UPO.5]` Реализация `UserProfileStatsViewController` ("Stats" таб): Радар-Чарт (`Charts` `[P2.FND.3]`), Инфо-блок (Имя, Ранг `[P1.RPG.1]`, Аттрибуты), Уровень, XP. Зависит от `UserProfileService`, `ProgressService`. *(Реализовано, включая список атрибутов и ограничение ширины 86%)*.
-- [x] `[P2.UPO.6]` Реализация ViewModel'ов для UPO экранов. *(UserProfileFeedViewModel, UserProfileStatsViewModel, UserProfileCardViewModel реализованы)*.
-
-### Тема: Уведомления (Notifications - Базовые) [NOT]
-- [~] `[P2.NOT.1]` Бэкенд: Проектирование схемы, реализация генерации уведомлений (комментарий, подписчик, лайк?). *(Модель AppNotification и заглушка NotificationService созданы. Бэкенд логика отсутствует)*.
-- [~] `[P2.NOT.2]` UI: Отображение иконки Уведомлений + счетчика (badge) в Nav Bar (`[P1.FND.4]`). *(Иконка добавлена в TopBarView FeedVC. Счетчик отсутствует)*.
-- [~] `[P2.NOT.3]` Навигация на экран Уведомлений. *(Реализована базовая навигация через AppCoordinator)*.
-- [~] `[P2.NOT.4]` UI: Базовый `NotificationsViewController` (список уведомлений) + логика прочтения. *(Создана заглушка VC)*.
-
----
-
-## Фаза 3: Зрелость и Оптимизация
-
-**Цель Фазы 3:** Добавить продвинутые функции (чат, программы тренировок, ачивки, лидерборды), реализовать бонус XP от аттрибутов, push-уведомления, оптимизировать и отполировать приложение.
-
-### Тема: Техническая Основа и UI [FND]
-- [ ] `[P3.FND.1]` Глубокая оптимизация производительности.
-- [ ] `[P3.FND.2]` UI/UX полировка всего приложения.
-- [ ] `[P3.FND.3]` Внедрение системы Аналитики.
-- [ ] `[P3.FND.4]` Расширение покрытия тестами (Unit, UI).
-- [ ] `[P3.FND.5]` Настройка CI/CD.
-
-### Тема: Feed (Таб 1) [FED]
-- [ ] `[P3.FED.1]` Подсветка Кружков в Верхней Панели (Бэкенд + Фронтенд логика seen/unseen).
-- [ ] `[P3.FED.2]` Улучшение алгоритма рекомендаций / добавление вкладки "Подписки".
-- [ ] `[P3.FED.3]` Реализация "Поделиться" (Share).
-
-### Тема: Person (Таб 2 - Свой Профиль) [PSN]
-- [ ] `[P3.PSN.1]`
-
-### Тема: Leveling (Таб 3 - Тренировки) [LVL]
-- [ ] `[P3.LVL.1]` Расширение аналитики упражнений (углы, скорость, стабильность).
-- [ ] `[P3.MSG.2]` Интеграция с Push Notifications.
-- [ ] `[P3.MSG.3]` Отображение статуса онлайн/печатает.
-
-## Новая Тема: Продвинутая Система Постов (Форматы и Карусели) [APS]
-
-**Цель:** Реализовать поддержку разных форматов постов в ленте, каруселей с единым форматом и единообразных 9:16 превью в сетке профиля.
-
-- [ ] `[P3.APS.1]` **Модель Данных:**
-    - [ ] `-` **Определить структуру `MediaItem`:** Должна содержать как минимум `type: String` ("image"/"video"), `url: String` (URL для отображения в ленте/карусели).
-    - [ ] `-` **Обновить модель `Post`:**
-        - [ ] `-` Заменить `imageURL: String?` на `mediaItems: [MediaItem]`.
-        - [ ] `-` Добавить `feedAspectRatio: String` (для хранения выбранного формата ленты, например, "1:1", "9:16", "1.91:1").
-        - [ ] `-` Добавить `gridThumbnailURL: String` (URL на 9:16 превью для сетки профиля).
-- [ ] `[P3.APS.2]` **Бэкенд / Обработка (Cloud Function):**
-    - [ ] `-` **Реализовать Cloud Function:** Триггер на создание документа в Firestore `posts/{postId}` или на загрузку файла в `Storage/posts/{userId}/{postId}/original/`.
-    - [ ] `-` **Входные данные:** `postId`, `userId` (из триггера). Функция читает документ `Post` из Firestore, чтобы получить `feedAspectRatio` и список оригинальных файлов в `mediaItems`.
-    - [ ] `-` **Логика:**
-        - [ ] `-` **Чтение оригинала:** Получить оригинальные файлы из `Storage/posts/{userId}/{postId}/original/`.
-        - [ ] `-` **Обработка для ленты:** Для каждого оригинала сгенерировать версию с соотношением `feedAspectRatio` (из Firestore) и сохранить в `Storage/posts/{userId}/{postId}/feed/`.
-        - [ ] `-` **Генерация 9:16 превью:** Взять *первый* оригинальный медиафайл, кадрировать до 9:16, сохранить в `Storage/posts/{userId}/{postId}/grid/`.
-        - [ ] `-` **Обновление Firestore:** Обновить документ `Post` в Firestore, заполнив `mediaItems[...].feedURL` и `gridThumbnailURL` ссылками на обработанные файлы.
-- [ ] `[P3.APS.3]` **UI Создания Поста (Клиент - Выбор/Предпросмотр):**
-    - [ ] `-` **Мультивыбор:** Реализовать выбор *нескольких* фото/видео.
-    - [ ] `-` **Выбор формата ленты:** Добавить UI для выбора *единого* соотношения сторон (`feedAspectRatio`) для *всех* выбранных медиа (1:1, 9:16, 1.91:1 и т.д.).
-    - [ ] `-` **Предпросмотр кадрирования:** Реализовать UI *предварительного просмотра* кадрирования для выбранного соотношения сторон (без фактического кадрирования на клиенте).
-- [ ] `[P3.APS.4]` **Логика Загрузки (Клиент):**
-    - [ ] `-` **Загрузка оригиналов:** Обновить `CreatePostViewModel` / `StorageService` для загрузки *оригиналов* выбранных медиафайлов в `Storage/posts/{userId}/{postId}/original/`.
-    - [ ] `-` **Создание документа Post:** При создании документа `Post` в Firestore, сохранять выбранное `feedAspectRatio` и метаданные оригиналов в `mediaItems` (например, тип, имя файла в `original/`). Поля `feedURL` и `gridThumbnailURL` остаются пустыми (их заполнит Cloud Function).
-- [ ] `[P3.APS.5]` **Отображение в Ленте (`PostCell`/`FullPostCell`):**
-    - [ ] `-` **Работа с `mediaItems`:** Обновить `PostCell` и `FullPostCell` для получения массива `mediaItems` из модели `Post`.
-    - [ ] `-` **Карусель:** Если `mediaItems.count > 1`, реализовать горизонтальный свайп (например, `UICollectionView` или `UIPageViewController` внутри ячейки) для пролистывания `mediaItems`.
-    - [ ] `-` **Динамический размер:** Ячейка должна корректно изменять свой размер (особенно высоту медиа-контейнера) в соответствии со значением `feedAspectRatio` поста.
-- [ ] `[P3.APS.6]` **Отображение в Сетке Профиля (`ProfileGridCell`):**
-    - [ ] `-` **Использование `gridThumbnailURL`:** Обновить ячейку сетки профиля (`ProfileGridCell` или аналог) для загрузки и отображения изображения по `gridThumbnailURL` из модели `Post`.
-    - [ ] `-` **Фиксированный формат 9:16:** Обеспечить *строгое* соотношение сторон 9:16 для `UIImageView` внутри ячейки, независимо от исходного изображения (использовать `contentMode = .scaleAspectFill` и `clipsToBounds = true`).
-- [ ] `[P3.APS.7]` **Логика Автоматического Кадрирования (Бэкенд):**
-    - [ ] `-` **Определить стратегию:** Четко определить метод кадрирования для 9:16 превью (например, взять центральную вертикальную полосу шириной `height * 9 / 16`).
-    - [ ] `-` **Реализовать в Cloud Function:** Добавить код в функцию из `[P3.APS.2]` для выполнения этого кадрирования (возможно, с использованием ImageMagick или специализированных библиотек для обработки изображений/видео на сервере).
-
-## Рефакторинг UI/UX Создания Поста [TASK.NCP] (New Create Post)
-
-**Цель:** Переработать флоу создания поста, сделав его более похожим на Instagram, с единым выбором соотношения сторон для всего поста и отдельными экранами для выбора медиа, выбора формата/превью, ручного кропа и финального ревью.
-
-**Предыдущий Флоу (для контекста):**
-1.  `UserProfileFeedVC`: Нажатие "New Post" -> `PHPicker`.
-2.  `UserProfileFeedVC.pickerDidFinish`: Вызов `processNextImage`.
-3.  `processNextImage`:
-    *   index 0: Показ `ImageCropVC` -> Выбор AR + Кроп -> Делегат -> `processNextImage(index + 1, selectedAR)`.
-    *   index > 0: Автокроп с `selectedAR` -> `processNextImage(index + 1, selectedAR)`.
-4.  Конец `processNextImage`: Вызов `coordinator.showCreatePost(MediaItem[])`.
-5.  `CreatePostVC`: Показ превью + коллекции миниатюр. Выбор AR *для отдельного фото*. Ручной кроп в превью. Добавление подписи. Share.
-6.  `CreatePostVM.sharePost`: Кроп каждого `EditableMediaItem` (с его AR/ручными параметрами), загрузка, создание поста (AR первого элемента как `feedAspectRatio`).
-
-**Новый Флоу:**
-1.  `UserProfileFeedVC`: Нажатие "New Post" -> `PHPicker`.
-2.  `UserProfileFeedVC.pickerDidFinish`: Вызов `coordinator.showPostMediaSelection(MediaItem[])`.
-3.  `PostMediaSelectionVC` (Экран 2):
-    *   Показ карусели превью.
-    *   Выбор *единого* `postAspectRatio` для поста.
-    *   Нажатие на превью -> `coordinator.showPostCrop(EditableMediaItem, postAspectRatio, delegate=self)`.
-    *   Нажатие "Next" -> `coordinator.showPostReview(EditableMediaItem[], postAspectRatio)`.
-4.  `PostCropVC` (Экран 3):
-    *   Показ `ImageCropView` с `postAspectRatio`.
-    *   Ручной кроп (зум/пан).
-    *   Нажатие "Done" -> `delegate.didFinishCropping(updatedItem)` -> `dismiss`.
-5.  `PostReviewVC` (Экран 4):
-    *   Показ карусели финальных превью.
-    *   Поле для подписи (`caption`).
-    *   Нажатие "Share" -> Инициализация `CreatePostViewModel` (или нового `PostReviewViewModel`) -> Вызов `sharePost`.
-6.  `CreatePostVM.sharePost`: (Адаптированный) Кроп каждого `EditableMediaItem` (с ручными параметрами, используя *единый* `postAspectRatio`), загрузка, создание поста с этим `postAspectRatio` как `feedAspectRatio`.
-
-**Подзадачи:**
-
-**[ ] `[TASK.NCP.1]` Модификация Модели и ViewModel:**
-    *   [ ] `-` В `CreatePostViewModel`: Удалить `EditableMediaItem.selectedAspectRatio`.
-    *   [ ] `-` В `CreatePostViewModel`: Добавить `@Published var postAspectRatio: PostAspectRatio = .square`.
-    *   [ ] `-` В `CreatePostViewModel.sharePost`: Использовать `self.postAspectRatio` для кропа и как `feedAspectRatio` при сохранении. Адаптировать хелперы кропа (`generateCroppedImage`, `cropImageManually`, `autoCropImage`) для работы с единым AR поста.
-    *   [ ] `-` В `EditableMediaItem`: Оставить поля для ручного кропа (`manualZoomScale`, `manualContentOffset`).
-
-**[ ] `[TASK.NCP.2]` Создание `PostMediaSelectionViewController` (Экран 2 - Выбор формата):**
-    *   [ ] `-` UI: Карусель `UICollectionView` для `[MediaItem]`/`[EditableMediaItem]`, кнопки для выбора `PostAspectRatio`, кнопки навигации ("Back", "Next", "Add More+").
-    *   [ ] `-` Логика: Принимает `[MediaItem]`. Хранит `[EditableMediaItem]`. Обновляет `postAspectRatio` при нажатии кнопок.
-    *   [ ] `-` Навигация: При тапе на ячейку -> `coordinator.showPostCrop`. При нажатии "Next" -> `coordinator.showPostReview`. При нажатии "Add More+" -> ? (Возврат к пикеру?).
-    *   [ ] `-` Делегат: Определить протокол для возврата результата (например, `PostMediaSelectionDelegate`).
-
-**[~] `[TASK.NCP.3]` Создание `PostCropViewController` (Экран 3 - Кроп):**
-    *   [x] `-` UI: Кнопки навигации ("Back/Close", "Done"), заголовок "Crop", `ImageCropView`, сетка третей на `ImageCropView`. *(UI элементы есть, ImageCropView готов, но сам VC не создан)*.
-    *   [~] `-` Логика: Принимает `EditableMediaItem` и `PostAspectRatio`. Настраивает `ImageCropView` (устанавливает `image`, `aspectRatio`, загружает `manualZoomScale`/`manualContentOffset` если есть). *(Логика в ImageCropView готова, передача параметров через координатор не реализована)*.
-    *   [~] `-` При нажатии "Done": Сохраняет текущие `currentZoomScale`/`currentContentOffset` из `ImageCropView` в `EditableMediaItem`, вызывает метод делегата `didFinishCropping(updatedItem)`, закрывается. *(Логика сохранения в ImageCropView есть, вызов делегата и закрытие не реализованы)*.
-    *   [ ] `-` Делегат: Определить протокол `PostCropViewControllerDelegate { func didFinishCropping(item: EditableMediaItem) }`. *(Не реализовано)*.
-
-**[ ] `[TASK.NCP.4]` Создание `PostReviewViewController` (Экран 4 - Ревью и Паблиш):**
-    *   [ ] `-` UI: Кнопки навигации ("Back", "Share"), заголовок "New Post", карусель `UICollectionView` для *финальных* превью, `UITextView` для подписи.
-    *   [ ] `-` Логика: Принимает `[EditableMediaItem]` и `PostAspectRatio`. Генерирует превью для карусели (возможно, требует доработки `generateCroppedImage` для генерации превью без полного сохранения).
-    *   [ ] `-` При нажатии "Share": Собирает данные (`caption`, `[EditableMediaItem]`, `postAspectRatio`), инициализирует `CreatePostViewModel` (или новый `PostReviewViewModel`), вызывает `sharePost`. Обрабатывает результат (закрытие, ошибка).
-
-**[ ] `[TASK.NCP.5]` Обновление `UserProfileFeedViewController`:**
-    *   [ ] `-` В `picker(_:didFinishPicking:)`: Заменить вызов `processNextImage` на вызов `coordinator.showPostMediaSelection(with: mediaItems)`.
-    *   [ ] `-` Удалить метод `processNextImage`.
-    *   [ ] `-` Удалить соответствие протоколу `ImageCropViewControllerDelegate` и его методы.
-    *   [ ] `-` Удалить метод `autoCropImage`.
-
-**[ ] `[TASK.NCP.6]` Обновление Координатора (`CurrentUserProfileCoordinator`):**
-    *   [ ] `-` Переименовать/заменить `showCreatePost(with:)` на `showPostMediaSelection(with:)`.
-    *   [ ] `-` Добавить метод `showPostCrop(item:aspectRatio:delegate:)`.
-    *   [ ] `-` Добавить метод `showPostReview(items:aspectRatio:)`.
-    *   [ ] `-` Реализовать навигацию между новыми VC.
-    *   [ ] `-` Реализовать обработку делегатов от `PostCropVC`.
-
-**[ ] `[TASK.NCP.7]` Рефакторинг/Удаление Старых Компонентов:**
-    *   [ ] `-` Оценить необходимость `ImageCropViewController`. Вероятно, его можно удалить или полностью переделать в `PostCropViewController`.
-    *   [ ] `-` Оценить необходимость `CreatePostViewController`. Вероятно, его можно удалить, перенеся нужные части UI/логики в новые VC.
-
-**[ ] `[TASK.NCP.8]` Тестирование:**
-    *   [ ] `-` Протестировать флоу с 1 фото.
-    *   [ ] `-` Протестировать флоу с несколькими фото.
-    *   [ ] `-` Протестировать разные соотношения сторон.
-    *   [ ] `-` Протестировать ручной кроп.
-    *   [ ] `-` Протестировать публикацию поста.
-    *   [ ] `-` Протестировать кнопки "Назад"/"Отмена" на всех экранах.
-
-### Тема: Leveling (Таб 3 - Тренировки) [LVL]
-  - [ ] `[P2.LVL.1]` Добавление 2-3 новых упражнений (`Exercise`) и их Анализаторов (`ExerciseAnalyzerProtocol`).
-  - [ ] `[P2.LVL.2]` Улучшение Анализаторов (обратная связь по технике).
+*Легенда:*
+*   `[ ]` - To Do
+*   `[~]` - In Progress
+*   `[X]` - Done
+*   `(Px.THEME.y)` - Phase.Theme.TaskID

@@ -10,7 +10,8 @@ protocol UserPostScrollViewControllerDelegate: AnyObject {
 
 // Меняем базовый класс и протоколы
 // Убираем избыточное объявление UICollectionViewDataSource здесь еще раз
-class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFlowLayout, FullPostCellDelegate {
+// Добавляем UICollectionViewDataSourcePrefetching
+class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFlowLayout, FullPostCellDelegate, UICollectionViewDataSourcePrefetching {
 
     // MARK: - Dependencies
     var viewModel: UserPostScrollViewModel! // Раскомментируем
@@ -29,7 +30,7 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFl
         layout.scrollDirection = .vertical
         layout.minimumLineSpacing = 0 // Убираем промежутки между ячейками
         layout.minimumInteritemSpacing = 0
-        // Размер ячейки будет задаваться делегатом
+        // Размер ячейки будет задаваться делегатом --> УДАЛЯЕМ
         
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
@@ -43,6 +44,8 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFl
         collectionView.register(PaginationIndicatorFooterView.self, 
                               forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter, 
                               withReuseIdentifier: PaginationIndicatorFooterView.identifier)
+        // Устанавливаем prefetchDataSource
+        collectionView.prefetchDataSource = self
         return collectionView
     }()
     
@@ -76,6 +79,9 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFl
         view.backgroundColor = .black
         setupUI()
         setupConstraints()
+        
+        // УДАЛЯЕМ настройку automatic size
+        
         // Раскомментируем биндинги
         setupBindings() 
         title = "Посты" 
@@ -85,6 +91,19 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFl
         super.viewDidLayoutSubviews()
         // Прокручиваем к начальному элементу после того, как layout будет готов
         // и только один раз
+        
+        // --- ОТЛАДКА РАЗМЕРОВ --- 
+        print("UserPostScrollVC [viewDidLayoutSubviews]:")
+        print("  view.bounds: \(view.bounds)")
+        print("  collectionView.frame: \(collectionView.frame)")
+        print("  collectionView.bounds: \(collectionView.bounds)")
+        print("  collectionView.safeAreaInsets: \(collectionView.safeAreaInsets)")
+        if let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+            print("  layout.itemSize: \(layout.itemSize)")
+            print("  layout.estimatedItemSize: \(layout.estimatedItemSize)")
+        }
+        // -------------------------
+        
         if !hasScrolledToInitial {
             scrollToInitialPost()
             hasScrolledToInitial = true
@@ -173,10 +192,22 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFl
             .receive(on: DispatchQueue.main)
             .compactMap { $0 }
             .sink { [weak self] message in
-                // TODO: Показать alert
-                print("*** UserPostScrollVC Error: \(message) ***")
+                print("*** UserPostScrollVC Error: \(message) ***") // Оставляем лог для отладки
+                self?.showErrorAlert(message: message)
             }
             .store(in: &cancellables)
+    }
+
+    // MARK: - Error Handling
+    
+    private func showErrorAlert(message: String) {
+        let alert = UIAlertController(
+            title: "Error", 
+            message: message, 
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 
 }
@@ -193,8 +224,8 @@ extension UserPostScrollViewController: UICollectionViewDataSource {
             fatalError("Unable to dequeue FullPostCell")
         }
         let post = viewModel.posts[indexPath.item]
-        // TODO: Передать замыкание для обновления layout?
-        cell.configure(with: post, indexPath: indexPath, needsLayoutUpdateAction: nil) 
+        // TODO: Передать замыкание для обновления layout? --> КОММЕНТАРИЙ УСТАРЕЛ
+        cell.configure(with: post, indexPath: indexPath)
         cell.delegate = self // Устанавливаем делегата
         return cell
     }
@@ -221,28 +252,43 @@ extension UserPostScrollViewController: UICollectionViewDataSource {
 
 // MARK: - UICollectionViewDelegateFlowLayout
 extension UserPostScrollViewController {
-    // Задаем размер ячейки равным размеру видимой области CollectionView
+    // ВОССТАНАВЛИВАЕМ ручной расчет высоты
+    
+    // Создаем временную ячейку для расчета высоты
+    // Лучше использовать одну и ту же временную ячейку для производительности
+    private static let sizingCell = FullPostCell(frame: .zero)
+    
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        // Используем bounds CollectionView для расчета размера
-        // Отнимаем safeAreaInsets, чтобы контент не заезжал под NavigationBar/TabBar
-        // let safeAreaHeight = collectionView.bounds.height - view.safeAreaInsets.top - view.safeAreaInsets.bottom // Старый расчет
-        // return CGSize(width: collectionView.bounds.width, height: safeAreaHeight) // Старый расчет
+        // 1. Получаем ширину collection view
+        let targetWidth = collectionView.bounds.width
+        
+        // 2. Получаем данные для поста
+        guard let post = viewModel.posts[safe: indexPath.item] else {
+            // Возвращаем дефолтный размер или нулевой, если поста нет
+            print("UserPostScrollVC [sizeForItemAt] Warning: No post data for indexPath \(indexPath)")
+            return CGSize(width: targetWidth, height: 300) // Примерная минимальная высота
+        }
+        
+        // 3. Используем статическую временную ячейку
+        let cell = UserPostScrollViewController.sizingCell
 
-        // НОВЫЙ РАСЧЕТ: Динамическая высота ячейки
-        let width = collectionView.bounds.width
-        
-        // TODO: Точный расчет высоты зависит от содержимого FullPostCell.
-        // Примерный расчет: высота картинки (например, 1:1) + фиксированная высота для остального (header, caption, actions)
-        let imageAspectRatio: CGFloat = 1.0 // Примерное соотношение 1:1, настройте под ваш дизайн
-        let imageHeight = width / imageAspectRatio
-        let estimatedOtherContentHeight: CGFloat = 150 // Примерная высота для хедера, кнопок, текста и отступов
-        
-        // Если у вас есть точная информация о высоте текста/изображения, используйте ее.
-        // Или настройте FullPostCell на использование Auto Layout и используйте estimatedItemSize у FlowLayout.
-        
-        let totalHeight = imageHeight + estimatedOtherContentHeight
-        
-        return CGSize(width: width, height: totalHeight)
+        // 4. Устанавливаем ширину ячейки ПЕРЕД конфигурацией и расчетом!
+        cell.bounds.size.width = targetWidth
+
+        // 5. Конфигурируем ячейку данными поста
+        cell.configure(with: post, indexPath: indexPath)
+
+        // 6. Рассчитываем размер с помощью Auto Layout ячейки
+        let calculatedSize = cell.contentView.systemLayoutSizeFitting(
+            CGSize(width: targetWidth, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required, // Ширина должна быть ТОЧНО targetWidth
+            verticalFittingPriority: .fittingSizeLevel  // Высота должна соответствовать содержимому
+        )
+
+        print("UserPostScrollVC [sizeForItemAt \(indexPath.item)]: Calculated size = \(calculatedSize)")
+
+        // 7. Возвращаем рассчитанный размер
+        return CGSize(width: targetWidth, height: max(1, calculatedSize.height))
     }
     
     // Метод для установки размера футера
@@ -254,11 +300,34 @@ extension UserPostScrollViewController {
 
 // MARK: - UICollectionViewDelegate
 extension UserPostScrollViewController: UICollectionViewDelegate {
+    // УДАЛЯЕМ старую логику пагинации из willDisplay
+    /*
     // Метод для пагинации
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         // Загружаем следующую страницу, когда приближаемся к концу списка
         // Например, за 3 элемента до конца
         if indexPath.item == viewModel.posts.count - 3 {
+            viewModel.fetchMorePosts()
+        }
+    }
+    */
+}
+
+// MARK: - UICollectionViewDataSourcePrefetching
+extension UserPostScrollViewController {
+    func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+        guard !viewModel.isFetchingMore, viewModel.canLoadMore else { return }
+        
+        // Проверяем, содержит ли массив indexPaths индекс, близкий к концу текущих данных
+        // Например, если последний загруженный элемент - 20, а prefetchThreshold = 5,
+        // то при запросе предзагрузки для индекса 16 (20 - 1 - 3) или больше, запускаем загрузку.
+        let lastLoadedItemIndex = viewModel.posts.count - 1
+        let prefetchThreshold = 5 // Начинаем загрузку за 5 элементов до конца
+        
+        let needsPrefetch = indexPaths.contains { $0.item >= lastLoadedItemIndex - prefetchThreshold }
+        
+        if needsPrefetch {
+            print("UserPostScrollVC: Prefetching next page triggered at index \(indexPaths.first?.item ?? -1)")
             viewModel.fetchMorePosts()
         }
     }
@@ -303,13 +372,13 @@ extension UserPostScrollViewController {
         delegate?.didTapCommentsButton(forPostID: postID)
     }
     
-    func fullPostCellDidToggleCaption(_ cell: FullPostCell, at indexPath: IndexPath) {
-        // Обновляем layout collectionView, чтобы пересчитать высоту ячейки
-        collectionView.collectionViewLayout.invalidateLayout()
-        // Можно добавить анимацию
-        // UIView.animate(withDuration: 0.2) {
-        //     self.collectionView.layoutIfNeeded()
-        // }
+    // Добавляем реализацию нового метода делегата
+    func fullPostCellDidRequestLayoutUpdate(at indexPath: IndexPath) {
+        print("UserPostScrollVC: Layout update requested for cell at \(indexPath)")
+        // Выполняем batch updates, чтобы анимировать изменение высоты ячейки
+        // Передаем nil в updates, так как изменения (numberOfLines) уже произошли в ячейке,
+        // а collectionView просто нужно пересчитать layout.
+        collectionView.performBatchUpdates(nil, completion: nil)
     }
 }
 
