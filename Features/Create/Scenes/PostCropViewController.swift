@@ -22,14 +22,6 @@ class PostCropViewController: UIViewController {
         return view
     }()
 
-    // Сетка третей (опционально)
-    private lazy var gridOverlayView: UIView = {
-        let view = GridOverlayView() // Предполагаем, что такой класс есть или будет создан
-        view.translatesAutoresizingMaskIntoConstraints = false
-        view.isUserInteractionEnabled = false // Не должна мешать жестам cropView
-        return view
-    }()
-
     // MARK: - Initialization
 
     init(item: EditableMediaItem, aspectRatio: PostAspectRatio) {
@@ -49,9 +41,11 @@ class PostCropViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .black
         setupNavigationBar()
+        // Сначала конфигурируем cropView с изображением и AR
+        configureCropView()
+        // Затем добавляем его в иерархию и устанавливаем констрейнты
         setupViews()
         setupConstraints()
-        configureCropView()
     }
 
     // MARK: - Setup
@@ -73,7 +67,6 @@ class PostCropViewController: UIViewController {
 
     private func setupViews() {
         view.addSubview(cropView)
-        view.addSubview(gridOverlayView) // Добавляем сетку поверх cropView
     }
 
     private func setupConstraints() {
@@ -83,24 +76,24 @@ class PostCropViewController: UIViewController {
             cropView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             cropView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             cropView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            
-            // Сетка накладывается точно на cropView
-            gridOverlayView.topAnchor.constraint(equalTo: cropView.topAnchor),
-            gridOverlayView.leadingAnchor.constraint(equalTo: cropView.leadingAnchor),
-            gridOverlayView.trailingAnchor.constraint(equalTo: cropView.trailingAnchor),
-            gridOverlayView.bottomAnchor.constraint(equalTo: cropView.bottomAnchor)
         ])
     }
     
     private func configureCropView() {
-        cropView.image = editableMediaItem.originalImage
+        // Используем промежуточную переменную с явным типом
+        let imageToSet: UIImage? = editableMediaItem.originalImage
+        cropView.sourceImage = imageToSet
+        
         cropView.aspectRatio = postAspectRatio.ratio // Устанавливаем переданное соотношение
         
         // Загружаем сохраненные параметры кропа, если они есть
         if let zoom = editableMediaItem.manualZoomScale, let offset = editableMediaItem.manualContentOffset {
+            print("🔧 configureCropView: Applying saved crop parameters: Zoom=\(zoom), Offset=\(offset)")
             cropView.setCrop(zoomScale: zoom, contentOffset: offset)
         } else {
-            cropView.resetCropParameters() // Сбрасываем к дефолту, если параметров нет
+            // ВОЗВРАЩАЕМ вызов resetCropParameters, если нет сохраненных данных
+            print("🔧 configureCropView: No saved crop parameters. Resetting crop view state.")
+            cropView.resetCropParameters() // Вызываем сброс явно
         }
     }
 
@@ -126,47 +119,5 @@ class PostCropViewController: UIViewController {
         
         // 3. Закрываем экран
         // dismiss(animated: true)
-    }
-}
-
-// TODO: Создать класс GridOverlayView, который рисует сетку третей
-class GridOverlayView: UIView {
-    override func draw(_ rect: CGRect) {
-        guard let context = UIGraphicsGetCurrentContext() else { return }
-        
-        let width = rect.width
-        let height = rect.height
-        
-        let oneThirdWidth = width / 3
-        let twoThirdsWidth = 2 * width / 3
-        let oneThirdHeight = height / 3
-        let twoThirdsHeight = 2 * height / 3
-        
-        context.setStrokeColor(UIColor.white.withAlphaComponent(0.6).cgColor)
-        context.setLineWidth(1.0 / UIScreen.main.scale) // Толщина в 1 пиксель
-        
-        // Вертикальные линии
-        context.move(to: CGPoint(x: oneThirdWidth, y: 0))
-        context.addLine(to: CGPoint(x: oneThirdWidth, y: height))
-        context.move(to: CGPoint(x: twoThirdsWidth, y: 0))
-        context.addLine(to: CGPoint(x: twoThirdsWidth, y: height))
-        
-        // Горизонтальные линии
-        context.move(to: CGPoint(x: 0, y: oneThirdHeight))
-        context.addLine(to: CGPoint(x: width, y: oneThirdHeight))
-        context.move(to: CGPoint(x: 0, y: twoThirdsHeight))
-        context.addLine(to: CGPoint(x: width, y: twoThirdsHeight))
-        
-        context.strokePath()
-    }
-    
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        backgroundColor = .clear
-        isOpaque = false
-    }
-    
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
     }
 } 
