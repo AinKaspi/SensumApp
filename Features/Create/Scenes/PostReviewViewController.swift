@@ -4,7 +4,7 @@ import Combine
 // TODO: Возможно, нужен делегат для обработки закрытия или ошибки
 
 /// Финальный экран для просмотра обрезанных изображений, добавления подписи и публикации поста.
-class PostReviewViewController: UIViewController {
+class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLayout {
 
     // ViewModel для управления состоянием и публикацией
     // Используем существующий CreatePostViewModel, адаптированный для нового флоу
@@ -16,9 +16,11 @@ class PostReviewViewController: UIViewController {
     private lazy var previewCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .horizontal
-        // Размер делаем таким же, как в PostMediaSelectionVC
-        layout.itemSize = CGSize(width: view.bounds.width * 0.8, height: view.bounds.height * 0.5) 
+        // Размер теперь будет задаваться через UICollectionViewDelegateFlowLayout
+        // layout.itemSize = CGSize(width: view.bounds.width * 0.8, height: view.bounds.height * 0.5) 
         layout.minimumLineSpacing = 0
+        // Добавляем отступы по краям, чтобы первая/последняя ячейка не прилипала
+        layout.sectionInset = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.isPagingEnabled = true
@@ -134,13 +136,17 @@ class PostReviewViewController: UIViewController {
 
     private func setupConstraints() {
         NSLayoutConstraint.activate([
-            // Карусель превью (меньше по высоте, чем на пред. экране)
+            // Карусель превью
             previewCollectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
             previewCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             previewCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            previewCollectionView.heightAnchor.constraint(equalToConstant: 100), // Фиксированная высота миниатюр
+            // Возвращаем фиксированную высоту, равную высоте ячейки
+            previewCollectionView.heightAnchor.constraint(equalToConstant: 250), 
+            // Убираем привязку низа к верху captionTextView
+            // previewCollectionView.bottomAnchor.constraint(equalTo: captionTextView.topAnchor, constant: -15),
 
             // Поле для подписи
+            // Привязываем верх captionTextView к низу collectionView
             captionTextView.topAnchor.constraint(equalTo: previewCollectionView.bottomAnchor, constant: 15),
             captionTextView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 15),
             captionTextView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -15),
@@ -163,8 +169,8 @@ class PostReviewViewController: UIViewController {
         // Используем ту же ячейку PreviewCell
         previewCollectionView.register(PreviewCell.self, forCellWithReuseIdentifier: PreviewCell.identifier)
         previewCollectionView.dataSource = self
-        // Delegate для collectionView здесь не нужен, так как ячейки неинтерактивны
-        // previewCollectionView.delegate = self 
+        // Устанавливаем delegate для FlowLayout
+        previewCollectionView.delegate = self 
     }
     
     private func setupTextView() {
@@ -259,9 +265,40 @@ extension PostReviewViewController: UICollectionViewDataSource {
         // Генерируем финальное превью (может быть затратно, если делать при каждой прокрутке)
         // Альтернатива: генерировать превью заранее и хранить в ViewModel
         let previewImage = viewModel.generateCroppedImage(for: item) // Используем хелпер из VM
+        
+        // Логируем размер сгенерированного изображения
+        if let img = previewImage {
+            print("🖼️ Review Cell [\(indexPath.item)]: Generated image size: \(img.size), Orientation: \(img.imageOrientation.rawValue)")
+        } else {
+            print("🖼️ Review Cell [\(indexPath.item)]: Failed to generate image.")
+        }
+        
         // Отображаем финальное превью без рамки соотношения
-        cell.configure(with: previewImage, targetAspectRatio: nil)
+        cell.configure(with: previewImage)
         return cell
+    }
+}
+
+// MARK: - UICollectionViewDelegateFlowLayout
+extension PostReviewViewController {
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        // Увеличиваем высоту превью еще раз
+        let previewHeight: CGFloat = 350 // Было 160
+        
+        // Получаем соотношение сторон поста из ViewModel (Height / Width)
+        let aspectRatio = viewModel.postAspectRatio.ratio
+        
+        // Рассчитываем ширину на основе высоты и соотношения
+        // Width = Height / (Height / Width)
+        let previewWidth = previewHeight / aspectRatio
+        
+        // Уменьшаем высоту для ревью экрана
+        let finalPreviewHeight: CGFloat = 250 // Новая высота, можно подобрать
+        let finalPreviewWidth = finalPreviewHeight / aspectRatio
+        
+        print("📏 Calculating size for review preview [\(indexPath.item)]: AR=\(aspectRatio), H=\(finalPreviewHeight), W=\(finalPreviewWidth)")
+        
+        return CGSize(width: finalPreviewWidth, height: finalPreviewHeight)
     }
 }
 

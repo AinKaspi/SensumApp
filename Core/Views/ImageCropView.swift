@@ -10,18 +10,27 @@ class ImageCropView: UIView {
         didSet {
             guard let image = image else {
                 scrollView.isHidden = true
+                // Сбрасываем contentSize, если изображение удалено
+                scrollView.contentSize = .zero
+                imageView.image = nil // Убираем старое изображение
                 return
             }
             
             scrollView.isHidden = false
             imageView.image = image
+            
+            // Устанавливаем contentSize СРАЗУ после получения изображения
+            // Это размер контента при масштабе 1.0
+            scrollView.contentSize = image.size
+            print("✅ Image set. ContentSize = \(image.size)")
+            
+            // Сбрасываем параметры кропа, т.к. пришло новое изображение
+            // Не анимируем, чтобы избежать визуальных артефактов при быстрой смене AR
             resetCropParameters(animated: false)
             
-            // Обновляем layout после того, как view будет размещено
-            if superview != nil {
-                setNeedsLayout()
-                layoutIfNeeded()
-            }
+            // Запрашиваем обновление layout, т.к. изменился контент и его размер
+            // layoutSubviews позаботится об остальном (констрейнты, зум, центр)
+            setNeedsLayout()
         }
     }
     
@@ -81,12 +90,29 @@ class ImageCropView: UIView {
     // MARK: - Layout
     
     override func layoutSubviews() {
+        // 1. Сначала вызываем super
         super.layoutSubviews()
+        
+        // 2. Обновляем констрейнты контейнера для нового AR
+        // Важно сделать это до расчета масштаба
         updateConstraintsForAspectRatio()
         
-        // Обновляем минимальный зум ПОСЛЕ обновления констрейнтов контейнера
-        if let image = image {
-            updateMinZoomScaleForImage(image)
+        // 3. Принудительно обновляем layout, чтобы containerView получил правильный размер
+        // Это важно, так как updateMinZoomScaleForImage использует containerView.bounds
+        superview?.layoutIfNeeded() // Используем layoutIfNeeded у superview или self?
+                                   // Попробуем self.layoutIfNeeded() сначала.
+        self.layoutIfNeeded()
+        
+        print("🔄 layoutSubviews: Bounds=\(self.bounds), Container=\(containerView.bounds)")
+        
+        // 4. Обновляем минимальный/максимальный зум, центрируем offset и обновляем инсеты
+        if let image = image, scrollView.contentSize != .zero {
+            updateZoomScaleAndSetInitialOffset(image: image, animated: false)
+        } else if image == nil {
+             // Если картинки нет, сбросим зум на всякий случай
+            scrollView.minimumZoomScale = 1.0
+            scrollView.maximumZoomScale = 1.0
+            scrollView.zoomScale = 1.0
         }
     }
     
@@ -120,10 +146,27 @@ class ImageCropView: UIView {
     /// Сбрасывает позицию и масштаб изображения к начальным значениям
     /// - Parameter animated: Анимировать ли сброс
     func resetCropParameters(animated: Bool = false) {
-        let minZoom = scrollView.minimumZoomScale
-        scrollView.setZoomScale(minZoom, animated: animated)
-        // После сброса зума нужно перецентровать
-        centerImage(animated: animated)
+        guard scrollView.minimumZoomScale.isFinite, scrollView.minimumZoomScale > 0 else {
+            print("⚠️ resetCropParameters: Invalid minimumZoomScale (\(scrollView.minimumZoomScale)). Cannot reset.")
+            return
+        }
+        
+        // Просто устанавливаем минимальный зум. 
+        // Центрирование offset'а произойдет в updateZoomScaleAndSetInitialOffset ПОСЛЕ применения зума.
+        print("🔄 Resetting Zoom to Minimum: \(scrollView.minimumZoomScale)")
+        scrollView.setZoomScale(scrollView.minimumZoomScale, animated: animated)
+        
+        // Убираем расчет и установку offset отсюда
+        /*
+        let imageViewSize = imageView.frame.size
+        let scrollViewSize = scrollView.bounds.size
+        let offsetX = max(0, (imageViewSize.width - scrollViewSize.width) / 2)
+        let offsetY = max(0, (imageViewSize.height - scrollViewSize.height) / 2)
+        let targetOffset = CGPoint(x: offsetX, y: offsetY)
+        print("🔄 Resetting Crop: Target Offset = \(targetOffset)")
+        scrollView.setContentOffset(targetOffset, animated: animated)
+        updateContentInsetsForCentering(animated: animated)
+        */
     }
     
     
@@ -213,81 +256,133 @@ class ImageCropView: UIView {
     }
     
     private func updateConstraintsForAspectRatio() {
-        // Определяем размеры контейнера на основе соотношения сторон
-        let containerWidth = bounds.width
-        let containerHeight = containerWidth / aspectRatio
-        
-        // Если высота контейнера больше высоты view, корректируем размеры
-        if containerHeight > bounds.height {
-            let newWidth = bounds.height * aspectRatio
-            containerViewWidthConstraint?.constant = -bounds.width + newWidth
-            containerViewHeightConstraint?.constant = 0
-        } else {
-            containerViewWidthConstraint?.constant = 0
-            containerViewHeightConstraint?.constant = -bounds.height + containerHeight
+        guard bounds.width > 0, bounds.height > 0, aspectRatio > 0 else {
+            print("⚠️ updateConstraintsForAspectRatio: Invalid bounds or aspectRatio. Bounds=\(bounds), AR=\(aspectRatio)")
+            return
         }
         
-        scrollView.contentSize = CGSize(width: containerWidth, height: containerHeight)
+        let viewWidth = bounds.width
+        let viewHeight = bounds.height
+        
+        // Рассчитываем высоту, если бы ширина контейнера равнялась ширине view
+        let heightBasedOnWidth = viewWidth / aspectRatio
+        
+        var targetWidth: CGFloat
+        var targetHeight: CGFloat
+        
+        if heightBasedOnWidth <= viewHeight {
+            // Контейнер помещается по высоте, используем полную ширину view
+            targetWidth = viewWidth
+            targetHeight = heightBasedOnWidth
+            print("📐 AR Constraint Update (Fit Width): Target Size = (\(targetWidth), \(targetHeight))")
+        } else {
+            // Контейнер не помещается по высоте, используем полную высоту view
+            targetWidth = viewHeight * aspectRatio
+            targetHeight = viewHeight
+            print("📐 AR Constraint Update (Fit Height): Target Size = (\(targetWidth), \(targetHeight))")
+        }
+        
+        // Обновляем константы констрейнтов
+        // Константа - это разница между размером scrollView и размером containerView
+        // Мы хотим, чтобы containerView был по центру, поэтому разница делится пополам для инсетов,
+        // но констрейнты width/height привязаны к scrollView (который равен bounds)
+        containerViewWidthConstraint?.constant = -(viewWidth - targetWidth)
+        containerViewHeightConstraint?.constant = -(viewHeight - targetHeight)
+        
+        print("   -> Constraints Updated: Width Constant = \(containerViewWidthConstraint?.constant ?? -999), Height Constant = \(containerViewHeightConstraint?.constant ?? -999)")
     }
     
     private func updateMinZoomScaleForImage(_ image: UIImage) {
-        let widthScale = containerView.bounds.width / image.size.width
-        let heightScale = containerView.bounds.height / image.size.height
+        // Убираем старый лог
+        // print("➡️ updateMinZoomScaleForImage called.")
         
-        // Используем максимальный масштаб, чтобы изображение целиком заполняло контейнер
-        let minScale = max(widthScale, heightScale)
-        
-        scrollView.minimumZoomScale = minScale
-        
-        // Если текущий масштаб меньше минимального, устанавливаем минимальный
-        if scrollView.zoomScale < minScale {
-            scrollView.zoomScale = minScale
+        // Используем image.size напрямую вместо scrollView.contentSize
+        guard containerView.bounds.width > 0, containerView.bounds.height > 0,
+              image.size.width > 0, image.size.height > 0 else {
+            print("⚠️ updateMinZoomScaleForImage: Invalid bounds or image size. Container: \(containerView.bounds), Image: \(image.size)")
+            return
         }
         
-        centerImage()
+        let cWidth = containerView.bounds.width
+        let cHeight = containerView.bounds.height
+        // Используем РАЗМЕР ИЗОБРАЖЕНИЯ!
+        let iWidth = image.size.width
+        let iHeight = image.size.height
+        print("   📏 Calc Scale: Container=(\(cWidth), \(cHeight)), ImageSize=(\(iWidth), \(iHeight))")
+        
+        // Рассчитываем масштабы относительно размера изображения
+        let widthScale = cWidth / iWidth
+        let heightScale = cHeight / iHeight
+        
+        print("   📊 Scales: WidthScale=\(widthScale), HeightScale=\(heightScale)")
+        
+        // minScale должен ЗАПОЛНЯТЬ контейнер
+        let minScale = max(widthScale, heightScale)
+        
+        // Ограничиваем максимальный зум относительно minScale, чтобы избежать слишком большого увеличения
+        let maxScale = max(minScale * 3.0, 3.0) // Максимум в 3 раза больше minScale, но не меньше 3.0
+        
+        // Проверяем, что minScale не NaN или infinity
+        guard minScale.isFinite, minScale > 0, maxScale.isFinite, maxScale > minScale else {
+            print("⚠️ updateMinZoomScaleForImage: Invalid calculated scales. min: \(minScale), max: \(maxScale)")
+            return
+        }
+        
+        scrollView.minimumZoomScale = minScale
+        scrollView.maximumZoomScale = maxScale
+        
+        print("🔎 Updated Zoom Scales: Min=\(minScale), Max=\(maxScale)")
+        
+        // Если текущий масштаб вне новых пределов, корректируем его
+        if scrollView.zoomScale < minScale {
+            print("   -> Setting zoomScale to minimum: \(minScale)")
+            scrollView.setZoomScale(minScale, animated: false)
+        } else if scrollView.zoomScale > maxScale {
+             print("   -> Setting zoomScale to maximum: \(maxScale)")
+             scrollView.setZoomScale(maxScale, animated: false)
+        } else {
+            // Если масштаб в пределах, просто центрируем
+            centerImage()
+        }
     }
     
     private func centerImage(animated: Bool = false) {
-        // Центрируем изображение, если оно меньше, чем scrollView
-        let contentWidth = scrollView.contentSize.width
-        let contentHeight = scrollView.contentSize.height
-        let scrollViewSize = scrollView.bounds.size
-        
-        // Используем frame imageView вместо contentSize, т.к. contentSize может быть больше scrollView
-        let imageViewSize = imageView.frame.size
-        
-        let horizontalPadding = max(0, (scrollViewSize.width - imageViewSize.width) / 2)
-        let verticalPadding = max(0, (scrollViewSize.height - imageViewSize.height) / 2)
-        
-        let newInsets = UIEdgeInsets(
-            top: verticalPadding,
-            left: horizontalPadding,
-            bottom: verticalPadding,
-            right: horizontalPadding
-        )
-        
-        if animated {
-            UIView.animate(withDuration: 0.2) {
-                self.scrollView.contentInset = newInsets
-            }
-        } else {
-            scrollView.contentInset = newInsets
+        // Добавляем проверку на почти нулевой размер imageView, что может случаться во время layout
+        guard imageView.bounds.width > 1, imageView.bounds.height > 1 else {
+            print("⚠️ centerImage: imageView bounds too small (\(imageView.bounds)). Skipping centering.")
+            return
         }
         
-        // Корректируем contentOffset, если изображение стало меньше видимой области
-        // чтобы избежать пустого пространства по краям после зума/отдаления
-        let newOffsetX = max(-newInsets.left, min(scrollView.contentOffset.x, contentWidth - scrollViewSize.width + newInsets.right))
-        let newOffsetY = max(-newInsets.top, min(scrollView.contentOffset.y, contentHeight - scrollViewSize.height + newInsets.bottom))
-        let newOffset = CGPoint(x: newOffsetX, y: newOffsetY)
+        let scrollViewSize = scrollView.bounds.size
+        // Размер imageView при текущем масштабе - используем frame, т.к. он учитывает transform
+        let imageViewSize = imageView.frame.size
+        
+        // Проверка на валидность размеров
+        guard scrollViewSize.width > 0, scrollViewSize.height > 0,
+              imageViewSize.width.isFinite, imageViewSize.height.isFinite,
+              imageViewSize.width >= 0, imageViewSize.height >= 0 else {
+            print("⚠️ centerImage: Invalid sizes. ScrollView: \(scrollViewSize), ImageView: \(imageViewSize)")
+            return
+        }
+        
+        // Рассчитываем необходимый offset для центрирования
+        let offsetX = max(0, (scrollViewSize.width - imageViewSize.width) / 2)
+        let offsetY = max(0, (scrollViewSize.height - imageViewSize.height) / 2)
+        
+        print("🔄 Centering image: Frame=\(imageView.frame), Bounds=\(imageView.bounds), OffsetX = \(offsetX), OffsetY = \(offsetY)")
 
-        if !scrollView.contentOffset.equalTo(newOffset) {
-             if animated {
-                 UIView.animate(withDuration: 0.2) {
-                     self.scrollView.contentOffset = newOffset
-                 }
-             } else {
-                 scrollView.contentOffset = newOffset
-             }
+        // Устанавливаем contentInset, чтобы создать 'поля' для центрирования
+        // Этот подход более стандартный для UIScrollView
+        let newInsets = UIEdgeInsets(top: offsetY, left: offsetX, bottom: offsetY, right: offsetX)
+        
+        if scrollView.contentInset != newInsets {
+            if animated {
+                UIView.animate(withDuration: 0.2) {
+                    self.scrollView.contentInset = newInsets
+                }
+            } else {
+                scrollView.contentInset = newInsets
+            }
         }
     }
     
@@ -307,19 +402,140 @@ class ImageCropView: UIView {
             scrollView.zoom(to: zoomRect, animated: true)
         }
     }
+    
+    // Переименовываем centerImage в updateContentInsetsForCentering
+    private func updateContentInsetsForCentering(animated: Bool = false) {
+        // Убираем guard let image, он не нужен для центрирования
+        // guard let image = imageView.image else { return }
+        
+        // Добавляем проверку на почти нулевой размер imageView, что может случаться во время layout
+        guard imageView.bounds.width > 1, imageView.bounds.height > 1 else {
+            print("⚠️ updateContentInsetsForCentering: imageView bounds too small (\(imageView.bounds)). Skipping centering.")
+            return
+        }
+        
+        let scrollViewSize = scrollView.bounds.size
+        // Размер imageView при текущем масштабе - используем frame, т.к. он учитывает transform
+        let imageViewSize = imageView.frame.size
+        
+        // Проверка на валидность размеров
+        guard scrollViewSize.width > 0, scrollViewSize.height > 0,
+              imageViewSize.width.isFinite, imageViewSize.height.isFinite,
+              imageViewSize.width >= 0, imageViewSize.height >= 0 else {
+            print("⚠️ updateContentInsetsForCentering: Invalid sizes. ScrollView: \(scrollViewSize), ImageView: \(imageViewSize)")
+            return
+        }
+        
+        // Рассчитываем необходимый offset для центрирования
+        let offsetX = max(0, (imageViewSize.width - scrollViewSize.width) / 2)
+        let offsetY = max(0, (imageViewSize.height - scrollViewSize.height) / 2)
+        
+        print("🔄 Updating Insets: Frame=\(imageView.frame), Bounds=\(imageView.bounds), OffsetX = \(offsetX), OffsetY = \(offsetY)")
+
+        // Устанавливаем contentInset, чтобы создать 'поля' для центрирования
+        // Этот подход более стандартный для UIScrollView
+        let newInsets = UIEdgeInsets(top: offsetY, left: offsetX, bottom: offsetY, right: offsetX)
+        
+        if scrollView.contentInset != newInsets {
+            if animated {
+                UIView.animate(withDuration: 0.2) {
+                    self.scrollView.contentInset = newInsets
+                }
+            } else {
+                scrollView.contentInset = newInsets
+            }
+        }
+    }
+    
+    // Переименовываем и добавляем логику установки начального offset
+    private func updateZoomScaleAndSetInitialOffset(image: UIImage, animated: Bool = false) {
+        guard containerView.bounds.width > 0, containerView.bounds.height > 0,
+              image.size.width > 0, image.size.height > 0 else {
+            print("⚠️ updateZoomScaleAndSetInitialOffset: Invalid bounds or image size. Container: \(containerView.bounds), Image: \(image.size)")
+            return
+        }
+        
+        // --- ДОБАВЛЕНО ОБРАТНО: Расчет minScale и maxScale ---
+        let cWidth = containerView.bounds.width
+        let cHeight = containerView.bounds.height
+        let iWidth = image.size.width
+        let iHeight = image.size.height
+        print("   📏 Calc Scale: Container=(\(cWidth), \(cHeight)), ImageSize=(\(iWidth), \(iHeight))")
+        
+        let widthScale = cWidth / iWidth
+        let heightScale = cHeight / iHeight
+        print("   📊 Scales: WidthScale=\(widthScale), HeightScale=\(heightScale)")
+        
+        let minScale = max(widthScale, heightScale)
+        let maxScale = max(minScale * 3.0, 3.0) // Максимум в 3 раза больше minScale, но не меньше 3.0
+        
+        guard minScale.isFinite, minScale > 0, maxScale.isFinite, maxScale > minScale else {
+            print("⚠️ updateZoomScaleAndSetInitialOffset: Invalid calculated scales. min: \(minScale), max: \(maxScale)")
+            return
+        }
+        // --- КОНЕЦ ДОБАВЛЕННОГО БЛОКА ---
+        
+        print("🔎 Updated Zoom Scales: Min=\(minScale), Max=\(maxScale)")
+        
+        var zoomChanged = false
+        var targetZoomScale = scrollView.zoomScale
+        
+        // Если текущий масштаб вне новых пределов, корректируем его
+        if scrollView.zoomScale < minScale {
+            print("   -> Setting zoomScale to minimum: \(minScale)")
+            targetZoomScale = minScale
+            zoomChanged = true
+        } else if scrollView.zoomScale > maxScale {
+             print("   -> Setting zoomScale to maximum: \(maxScale)")
+             targetZoomScale = maxScale
+             zoomChanged = true
+        }
+        
+        if zoomChanged {
+            scrollView.setZoomScale(targetZoomScale, animated: animated)
+            // Важно: setZoomScale асинхронный, frame imageView обновится позже.
+            // Чтобы точно отцентрировать, нужно это делать в scrollViewDidEndZooming или
+            // использовать completion handler, если бы он был.
+            // НО! Для НАЧАЛЬНОЙ установки (animated: false) можно попробовать сразу.
+            // Вызываем layoutIfNeeded, чтобы обновить frame imageView немедленно после setZoomScale(..., animated: false)
+            if !animated {
+                 scrollView.layoutIfNeeded()
+            }
+        }
+        
+        // --- Установка НАЧАЛЬНОГО contentOffset ---
+        // Делаем это ПОСЛЕ установки/проверки zoomScale
+        let imageViewSize = imageView.frame.size // Frame должен быть актуален после layoutIfNeeded()
+        let scrollViewSize = scrollView.bounds.size
+        let offsetX = max(0, (imageViewSize.width - scrollViewSize.width) / 2)
+        let offsetY = max(0, (imageViewSize.height - scrollViewSize.height) / 2)
+        let targetOffset = CGPoint(x: offsetX, y: offsetY)
+        
+        // Устанавливаем offset только если зум МИНИМАЛЬНЫЙ (т.е. при инициализации/сбросе)
+        // и текущий offset отличается. Не устанавливаем при ручном зуме/перетаскивании.
+        if abs(scrollView.zoomScale - minScale) < 0.001 && scrollView.contentOffset != targetOffset {
+            print("🎯 Setting Initial Content Offset: \(targetOffset) (Zoom: \(scrollView.zoomScale))")
+            scrollView.setContentOffset(targetOffset, animated: animated)
+        } else {
+             print("   -> Skipping initial offset setting (Zoom: \(scrollView.zoomScale), MinZoom: \(minScale), Offset: \(scrollView.contentOffset), Target: \(targetOffset))")
+        }
+        
+        // --- Обновление Content Insets ---
+        // Вызываем всегда, чтобы инсеты были правильными для текущего зума/положения
+        updateContentInsetsForCentering(animated: animated)
+    }
 }
 
 // MARK: - UIScrollViewDelegate
 
 extension ImageCropView: UIScrollViewDelegate {
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        // Указываем, какой view масштабировать
-        return imageView // Масштабируем imageView, а не containerView
+        return imageView
     }
     
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
-        // Центрируем изображение после зума
-        centerImage(animated: false) // Не анимируем при зуме пальцами
+        // Центрируем (обновляем инсеты) после зума
+        updateContentInsetsForCentering(animated: false)
     }
     
     // Опционально: можно добавить scrollViewDidEndZooming для сохранения состояния

@@ -2,6 +2,15 @@ import UIKit
 import Combine
 // import AVFoundation // Убрали, т.к. видео не поддерживается
 
+// Импортируем, чтобы PostAspectRatio был доступен (предполагая модульную структуру)
+// Если это не модуль, а просто файлы в одном таргете, импорт не нужен,
+// но Xcode должен найти тип. Если ошибка останется, нужно проверить Target Membership.
+// import Core // Если 'Core' это модуль
+// Пока просто добавим импорт Foundation/UIKit, если PostAspectRatio там не объявлен
+
+// MARK: - PostAspectRatio Enum moved to Core/Models/PostAspectRatio.swift -
+
+/*
 /// Enum defining aspect ratios for posts
 enum PostAspectRatio: String, CaseIterable {
     case square = "1:1"     // Квадрат
@@ -13,18 +22,19 @@ enum PostAspectRatio: String, CaseIterable {
         return self.rawValue
     }
     
-    /// Actual CGFloat ratio value (height / width)
+    /// Actual CGFloat ratio value (width / height)
     var ratio: CGFloat {
         switch self {
         case .square:
             return 1.0
         case .portrait:
-            return 16.0 / 9.0
+            return 9.0 / 16.0 // ~0.5625
         case .landscape:
-            return 1.0 / 1.91 // Height / Width для 1.91:1
+            return 1.91 / 1.0 // 1.91
         }
     }
 }
+*/
 
 extension Notification.Name {
     static let didCreateNewPost = Notification.Name("didCreateNewPostNotification")
@@ -428,20 +438,33 @@ final class CreatePostViewModel {
     // Оставляем private, так как используется только внутри generateCroppedImage и thumbnail генерации
     private func autoCropImage(_ image: UIImage, withTargetAspectRatio targetAspectRatio: CGFloat) -> UIImage? {
         
-        print("📐 Cropping automatically with AR: \(targetAspectRatio)") // Доп. лог
+        print("📐 Cropping automatically with AR: \(targetAspectRatio)")
         let imageWidth = image.size.width
         let imageHeight = image.size.height
         var cropWidth: CGFloat
         var cropHeight: CGFloat
 
         // Рассчитываем целевые размеры для кропа
-        if imageWidth / imageHeight > targetAspectRatio { // Исходное изображение шире целевого
+        let imageRatioWH = imageWidth / imageHeight // Соотношение изображения W/H
+        let targetRatioWH = 1.0 / targetAspectRatio // Целевое соотношение W/H
+        
+        print("    Image Ratio (W/H): \(imageRatioWH)")
+        print("    Target Ratio (W/H): \(targetRatioWH)")
+
+        // Сравниваем соотношения W/H
+        if imageRatioWH > targetRatioWH {
+            // Изображение шире целевого (W/H). Сохраняем высоту, обрезаем ширину.
+            print("    -> Image is wider than target.")
             cropHeight = imageHeight
-            cropWidth = cropHeight * targetAspectRatio
-        } else { // Исходное изображение выше или такое же
+            cropWidth = cropHeight / targetAspectRatio // Width = Height / (H/W)
+        } else {
+            // Изображение выше или такое же как целевое (W/H). Сохраняем ширину, обрезаем высоту.
+            print("    -> Image is taller or same as target.")
             cropWidth = imageWidth
-            cropHeight = cropWidth / targetAspectRatio
+            cropHeight = cropWidth * targetAspectRatio // Height = Width * (H/W)
         }
+        
+        print("    Calculated Crop Size (W, H): (\(cropWidth), \(cropHeight))")
 
         // Центрируем область кропа
         let cropX = (imageWidth - cropWidth) / 2

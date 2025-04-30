@@ -8,31 +8,39 @@ class PreviewCell: UICollectionViewCell {
     private let imageView: UIImageView = {
         let imageView = UIImageView()
         imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.contentMode = .scaleAspectFit // Отображаем все изображение, вписывая его
+        imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
         imageView.backgroundColor = .black // Фон, если изображение с прозрачностью
+        // --- УБИРАЕМ DEBUG BORDER ---
+        // imageView.layer.borderColor = UIColor.red.cgColor
+        // imageView.layer.borderWidth = 2.0
+        // --- END DEBUG BORDER ---
         return imageView
     }()
     
-    // Опциональная рамка для индикации выбранного соотношения
+    // Убираем aspectRatioOverlayView
+    /*
     private let aspectRatioOverlayView: UIView = {
-        let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        view.backgroundColor = .clear
-        view.layer.borderColor = UIColor.systemBlue.cgColor
-        view.layer.borderWidth = 2
-        view.isHidden = true // Скрыта по умолчанию
-        return view
+        ...
     }()
+    */
     
-    private var aspectRatioConstraint: NSLayoutConstraint?
+    // Убираем ссылки на констрейнты overlay
+    // private var overlayWidthConstraint: NSLayoutConstraint?
+    // private var overlayHeightConstraint: NSLayoutConstraint?
+    // private var overlayAspectRatioConstraint: NSLayoutConstraint?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         contentView.backgroundColor = .black
         contentView.addSubview(imageView)
-        contentView.addSubview(aspectRatioOverlayView)
+        // Убираем добавление aspectRatioOverlayView
+        // contentView.addSubview(aspectRatioOverlayView)
         setupConstraints()
+        
+        // --- DEBUG BACKGROUND ---
+        contentView.backgroundColor = .purple // Устанавливаем фон для contentView
+        // --- END DEBUG BACKGROUND ---
     }
 
     required init?(coder: NSCoder) {
@@ -47,61 +55,49 @@ class PreviewCell: UICollectionViewCell {
             imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
             
-            // Overlay для AR центрирован и будет иметь констрейнт соотношения сторон
+            // Убираем констрейнты для aspectRatioOverlayView
+            /*
             aspectRatioOverlayView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             aspectRatioOverlayView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            aspectRatioOverlayView.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor),
-            aspectRatioOverlayView.heightAnchor.constraint(lessThanOrEqualTo: contentView.heightAnchor)
+            */
         ])
+        
+        // Убираем создание констрейнтов для overlay
+        /*
+        overlayWidthConstraint = aspectRatioOverlayView.widthAnchor.constraint(equalToConstant: 0)
+        ...
+        */
     }
     
-    func configure(with image: UIImage?, targetAspectRatio: CGFloat? = nil) {
+    // Упрощаем configure, убираем настройку overlay
+    func configure(with image: UIImage?) { // Убираем targetAspectRatio
         imageView.image = image
         
-        // Настраиваем рамку соотношения сторон, если оно передано
+        // Убираем всю логику настройки overlay
+        /*
         if let targetAR = targetAspectRatio {
-            aspectRatioOverlayView.isHidden = false
-            
-            // Удаляем старый констрейнт, если он был
-            aspectRatioConstraint?.isActive = false
-            
-            // Рассчитываем размер рамки, вписанной в imageView
-            let viewSize = imageView.bounds.size
-            guard viewSize.width > 0, viewSize.height > 0 else { return }
-            
-            var overlayWidth: CGFloat
-            var overlayHeight: CGFloat
-            
-            if viewSize.width / viewSize.height >= 1.0 / targetAR { // Если view шире, чем нужно
-                overlayHeight = viewSize.height
-                overlayWidth = overlayHeight / targetAR // Ширина = Высота / Соотношение (H/W)
-            } else { // Если view выше, чем нужно
-                overlayWidth = viewSize.width
-                overlayHeight = overlayWidth * targetAR // Высота = Ширина * Соотношение (H/W)
-            }
-            
-            // Добавляем констрейнт соотношения сторон для overlay
-            // Важно: targetAR = Height / Width
-            aspectRatioConstraint = aspectRatioOverlayView.widthAnchor.constraint(equalTo: aspectRatioOverlayView.heightAnchor, multiplier: 1.0 / targetAR)
-            aspectRatioConstraint?.priority = .defaultHigh // Избегаем конфликтов
-            aspectRatioConstraint?.isActive = true
-            
-            // Дополнительно ограничиваем размер рамки
-            NSLayoutConstraint.activate([
-                aspectRatioOverlayView.widthAnchor.constraint(equalToConstant: overlayWidth),
-                aspectRatioOverlayView.heightAnchor.constraint(equalToConstant: overlayHeight)
-            ])
-            
+            ...
         } else {
-            aspectRatioOverlayView.isHidden = true
-            aspectRatioConstraint?.isActive = false
+            ...
         }
+        */
     }
 
     override func prepareForReuse() {
         super.prepareForReuse()
         imageView.image = nil
-        aspectRatioOverlayView.isHidden = true
-        aspectRatioConstraint?.isActive = false
+        // --- DEBUG BORDER --- 
+        // Убираем рамку при реюзе, configure установит снова если надо
+        // imageView.layer.borderWidth = 0 
+        // --- END DEBUG BORDER ---
+        // --- DEBUG BACKGROUND ---
+        // contentView.backgroundColor = .black // Возвращаем фон при реюзе
+        // --- END DEBUG BACKGROUND ---
+        
+        // Убираем деактивацию констрейнтов overlay
+        /*
+        overlayWidthConstraint?.isActive = false
+        ...
+        */
     }
 } 

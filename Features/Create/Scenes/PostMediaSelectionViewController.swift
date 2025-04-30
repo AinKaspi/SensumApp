@@ -139,8 +139,10 @@ class PostMediaSelectionViewController: UIViewController {
     }
     
     @objc private func aspectRatioChanged(_ sender: UISegmentedControl) {
-        selectedAspectRatio = PostAspectRatio.allCases[sender.selectedSegmentIndex]
-        print("Aspect Ratio Changed: \(selectedAspectRatio.stringValue)")
+        let newIndex = sender.selectedSegmentIndex
+        guard newIndex >= 0 && newIndex < PostAspectRatio.allCases.count else { return }
+        selectedAspectRatio = PostAspectRatio.allCases[newIndex]
+        print("🕹️ Aspect Ratio Changed: Index=\(newIndex), New AR=\(selectedAspectRatio.stringValue) (\(selectedAspectRatio.ratio))")
         previewCollectionView.reloadData() // Перезагружаем для обновления рамок
     }
     
@@ -172,7 +174,8 @@ extension PostMediaSelectionViewController: UICollectionViewDataSource {
             fatalError("Unable to dequeue PreviewCell")
         }
         let item = editableMedia[indexPath.item]
-        cell.configure(with: item.originalImage, targetAspectRatio: selectedAspectRatio.ratio)
+        // Убираем targetAspectRatio из вызова configure
+        cell.configure(with: item.originalImage)
         return cell
     }
 }
