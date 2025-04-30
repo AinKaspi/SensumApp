@@ -18,7 +18,7 @@ protocol UserProfileFeedViewControllerDelegate: AnyObject {
 // Обновляем: используем PHPickerViewControllerDelegate и добавляем CreatePostViewControllerDelegate
 // Убираем лишние протоколы из объявления класса, они будут в extensions
 // Consolidated protocol conformances here
-class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDelegate, CreatePostViewControllerDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout, UICollectionViewDataSourcePrefetching {
+class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout, UICollectionViewDataSourcePrefetching {
 
     // Добавляем ViewModel
     var viewModel: UserProfileFeedViewModel! // Используем !, т.к. он будет инжектирован координатором
@@ -697,14 +697,50 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
 
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true)
+        print("📸 PHPicker: didFinishPicking - \(results.count) items selected.") // Лог 1
 
         guard !results.isEmpty else {
-            print("Media selection cancelled.")
+            print("📸 PHPicker: Media selection cancelled or empty.") // Лог 2
             return
         }
 
-        // Обрабатываем выбранные изображения по очереди и отправляем на кроп
-        processNextImage(from: results, at: 0, withCroppedImages: [], selectedAspectRatio: nil)
+        // НОВАЯ ЛОГИКА: Собрать [MediaItem] и передать координатору
+        var selectedMediaItems: [MediaItem] = []
+        let dispatchGroup = DispatchGroup()
+
+        for result in results {
+            dispatchGroup.enter()
+            let provider = result.itemProvider
+            if provider.canLoadObject(ofClass: UIImage.self) {
+                provider.loadObject(ofClass: UIImage.self) { image, error in
+                    if let image = image as? UIImage {
+                        selectedMediaItems.append(.image(image))
+                    } else if let error = error {
+                        print("❌ PHPicker Error loading image: \(error.localizedDescription)")
+                    }
+                    dispatchGroup.leave()
+                }
+            } else {
+                print("⚠️ PHPicker Warning: Item provider cannot load UIImage.")
+                dispatchGroup.leave()
+            }
+        }
+
+        dispatchGroup.notify(queue: .main) {
+            print("📸 PHPicker: Finished processing \(selectedMediaItems.count) images.")
+            guard !selectedMediaItems.isEmpty else {
+                print("❌ PHPicker: No valid images were loaded.")
+                return
+            }
+            
+            // Вызываем координатора для показа нового экрана выбора формата
+            if let coordinator = self.delegate as? CurrentUserProfileCoordinator {
+                 print("➡️ PHPicker: Calling coordinator.showPostMediaSelection with \(selectedMediaItems.count) items.")
+                 coordinator.showPostMediaSelection(with: selectedMediaItems)
+             } else {
+                 print("❌ PHPicker Error: Delegate is not CurrentUserProfileCoordinator or is nil.")
+             }
+        }
     }
 
     // MARK: - Helpers
@@ -718,114 +754,6 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         let picker = PHPickerViewController(configuration: config)
         picker.delegate = self
         present(picker, animated: true)
-    }
-    
-    // Рекурсивная функция для последовательной обработки выбранных изображений
-    private func processNextImage(from results: [PHPickerResult], at index: Int, withCroppedImages croppedImages: [MediaItem], selectedAspectRatio: CGFloat? = nil) {
-        // Проверяем, что мы не вышли за пределы массива
-        guard index < results.count else {
-            // Все изображения обработаны, можем показать экран создания поста
-            if !croppedImages.isEmpty {
-                if let coordinator = self.delegate as? CurrentUserProfileCoordinator {
-                    coordinator.showCreatePost(with: croppedImages)
-                } else {
-                    print("Error: Delegate does not conform to expected coordinator type or is nil.")
-                }
-            }
-            return
-        }
-        
-        let result = results[index]
-        let provider = result.itemProvider
-        
-        // Только если провайдер может предоставить UIImage
-        if provider.canLoadObject(ofClass: UIImage.self) {
-            provider.loadObject(ofClass: UIImage.self) { [weak self] object, error in
-                guard let self = self else { return }
-                
-                DispatchQueue.main.async {
-                    if let error = error {
-                        print("Error loading image: \(error.localizedDescription)")
-                        // Переходим к следующему изображению, даже если это изображение не загрузилось
-                        self.processNextImage(from: results, at: index + 1, withCroppedImages: croppedImages, selectedAspectRatio: selectedAspectRatio)
-                        return
-                    }
-                    
-                    if let image = object as? UIImage {
-                        // Если это первое изображение или нет выбранного соотношения сторон, 
-                        // показываем экран кропа
-                        if index == 0 || selectedAspectRatio == nil {
-                            // Показываем экран кропа для изображения
-                            let cropViewController = ImageCropViewController(image: image, imageIndex: index)
-                            cropViewController.delegate = self
-                            
-                            // Передаем данные для сохранения контекста между вызовами
-                            cropViewController.originalResults = results
-                            cropViewController.originalIndex = index
-                            cropViewController.croppedImages = croppedImages
-                            
-                            self.present(cropViewController, animated: true)
-                        } else {
-                            // Для последующих изображений применяем автоматический кроп
-                            // с тем же соотношением сторон, что было выбрано для первого изображения
-                            print("Applying automatic crop with aspect ratio \(selectedAspectRatio!) to image at index \(index)")
-                            
-                            // Создаем кропнутое изображение с центрированием
-                            let croppedImage = self.autoCropImage(image, withAspectRatio: selectedAspectRatio!)
-                            
-                            // Добавляем результат в массив и переходим к следующему изображению
-                            var updatedCroppedImages = croppedImages
-                            updatedCroppedImages.append(.image(croppedImage))
-                            
-                            // Обрабатываем следующее изображение
-                            self.processNextImage(from: results, at: index + 1, withCroppedImages: updatedCroppedImages, selectedAspectRatio: selectedAspectRatio)
-                        }
-                    } else {
-                        // Если не удалось загрузить изображение, переходим к следующему
-                        self.processNextImage(from: results, at: index + 1, withCroppedImages: croppedImages, selectedAspectRatio: selectedAspectRatio)
-                    }
-                }
-            }
-        } else {
-            // Если провайдер не может предоставить UIImage, переходим к следующему
-            processNextImage(from: results, at: index + 1, withCroppedImages: croppedImages, selectedAspectRatio: selectedAspectRatio)
-        }
-    }
-
-    // Функция для автоматического кропа изображения с заданным соотношением сторон
-    private func autoCropImage(_ image: UIImage, withAspectRatio aspectRatio: CGFloat) -> UIImage {
-        let imageWidth = image.size.width
-        let imageHeight = image.size.height
-        let imageRatio = imageWidth / imageHeight
-        
-        // Размеры области кропа
-        var cropWidth: CGFloat
-        var cropHeight: CGFloat
-        
-        if imageRatio > aspectRatio {
-            // Изображение шире, чем требуемое соотношение
-            cropHeight = imageHeight
-            cropWidth = cropHeight * aspectRatio
-        } else {
-            // Изображение выше, чем требуемое соотношение
-            cropWidth = imageWidth
-            cropHeight = cropWidth / aspectRatio
-        }
-        
-        // Центрируем область кропа
-        let originX = (imageWidth - cropWidth) / 2
-        let originY = (imageHeight - cropHeight) / 2
-        
-        // Создаем CGRect для области кропа
-        let cropRect = CGRect(x: originX, y: originY, width: cropWidth, height: cropHeight)
-        
-        // Выполняем кроп
-        if let cgImage = image.cgImage?.cropping(to: cropRect) {
-            return UIImage(cgImage: cgImage, scale: image.scale, orientation: image.imageOrientation)
-        }
-        
-        // Если что-то пошло не так, возвращаем исходное изображение
-        return image
     }
 
     // MARK: - CreatePostViewControllerDelegate
@@ -1069,35 +997,6 @@ extension UserProfileFeedViewController {
     }
 }
 
-// MARK: - CreatePostViewControllerDelegate
-// Реализация делегата находится в extension для лучшей организации
-extension UserProfileFeedViewController {
-
-    func didFinishCreatingPost(_ controller: CreatePostViewController) {
-        print("⭐ UserProfileFeedVC: Выполняется didFinishCreatingPost")
-        controller.dismiss(animated: true) {
-            // Обновляем все данные пользователя после создания поста
-            // Убедитесь, что ваш ViewModel имеет этот метод или аналогичный
-            print("⭐ UserProfileFeedVC: Обновляем данные через fetchAllUserData()")
-            self.viewModel.fetchAllUserData()
-            // Явно перезагружаем коллекцию
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                print("⭐ UserProfileFeedVC: Принудительное обновление коллекции постов")
-                self.postsCollectionView.reloadData()
-            }
-            print("⭐ UserProfileFeedVC: didFinishCreatingPost завершен")
-        }
-    }
-
-    func didCancelCreatingPost(_ controller: CreatePostViewController) {
-        print("CreatePostViewController cancelled.")
-        controller.dismiss(animated: true) {
-            print("CreatePostViewController dismissed. (Cancelled)")
-        }
-    }
-
-} // Конец extension
-
 // MARK: - Actions for Top Bar
 extension UserProfileFeedViewController {
     @objc private func topBarSettingsButtonTapped() {
@@ -1158,22 +1057,6 @@ extension UserProfileFeedViewController {
         confirmAlert.addAction(confirmAction)
         
         present(confirmAlert, animated: true)
-    }
-}
-
-// Добавляем соответствие ImageCropViewControllerDelegate
-extension UserProfileFeedViewController: ImageCropViewControllerDelegate {
-    func imageCropViewController(_ controller: ImageCropViewController, didFinishCroppingImage image: UIImage, withAspectRatio aspectRatioString: String) {
-        print("✂️ ImageCropViewControllerDelegate: didFinishCroppingImage - Соотношение: \(aspectRatioString)")
-        // TODO: Реализовать логику сохранения обрезанного аватара
-        // Например:
-        // viewModel.updateAvatar(image: image)
-        controller.dismiss(animated: true)
-    }
-    
-    func imageCropViewControllerDidCancel(_ controller: ImageCropViewController) {
-        print("✂️ ImageCropViewControllerDelegate: didCancel")
-        controller.dismiss(animated: true)
     }
 }
 

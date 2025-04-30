@@ -7,8 +7,8 @@ import AVFoundation // Добавляем для AVAsset
 // Добавляем соответствие UserProfileFeedViewControllerDelegate и EditProfileViewControllerDelegate
 // Добавляем EditProfileViewModelDelegate
 // Раскомментируем UserPostScrollViewControllerDelegate
-// Добавляем CreatePostViewControllerDelegate
-class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerDelegate, EditProfileViewControllerDelegate, EditProfileViewModelDelegate, UserPostScrollViewControllerDelegate, CreatePostViewControllerDelegate {
+// Удаляем CreatePostViewControllerDelegate, добавляем PostMediaSelectionDelegate и PostCropViewControllerDelegate
+class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerDelegate, EditProfileViewControllerDelegate, EditProfileViewModelDelegate, UserPostScrollViewControllerDelegate, PostMediaSelectionDelegate, PostCropViewControllerDelegate {
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
     
@@ -126,26 +126,54 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
         navigationController.pushViewController(vc, animated: true)
     }
 
-    // Добавляем метод для показа экрана создания поста
-    func showCreatePost(with mediaItems: [MediaItem]) {
-        print("CurrentUserProfileCoordinator: Showing Create Post screen with \(mediaItems.count) items.")
+    // 1. Переименовываем showCreatePost в showPostMediaSelection
+    // Он будет показывать первый экран нового флоу
+    func showPostMediaSelection(with mediaItems: [MediaItem]) {
+        print("➡️ Coordinator: Showing Post Media Selection screen with \(mediaItems.count) items.")
         guard !mediaItems.isEmpty else {
-            print("CurrentUserProfileCoordinator Error: Cannot show Create Post screen with empty media items.")
+            print("❌ Coordinator Error: Cannot show Post Media Selection screen with empty media items.")
             // TODO: Показать алерт пользователю?
             return
         }
 
-        // Создаем ViewModel для CreatePost
-        let createPostViewModel = CreatePostViewModel(initialMedia: mediaItems)
-
         // Создаем ViewController
-        let createPostVC = CreatePostViewController(viewModel: createPostViewModel)
-        createPostVC.delegate = self // Устанавливаем себя делегатом
-
-        // Представляем модально или в новом NavigationController
-        let createPostNavController = UINavigationController(rootViewController: createPostVC)
-        createPostNavController.modalPresentationStyle = .fullScreen // Или .automatic
-        navigationController.present(createPostNavController, animated: true)
+        let vc = PostMediaSelectionViewController(media: mediaItems)
+        // TODO: Установить делегата (vc.delegate = self), когда протокол будет определен
+        vc.delegate = self
+        
+        // Показываем экран (push в текущий стек)
+        navigationController.isNavigationBarHidden = false // Показываем навбар для этого флоу
+        navigationController.pushViewController(vc, animated: true)
+    }
+    
+    // 2. Добавляем showPostCrop
+    func showPostCrop(item: EditableMediaItem, aspectRatio: PostAspectRatio /*, delegate: PostCropViewControllerDelegate */) {
+        print("✂️ Coordinator: Showing Post Crop screen for item \(item.id).")
+        let vc = PostCropViewController(item: item, aspectRatio: aspectRatio)
+        // TODO: Установить делегата (vc.delegate = delegate), когда протокол будет определен
+        vc.delegate = self // Устанавливаем координатор делегатом для PostCropVC
+        
+        // Представляем модально в новом NavigationController для своего навбара
+        let cropNavController = UINavigationController(rootViewController: vc)
+        cropNavController.modalPresentationStyle = .fullScreen
+        navigationController.present(cropNavController, animated: true)
+    }
+    
+    // 3. Добавляем showPostReview
+    func showPostReview(items: [EditableMediaItem], aspectRatio: PostAspectRatio) {
+         print("✍️ Coordinator: Showing Post Review screen with \(items.count) items.")
+         guard !items.isEmpty else {
+             print("❌ Coordinator Error: Cannot show Post Review screen with empty items.")
+             return
+         }
+         
+         // Создаем ViewController
+         // Он сам создаст ViewModel
+         let vc = PostReviewViewController(items: items, aspectRatio: aspectRatio)
+         // TODO: Установить делегата для обработки закрытия?
+         
+         // Показываем экран (push)
+         navigationController.pushViewController(vc, animated: true)
     }
 
     // MARK: - Post Navigation
@@ -217,6 +245,8 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
         navigationController.pushViewController(commentsVC, animated: true)
     }
 
+    // Удаляем реализацию CreatePostViewControllerDelegate
+    /*
     // MARK: - CreatePostViewControllerDelegate
 
     func didFinishCreatingPost(_ controller: CreatePostViewController) {
@@ -250,9 +280,58 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
             print("CurrentUserProfileCoordinator: Create Post controller dismissed.")
         }
     }
-
+    
     func didCancelCreatingPost(_ controller: CreatePostViewController) {
-        print("CurrentUserProfileCoordinator: Create Post cancelled.")
-        controller.dismiss(animated: true)
+         print("CurrentUserProfileCoordinator: Create Post cancelled.")
+         controller.dismiss(animated: true)
+     }
+    */
+     
+     // TODO: Реализовать методы делегатов PostMediaSelectionDelegate и PostCropViewControllerDelegate
+     // func postMediaSelectionDidTapNext(items: [EditableMediaItem], aspectRatio: PostAspectRatio) { ... }
+     // func postMediaSelectionDidCancel() { ... }
+     // func postCropDidFinish(item: EditableMediaItem) { ... }
+
+    // MARK: - PostMediaSelectionDelegate
+    
+    func postMediaSelectionDidTapNext(items: [EditableMediaItem], aspectRatio: PostAspectRatio) {
+        // Переходим к экрану ревью
+        showPostReview(items: items, aspectRatio: aspectRatio)
     }
+
+    func postMediaSelectionDidTapItem(at index: Int, currentItems: [EditableMediaItem], aspectRatio: PostAspectRatio) {
+        guard index >= 0 && index < currentItems.count else { return }
+        let itemToCrop = currentItems[index]
+        // Переходим к экрану кропа для выбранного элемента
+        showPostCrop(item: itemToCrop, aspectRatio: aspectRatio)
+    }
+
+    func postMediaSelectionDidCancel() {
+        // Закрываем экран выбора формата (возвращаемся к профилю)
+        navigationController.popViewController(animated: true)
+        navigationController.isNavigationBarHidden = true // Скрываем навбар снова
+    }
+
+    // MARK: - PostCropViewControllerDelegate
+
+    func postCropDidFinish(item: EditableMediaItem) {
+        // Закрываем модальный экран кропа
+        navigationController.dismiss(animated: true) { [weak self] in
+            // Находим PostMediaSelectionViewController в стеке навигации
+            if let selectionVC = self?.navigationController.viewControllers.last as? PostMediaSelectionViewController {
+                // Находим индекс обновленного элемента (по ID)
+                if let updatedIndex = selectionVC.editableMedia.firstIndex(where: { $0.id == item.id }) {
+                    // Обновляем элемент в массиве selectionVC
+                    selectionVC.updateEditableItem(at: updatedIndex, with: item)
+                    print("✅ Coordinator: Updated item at index \(updatedIndex) after cropping.")
+                }
+            }
+        }
+    }
+    
+    func postCropDidCancel() {
+        // Просто закрываем модальный экран кропа
+        navigationController.dismiss(animated: true)
+    }
+
 }

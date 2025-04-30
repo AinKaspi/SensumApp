@@ -2,34 +2,34 @@
 
 ---
 
-## Текущая Задача: Рефакторинг Системы Постов [TASK.APS]
+## Текущая Задача: Рефакторинг Системы Постов [TASK.APS] (ЗАВЕРШЕНЫ ОСНОВНЫЕ ПУНКТЫ)
 
 **Цель:** Реализовать создание и отображение постов с поддержкой каруселей, индивидуального выбора формата (1:1, 9:16, 1.91:1) и кропа для каждого изображения, генерацией 9:16 миниатюр для сетки профиля и динамическим отображением в ленте.
 
 **Подзадачи:**
 
-1.  **[ ] `[TASK.APS.1]` Обновить Enum `PostAspectRatio`:** Заменить "16:9" на "1.91:1", скорректировать `ratio`.
-2.  **[ ] `[TASK.APS.2]` Рефакторинг `ImageCropViewController`:**
-    *   [ ] `-` Обновить `UISegmentedControl` на "1:1", "9:16", "1.91:1".
-    *   [ ] `-` Изменить делегат `ImageCropViewControllerDelegate` для передачи `aspectRatioString`.
-    *   [ ] `-` Обновить вызов делегата в `doneButtonTapped`.
-3.  **[ ] `[TASK.APS.3]` Рефакторинг `CreatePostViewModel`:**
-    *   [ ] `-` Определить структуру `EditableMediaItem` для хранения оригинала, кропа, соотношения сторон.
-    *   [ ] `-` Заменить `@Published var selectedMedia: [MediaItem]` на `@Published var editableMedia: [EditableMediaItem]`.
-    *   [ ] `-` Обновить логику инициализации и управления `editableMedia`.
-    *   [ ] `-` Переписать `sharePost`:
-        *   [ ] `-` Индивидуальный кроп каждого `EditableMediaItem`.
-        *   [ ] `-` Параллельная загрузка финальных изображений.
-        *   [ ] `-` Определение `feedAspectRatio` поста (по первому элементу).
-        *   [ ] `-` Генерация 9:16 кропа первого фото для `gridThumbnail`.
-        *   [ ] `-` Загрузка `gridThumbnail`.
-        *   [ ] `-` Формирование `[MediaItemDTO]`.
-        *   [ ] `-` Вызов нового `PostService.createPost(...)`.
-4.  **[ ] `[TASK.APS.4]` Рефакторинг `CreatePostViewController`:**
-    *   [ ] `-` Адаптировать UI для работы с `editableMedia` из ViewModel.
-    *   [ ] `-` Обновить логику выбора миниатюры (`didSelectItemAt`) для загрузки `EditableMediaItem` в `imageCropView`.
-    *   [ ] `-` Обновить логику `aspectRatioChanged` для изменения соотношения **только текущего** `EditableMediaItem`.
-    *   [ ] `-` Реализовать сохранение параметров кропа из `imageCropView` обратно в **текущий** `EditableMediaItem` при смене фокуса/перед `shareTapped`.
+1.  **[x] `[TASK.APS.1]` Обновить Enum `PostAspectRatio`:** Заменить "16:9" на "1.91:1", скорректировать `ratio`. (Сделано: "4:5" -> "9:16").
+2.  **[-] `[TASK.APS.2]` Рефакторинг `ImageCropViewController`:** (Пропущено/Устарело, т.к. флоу меняется в TASK.NCP)
+    *   [-] `-` Обновить `UISegmentedControl` на "1:1", "9:16", "1.91:1".
+    *   [-] `-` Изменить делегат `ImageCropViewControllerDelegate` для передачи `aspectRatioString`.
+    *   [-] `-` Обновить вызов делегата в `doneButtonTapped`.
+3.  **[x] `[TASK.APS.3]` Рефакторинг `CreatePostViewModel`:** (Сделано)
+    *   [x] `-` Определить структуру `EditableMediaItem` для хранения оригинала, кропа, соотношения сторон.
+    *   [x] `-` Заменить `@Published var selectedMedia: [MediaItem]` на `@Published var editableMedia: [EditableMediaItem]`.
+    *   [x] `-` Обновить логику инициализации и управления `editableMedia`.
+    *   [x] `-` Переписать `sharePost`:
+        *   [x] `-` Индивидуальный кроп каждого `EditableMediaItem` (включая ручной).
+        *   [x] `-` Параллельная загрузка финальных изображений.
+        *   [x] `-` Определение `feedAspectRatio` поста (по первому элементу - *уточнение: будет изменено в NCP*).
+        *   [x] `-` Генерация 9:16 кропа первого фото для `gridThumbnail`.
+        *   [x] `-` Загрузка `gridThumbnail`.
+        *   [x] `-` Формирование `[MediaItemDTO]`.
+        *   [x] `-` Вызов нового `PostService.createPost(...)`.
+4.  **[x] `[TASK.APS.4]` Рефакторинг `CreatePostViewController`:** (Сделано)
+    *   [x] `-` Адаптировать UI для работы с `editableMedia` из ViewModel.
+    *   [x] `-` Обновить логику выбора миниатюры (`didSelectItemAt`) для загрузки `EditableMediaItem` в `imageCropView`.
+    *   [x] `-` Обновить логику `aspectRatioChanged` для изменения соотношения **только текущего** `EditableMediaItem`.
+    *   [x] `-` Реализовать сохранение параметров кропа из `imageCropView` обратно в **текущий** `EditableMediaItem` при смене фокуса/перед `shareTapped`.
 5.  **[ ] `[TASK.APS.5]` Проверить `PostService.createPost(...)`:** Убедиться, что он корректно сохраняет `mediaItems`, `feedAspectRatio`, `gridThumbnailURL`.
 6.  **[ ] `[TASK.APS.6]` Рефакторинг Отображения `Feed`:**
     *   [ ] `-` `FeedCell`: Поддержка карусели (`mediaItems.count > 1`). Динамическая высота медиа-контейнера по `post.feedAspectRatio`.
@@ -260,3 +260,89 @@
 - [ ] `[P3.APS.7]` **Логика Автоматического Кадрирования (Бэкенд):**
     - [ ] `-` **Определить стратегию:** Четко определить метод кадрирования для 9:16 превью (например, взять центральную вертикальную полосу шириной `height * 9 / 16`).
     - [ ] `-` **Реализовать в Cloud Function:** Добавить код в функцию из `[P3.APS.2]` для выполнения этого кадрирования (возможно, с использованием ImageMagick или специализированных библиотек для обработки изображений/видео на сервере).
+
+## Рефакторинг UI/UX Создания Поста [TASK.NCP] (New Create Post)
+
+**Цель:** Переработать флоу создания поста, сделав его более похожим на Instagram, с единым выбором соотношения сторон для всего поста и отдельными экранами для выбора медиа, выбора формата/превью, ручного кропа и финального ревью.
+
+**Предыдущий Флоу (для контекста):**
+1.  `UserProfileFeedVC`: Нажатие "New Post" -> `PHPicker`.
+2.  `UserProfileFeedVC.pickerDidFinish`: Вызов `processNextImage`.
+3.  `processNextImage`:
+    *   index 0: Показ `ImageCropVC` -> Выбор AR + Кроп -> Делегат -> `processNextImage(index + 1, selectedAR)`.
+    *   index > 0: Автокроп с `selectedAR` -> `processNextImage(index + 1, selectedAR)`.
+4.  Конец `processNextImage`: Вызов `coordinator.showCreatePost(MediaItem[])`.
+5.  `CreatePostVC`: Показ превью + коллекции миниатюр. Выбор AR *для отдельного фото*. Ручной кроп в превью. Добавление подписи. Share.
+6.  `CreatePostVM.sharePost`: Кроп каждого `EditableMediaItem` (с его AR/ручными параметрами), загрузка, создание поста (AR первого элемента как `feedAspectRatio`).
+
+**Новый Флоу:**
+1.  `UserProfileFeedVC`: Нажатие "New Post" -> `PHPicker`.
+2.  `UserProfileFeedVC.pickerDidFinish`: Вызов `coordinator.showPostMediaSelection(MediaItem[])`.
+3.  `PostMediaSelectionVC` (Экран 2):
+    *   Показ карусели превью.
+    *   Выбор *единого* `postAspectRatio` для поста.
+    *   Нажатие на превью -> `coordinator.showPostCrop(EditableMediaItem, postAspectRatio, delegate=self)`.
+    *   Нажатие "Next" -> `coordinator.showPostReview(EditableMediaItem[], postAspectRatio)`.
+4.  `PostCropVC` (Экран 3):
+    *   Показ `ImageCropView` с `postAspectRatio`.
+    *   Ручной кроп (зум/пан).
+    *   Нажатие "Done" -> `delegate.didFinishCropping(updatedItem)` -> `dismiss`.
+5.  `PostReviewVC` (Экран 4):
+    *   Показ карусели финальных превью.
+    *   Поле для подписи (`caption`).
+    *   Нажатие "Share" -> Инициализация `CreatePostViewModel` (или нового `PostReviewViewModel`) -> Вызов `sharePost`.
+6.  `CreatePostVM.sharePost`: (Адаптированный) Кроп каждого `EditableMediaItem` (с ручными параметрами, используя *единый* `postAspectRatio`), загрузка, создание поста с этим `postAspectRatio` как `feedAspectRatio`.
+
+**Подзадачи:**
+
+**[ ] `[TASK.NCP.1]` Модификация Модели и ViewModel:**
+    *   [ ] `-` В `CreatePostViewModel`: Удалить `EditableMediaItem.selectedAspectRatio`.
+    *   [ ] `-` В `CreatePostViewModel`: Добавить `@Published var postAspectRatio: PostAspectRatio = .square`.
+    *   [ ] `-` В `CreatePostViewModel.sharePost`: Использовать `self.postAspectRatio` для кропа и как `feedAspectRatio` при сохранении. Адаптировать хелперы кропа (`generateCroppedImage`, `cropImageManually`, `autoCropImage`) для работы с единым AR поста.
+    *   [ ] `-` В `EditableMediaItem`: Оставить поля для ручного кропа (`manualZoomScale`, `manualContentOffset`).
+
+**[ ] `[TASK.NCP.2]` Создание `PostMediaSelectionViewController` (Экран 2 - Выбор формата):**
+    *   [ ] `-` UI: Карусель `UICollectionView` для `[MediaItem]`/`[EditableMediaItem]`, кнопки для выбора `PostAspectRatio`, кнопки навигации ("Back", "Next", "Add More+").
+    *   [ ] `-` Логика: Принимает `[MediaItem]`. Хранит `[EditableMediaItem]`. Обновляет `postAspectRatio` при нажатии кнопок.
+    *   [ ] `-` Навигация: При тапе на ячейку -> `coordinator.showPostCrop`. При нажатии "Next" -> `coordinator.showPostReview`. При нажатии "Add More+" -> ? (Возврат к пикеру?).
+    *   [ ] `-` Делегат: Определить протокол для возврата результата (например, `PostMediaSelectionDelegate`).
+
+**[ ] `[TASK.NCP.3]` Создание `PostCropViewController` (Экран 3 - Кроп):**
+    *   [ ] `-` UI: Кнопки навигации ("Back/Close", "Done"), заголовок "Crop", `ImageCropView`, сетка третей на `ImageCropView`.
+    *   [ ] `-` Логика: Принимает `EditableMediaItem` и `PostAspectRatio`. Настраивает `ImageCropView` (устанавливает `image`, `aspectRatio`, загружает `manualZoomScale`/`manualContentOffset` если есть).
+    *   [ ] `-` При нажатии "Done": Сохраняет текущие `currentZoomScale`/`currentContentOffset` из `ImageCropView` в `EditableMediaItem`, вызывает метод делегата `didFinishCropping(updatedItem)`, закрывается.
+    *   [ ] `-` Делегат: Определить протокол `PostCropViewControllerDelegate { func didFinishCropping(item: EditableMediaItem) }`.
+
+**[ ] `[TASK.NCP.4]` Создание `PostReviewViewController` (Экран 4 - Ревью и Паблиш):**
+    *   [ ] `-` UI: Кнопки навигации ("Back", "Share"), заголовок "New Post", карусель `UICollectionView` для *финальных* превью, `UITextView` для подписи.
+    *   [ ] `-` Логика: Принимает `[EditableMediaItem]` и `PostAspectRatio`. Генерирует превью для карусели (возможно, требует доработки `generateCroppedImage` для генерации превью без полного сохранения).
+    *   [ ] `-` При нажатии "Share": Собирает данные (`caption`, `[EditableMediaItem]`, `postAspectRatio`), инициализирует `CreatePostViewModel` (или новый `PostReviewViewModel`), вызывает `sharePost`. Обрабатывает результат (закрытие, ошибка).
+
+**[ ] `[TASK.NCP.5]` Обновление `UserProfileFeedViewController`:**
+    *   [ ] `-` В `picker(_:didFinishPicking:)`: Заменить вызов `processNextImage` на вызов `coordinator.showPostMediaSelection(with: mediaItems)`.
+    *   [ ] `-` Удалить метод `processNextImage`.
+    *   [ ] `-` Удалить соответствие протоколу `ImageCropViewControllerDelegate` и его методы.
+    *   [ ] `-` Удалить метод `autoCropImage`.
+
+**[ ] `[TASK.NCP.6]` Обновление Координатора (`CurrentUserProfileCoordinator`):**
+    *   [ ] `-` Переименовать/заменить `showCreatePost(with:)` на `showPostMediaSelection(with:)`.
+    *   [ ] `-` Добавить метод `showPostCrop(item:aspectRatio:delegate:)`.
+    *   [ ] `-` Добавить метод `showPostReview(items:aspectRatio:)`.
+    *   [ ] `-` Реализовать навигацию между новыми VC.
+    *   [ ] `-` Реализовать обработку делегатов от `PostCropVC`.
+
+**[ ] `[TASK.NCP.7]` Рефакторинг/Удаление Старых Компонентов:**
+    *   [ ] `-` Оценить необходимость `ImageCropViewController`. Вероятно, его можно удалить или полностью переделать в `PostCropViewController`.
+    *   [ ] `-` Оценить необходимость `CreatePostViewController`. Вероятно, его можно удалить, перенеся нужные части UI/логики в новые VC.
+
+**[ ] `[TASK.NCP.8]` Тестирование:**
+    *   [ ] `-` Протестировать флоу с 1 фото.
+    *   [ ] `-` Протестировать флоу с несколькими фото.
+    *   [ ] `-` Протестировать разные соотношения сторон.
+    *   [ ] `-` Протестировать ручной кроп.
+    *   [ ] `-` Протестировать публикацию поста.
+    *   [ ] `-` Протестировать кнопки "Назад"/"Отмена" на всех экранах.
+
+### Тема: Leveling (Таб 3 - Тренировки) [LVL]
+  - [ ] `[P2.LVL.1]` Добавление 2-3 новых упражнений (`Exercise`) и их Анализаторов (`ExerciseAnalyzerProtocol`).
+  - [ ] `[P2.LVL.2]` Улучшение Анализаторов (обратная связь по технике).

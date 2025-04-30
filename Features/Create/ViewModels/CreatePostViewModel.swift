@@ -5,7 +5,7 @@ import Combine
 /// Enum defining aspect ratios for posts
 enum PostAspectRatio: String, CaseIterable {
     case square = "1:1"     // Квадрат
-    case portrait = "4:5"   // Вертикальный
+    case portrait = "9:16"   // Вертикальный (старый был 4:5)
     case landscape = "1.91:1" // Горизонтальный (Instagram Landscape)
     
     /// String representation for UI display
@@ -19,7 +19,7 @@ enum PostAspectRatio: String, CaseIterable {
         case .square:
             return 1.0
         case .portrait:
-            return 5.0 / 4.0
+            return 16.0 / 9.0
         case .landscape:
             return 1.0 / 1.91 // Height / Width для 1.91:1
         }
@@ -35,7 +35,6 @@ struct EditableMediaItem: Identifiable {
     let id = UUID() // Уникальный ID для SwiftUI/Combine
     let originalImage: UIImage
     var finalImage: UIImage? // Финальное (обрезанное) изображение для загрузки
-    var selectedAspectRatio: PostAspectRatio = .square // Соотношение сторон для этого элемента
     // Добавляем параметры для ручного кропа
     var manualZoomScale: CGFloat? = nil
     var manualContentOffset: CGPoint? = nil
@@ -57,6 +56,9 @@ final class CreatePostViewModel {
     // Удаляем общее selectedAspectRatio, оно теперь в EditableMediaItem
     // @Published var selectedAspectRatio: PostAspectRatio = .square 
 
+    // Добавляем единое соотношение сторон для всего поста
+    @Published var postAspectRatio: PostAspectRatio = .square
+
     @Published var caption: String = ""
     @Published var isSharing: Bool = false
     @Published var errorMessage: String?
@@ -76,8 +78,8 @@ final class CreatePostViewModel {
         // Конвертируем [MediaItem] в [EditableMediaItem]
         self.editableMedia = initialMedia.compactMap {
             if case .image(let img) = $0 {
-                // Начальное соотношение можно оставить .square или определить по изображению
-                return EditableMediaItem(originalImage: img, selectedAspectRatio: .square) 
+                // Удаляем передачу selectedAspectRatio
+                return EditableMediaItem(originalImage: img) // Было: EditableMediaItem(originalImage: img, selectedAspectRatio: .square)
             } else {
                 return nil // Пропускаем не-изображения
             }
@@ -93,42 +95,43 @@ final class CreatePostViewModel {
         }
     }
 
+    // Хелпер-инициализатор для PostReviewViewController
+    convenience init(initialEditableItems: [EditableMediaItem], postAspectRatio: PostAspectRatio, storageService: StorageServiceProtocol = StorageService(), postService: PostServiceProtocol = PostService()) {
+        // Этот init обходит конвертацию из MediaItem
+        self.init(initialMedia: [], storageService: storageService, postService: postService) // Вызываем основной init с пустым массивом
+        self.editableMedia = initialEditableItems // Устанавливаем переданные items
+        self.postAspectRatio = postAspectRatio // Устанавливаем переданный AR
+        if !initialEditableItems.isEmpty {
+            self.selectedMediaIndex = 0
+        } else {
+            self.selectedMediaIndex = -1
+        }
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     // MARK: - Public Methods
     
-    /// Обновляет выбранное соотношение сторон для ТЕКУЩЕГО редактируемого элемента
-    func updateAspectRatioForCurrentItem(_ aspectRatio: PostAspectRatio) {
-        guard selectedMediaIndex >= 0 && selectedMediaIndex < editableMedia.count else { return }
-        editableMedia[selectedMediaIndex].selectedAspectRatio = aspectRatio
-        // Сбрасываем finalImage и параметры ручного кропа, т.к. соотношение изменилось
-        editableMedia[selectedMediaIndex].finalImage = nil 
-        resetManualCropParametersForCurrentItem() // Вызываем сброс параметров
-        print("🔄 Updated aspect ratio for index \(selectedMediaIndex) to \(aspectRatio.stringValue), reset crop parameters.")
-    }
-    
-    /// Сохраняет параметры ручного кропа для текущего элемента
-    func setManualCropParametersForCurrentItem(zoomScale: CGFloat, contentOffset: CGPoint) {
-        guard selectedMediaIndex >= 0 && selectedMediaIndex < editableMedia.count else { return }
-        editableMedia[selectedMediaIndex].manualZoomScale = zoomScale
-        editableMedia[selectedMediaIndex].manualContentOffset = contentOffset
+    /// Сохраняет параметры ручного кропа для элемента по индексу
+    func setManualCropParameters(for index: Int, zoomScale: CGFloat, contentOffset: CGPoint) {
+        guard index >= 0 && index < editableMedia.count else { return }
+        editableMedia[index].manualZoomScale = zoomScale
+        editableMedia[index].manualContentOffset = contentOffset
         // Сбрасываем finalImage, т.к. кроп изменился
-        editableMedia[selectedMediaIndex].finalImage = nil 
-        print("💾 VM: Saved manual crop parameters for index \(selectedMediaIndex)")
+        editableMedia[index].finalImage = nil 
+        print("💾 VM: Saved manual crop parameters for index \(index)")
     }
 
-    /// Сбрасывает параметры ручного кропа для текущего элемента
-    func resetManualCropParametersForCurrentItem() {
-        guard selectedMediaIndex >= 0 && selectedMediaIndex < editableMedia.count else { return }
-        editableMedia[selectedMediaIndex].manualZoomScale = nil
-        editableMedia[selectedMediaIndex].manualContentOffset = nil
+    /// Сбрасывает параметры ручного кропа для элемента по индексу
+    func resetManualCropParameters(for index: Int) {
+        guard index >= 0 && index < editableMedia.count else { return }
+        editableMedia[index].manualZoomScale = nil
+        editableMedia[index].manualContentOffset = nil
         // Сбрасываем finalImage
-        editableMedia[selectedMediaIndex].finalImage = nil 
-        print("🗑️ VM: Reset manual crop parameters for index \(selectedMediaIndex)")
-    }
-
-    /// Возвращает текущее выбранное соотношение для UI
-    var currentSelectedAspectRatio: PostAspectRatio {
-        guard selectedMediaIndex >= 0 && selectedMediaIndex < editableMedia.count else { return .square }
-        return editableMedia[selectedMediaIndex].selectedAspectRatio
+        editableMedia[index].finalImage = nil 
+        print("🗑️ VM: Reset manual crop parameters for index \(index)")
     }
 
     /// Uploads the selected media to storage and creates a new post document in Firestore.
@@ -245,7 +248,7 @@ final class CreatePostViewModel {
                 }
 
                 // Определяем feedAspectRatio для всего поста (по первому элементу)
-                let feedAspectRatio = self.editableMedia.first?.selectedAspectRatio.rawValue ?? PostAspectRatio.square.rawValue
+                let feedAspectRatio = self.postAspectRatio.rawValue
 
                 return Future<Void, Error> { promise in
                     print("📱 CreatePostViewModel: Создаем пост с aspectRatio: \(feedAspectRatio), gridThumbnail: \(gridThumbnailURL.absoluteString)")
@@ -328,9 +331,11 @@ final class CreatePostViewModel {
     }
     
     // НОВЫЙ хелпер для генерации кропнутого изображения с учетом ручных параметров
-    private func generateCroppedImage(for item: EditableMediaItem) -> UIImage? {
+    // Меняем private на internal (или fileprivate)
+    /* private */ func generateCroppedImage(for item: EditableMediaItem) -> UIImage? {
         let originalImage = item.originalImage
-        let targetAspectRatio = item.selectedAspectRatio.ratio // Соотношение для рамки
+        // Используем единое соотношение для поста
+        let targetAspectRatio = self.postAspectRatio.ratio
         
         // Если есть параметры ручного кропа, используем их
         if let zoomScale = item.manualZoomScale, let contentOffset = item.manualContentOffset {
@@ -349,8 +354,10 @@ final class CreatePostViewModel {
     }
     
     // НОВЫЙ хелпер: Кроп изображения по заданным параметрам масштаба и смещения
+    // Оставляем private, так как используется только внутри generateCroppedImage
     private func cropImageManually(originalImage: UIImage, targetAspectRatio: CGFloat, zoomScale: CGFloat, contentOffset: CGPoint) -> UIImage? {
         
+        print("📐 Cropping manually with AR: \(targetAspectRatio), Zoom: \(zoomScale), Offset: \(contentOffset)") // Доп. лог
         let originalSize = originalImage.size
         
         // 1. Определяем размер видимой области (crop box) на основе targetAspectRatio
@@ -418,7 +425,10 @@ final class CreatePostViewModel {
     }
     
     // Заменяем старый autoCropImage на новый с другим именем параметра для ясности
+    // Оставляем private, так как используется только внутри generateCroppedImage и thumbnail генерации
     private func autoCropImage(_ image: UIImage, withTargetAspectRatio targetAspectRatio: CGFloat) -> UIImage? {
+        
+        print("📐 Cropping automatically with AR: \(targetAspectRatio)") // Доп. лог
         let imageWidth = image.size.width
         let imageHeight = image.size.height
         var cropWidth: CGFloat
