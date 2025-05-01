@@ -271,28 +271,23 @@ extension UserPostScrollViewController {
         
         // 3. Используем статическую временную ячейку
         let cell = UserPostScrollViewController.sizingCell
-
-        // 4. Устанавливаем ширину ячейки ПЕРЕД конфигурацией и расчетом!
+  
+        // 4. Устанавливаем ширину ячейки, конфигурируем ее
         cell.bounds.size.width = targetWidth
-
-        // 5. Конфигурируем ячейку данными поста
         cell.configure(with: post, indexPath: indexPath)
-
-        // 6. Рассчитываем размер с помощью Auto Layout ячейки
+        cell.layoutIfNeeded() // ВАЖНО: Рассчитать layout ДО измерения subviews
+  
+        // 5. Рассчитываем итоговый размер всей contentView ячейки
         let calculatedSize = cell.contentView.systemLayoutSizeFitting(
             CGSize(width: targetWidth, height: UIView.layoutFittingCompressedSize.height),
-            withHorizontalFittingPriority: .required, // Ширина должна быть ТОЧНО targetWidth
-            verticalFittingPriority: .fittingSizeLevel // Высота должна соответствовать содержимому
+            withHorizontalFittingPriority: .required, 
+            verticalFittingPriority: .fittingSizeLevel 
         )
-
-        // Учитываем высоту pageControl, если он будет виден
-        let pageControlHeight: CGFloat = (post.mediaItems.count > 1) ? 24.0 : 0 // 20 (высота) + 4 (отступ сверху)
-        let finalHeight = max(1, calculatedSize.height) + pageControlHeight
-
-        print("UserPostScrollVC [sizeForItemAt \(indexPath.item)]: Calculated H = \(calculatedSize.height), PageControl H = \(pageControlHeight), Final H = \(finalHeight)")
-
-        // 7. Возвращаем рассчитанный размер
-        return CGSize(width: targetWidth, height: finalHeight)
+  
+        print("UserPostScrollVC [sizeForItemAt \(indexPath.item)]: Final Calculated size = \(calculatedSize)")
+  
+        // 6. Возвращаем рассчитанный размер
+        return CGSize(width: targetWidth, height: max(1, calculatedSize.height))
     }
     
     // Метод для установки размера футера
@@ -358,22 +353,26 @@ extension UserPostScrollViewController {
     }
     
     func didTapCommentButton(in cell: FullPostCell) {
+        print("--- UserPostScrollVC: didTapCommentButton(in cell:). Calling delegate... ---") // DEBUG
         guard let indexPath = collectionView.indexPath(for: cell),
-              let postID = viewModel.posts[safe: indexPath.item]?.id
-        else { return }
+              let postID = viewModel.posts[safe: indexPath.item]?.id // Безопасное извлечение ID
+        else {
+            print("--- UserPostScrollVC Error: Failed to get indexPath or postID for comment button tap. IndexPath: \(String(describing: collectionView.indexPath(for: cell))), PostID: \(String(describing: viewModel.posts[safe: collectionView.indexPath(for: cell)?.item ?? -1]?.id)) ---")
+            return
+        }
+
+        // Дополнительная проверка делегата
+        guard delegate != nil else {
+            print("--- UserPostScrollVC Error: delegate is nil! Cannot call didTapCommentsButton. ---")
+            return
+        }
+
         delegate?.didTapCommentsButton(forPostID: postID)
     }
     
     func didTapShareButton(in cell: FullPostCell) {
         print("UserPostScrollVC: Share button tapped (TBD)")
         // TODO: Реализовать Share
-    }
-    
-    func didTapViewAllComments(in cell: FullPostCell) {
-        guard let indexPath = collectionView.indexPath(for: cell),
-              let postID = viewModel.posts[safe: indexPath.item]?.id
-        else { return }
-        delegate?.didTapCommentsButton(forPostID: postID)
     }
     
     // Добавляем реализацию нового метода делегата
@@ -418,5 +417,16 @@ class PaginationIndicatorFooterView: UICollectionReusableView {
 
     func stopAnimating() {
         activityIndicator.stopAnimating()
+    }
+}
+
+// MARK: - Helper Methods
+extension UserPostScrollViewController {
+    private func aspectRatioMultiplier(from string: String) -> CGFloat {
+        switch string {
+            case "9:16": return 16.0 / 9.0
+            case "16:9": return 9.0 / 16.0
+            default: return 1.0 // Default case, assuming 1:1 aspect ratio
+        }
     }
 }

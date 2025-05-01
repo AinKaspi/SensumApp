@@ -7,7 +7,6 @@ protocol FullPostCellDelegate: AnyObject {
     func didTapFollowButton(in cell: FullPostCell)
     func didTapLikeButton(in cell: FullPostCell)
     func didTapCommentButton(in cell: FullPostCell)
-    func didTapViewAllComments(in cell: FullPostCell)
     // УДАЛЯЕМ делегат для toggle caption, он больше не нужен для обновления layout
     // func fullPostCellDidToggleCaption(_ cell: FullPostCell, at indexPath: IndexPath)
     // ДОБАВЛЯЕМ новый метод делегата для запроса обновления layout
@@ -50,12 +49,15 @@ class FullPostCell: UICollectionViewCell {
         collectionView.register(MediaItemCell.self, forCellWithReuseIdentifier: MediaItemCell.identifier)
         collectionView.dataSource = self // Установим DataSource
         collectionView.delegate = self   // Установим Delegate
+        collectionView.prefetchDataSource = self // Установим PrefetchDataSource
         return collectionView
     }()
 
     private lazy var pageControl: UIPageControl = {
         let pageControl = UIPageControl()
         pageControl.translatesAutoresizingMaskIntoConstraints = false
+        // Уменьшаем размер точек через transform
+        pageControl.transform = CGAffineTransform(scaleX: 0.7, y: 0.7)
         pageControl.hidesForSinglePage = true
         pageControl.currentPageIndicatorTintColor = .white
         pageControl.pageIndicatorTintColor = .lightGray
@@ -181,7 +183,8 @@ class FullPostCell: UICollectionViewCell {
 
     // -- Footer Stack --
     private lazy var footerStackView: UIStackView = {
-        let stackView = UIStackView(arrangedSubviews: [captionLabel, viewAllCommentsButton])
+        // Удаляем viewAllCommentsButton из стека
+        let stackView = UIStackView(arrangedSubviews: [captionLabel])
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.axis = .vertical
         stackView.spacing = 4 // Уменьшаем отступ для более компактного вида
@@ -226,17 +229,6 @@ class FullPostCell: UICollectionViewCell {
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(captionTapped))
         label.addGestureRecognizer(tapGesture)
         return label
-    }()
-
-    private lazy var viewAllCommentsButton: UIButton = { // Новая кнопка для комментариев
-       let button = UIButton(type: .system)
-       button.translatesAutoresizingMaskIntoConstraints = false
-       button.setTitle("View all comments", for: .normal)
-       button.titleLabel?.font = .systemFont(ofSize: 14)
-       button.setTitleColor(.lightGray, for: .normal)
-       button.contentHorizontalAlignment = .left
-       button.addTarget(self, action: #selector(viewAllCommentsTapped), for: .touchUpInside)
-       return button
     }()
 
     // MARK: - Init
@@ -315,7 +307,7 @@ class FullPostCell: UICollectionViewCell {
             pageControl.heightAnchor.constraint(equalToConstant: 20), // Стандартная высота
 
             // Actions and Stats Stack View (Под PageControl)
-            actionsAndStatsStackView.topAnchor.constraint(equalTo: pageControl.bottomAnchor, constant: buttonSpacing - 4), // Отступ от pageControl (немного уменьшен)
+            actionsAndStatsStackView.topAnchor.constraint(equalTo: pageControl.bottomAnchor, constant: buttonSpacing - 4),
             actionsAndStatsStackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             actionsAndStatsStackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
 
@@ -433,6 +425,15 @@ class FullPostCell: UICollectionViewCell {
         // Сбрасываем скролл в начало, если ячейка переиспользуется
         mediaCollectionView.setContentOffset(.zero, animated: false)
         
+        // ---> ПРОАКТИВНАЯ ПРЕДЗАГРУЗКА <--- 
+        // Запускаем предзагрузку для первых нескольких изображений карусели СРАЗУ
+        let initialPrefetchUrls = mediaItems.prefix(3).compactMap { URL(string: $0.url) } // Берем первые 3
+        if !initialPrefetchUrls.isEmpty {
+            print("FullPostCell [configure]: Proactively prefetching initial \(initialPrefetchUrls.count) images.")
+            ImagePrefetcher(urls: initialPrefetchUrls).start()
+        }
+        // -----------------------------------
+        
         // --- Настройка Footer --- 
         likeButton.isSelected = post.isLiked
         likeCountLabel.text = "\(post.likeCount)"
@@ -440,9 +441,6 @@ class FullPostCell: UICollectionViewCell {
  
         // Больше ничего не скрываем, всегда показываем 0
  
-        // Комментарии и настройка нижнего констрейнта
-        configureFooter(commentCount: post.commentCount)
-
         // Вызываем updateCaptionDisplay ПОСЛЕ установки констрейнта aspect ratio
         updateCaptionDisplay()
         
@@ -461,21 +459,6 @@ class FullPostCell: UICollectionViewCell {
         self.imageAspectRatioConstraint = constraint
     }
     
-    // Новый метод для настройки футера и нижних констрейнтов
-    private func configureFooter(commentCount: Int) {
-        if commentCount > 0 {
-            viewAllCommentsButton.setTitle("View all \(commentCount) comments", for: .normal)
-            viewAllCommentsButton.isHidden = false
-            // Логика активации/деактивации констрейнтов низа больше не нужна,
-            // StackView сам управляет видимостью дочерних элементов.
-        } else {
-            viewAllCommentsButton.isHidden = true
-            // Логика обновления нижних констрейнтов больше не нужна.
-            // Просто обновляем видимость кнопки, если это не было сделано в configureFooter.
-            // configureFooter(commentCount: viewAllCommentsButton.isHidden ? 0 : 1)
-        }
-    }
-
     // Метод теперь НЕ принимает indexPath
     private func updateCaptionDisplay() {
         guard let currentPath = indexPath else { return } // Защита
@@ -493,10 +476,6 @@ class FullPostCell: UICollectionViewCell {
              captionLabel.numberOfLines = 0
              isCaptionExpanded = true // Считаем развернутым
         }
-        
-        // Логика обновления нижних констрейнтов больше не нужна.
-        // Просто обновляем видимость кнопки, если это не было сделано в configureFooter.
-        // configureFooter(commentCount: viewAllCommentsButton.isHidden ? 0 : 1)
     }
 
     // Вспомогательный метод для загрузки изображения поста (упрощен)
@@ -538,24 +517,16 @@ class FullPostCell: UICollectionViewCell {
     // НОВЫЕ ОБРАБОТЧИКИ ДЛЯ КНОПОК
     @objc private func likeButtonTapped() {
         // Меняем состояние локально для быстрого отклика
-        likeButton.isSelected.toggle()
+        // likeButton.isSelected.toggle() // ViewModel теперь управляет состоянием
         // Уведомляем делегата
         delegate?.didTapLikeButton(in: self)
     }
     
     @objc private func commentButtonTapped() {
+        print("--- FullPostCell: commentButtonTapped! Calling delegate... ---") // DEBUG
         delegate?.didTapCommentButton(in: self)
     }
     
-    @objc private func viewAllCommentsTapped() {
-        delegate?.didTapViewAllComments(in: self)
-    }
-    
-    // Заглушка, если селектор не найден
-    @objc private func actionButtonTapped() {
-        print("Action button tapped - selector not specified")
-    }
-
     @objc private func captionTapped(_ sender: UITapGestureRecognizer) {
         guard let indexPath = indexPath else {
             print("IndexPath is nil in captionTapped")
@@ -656,12 +627,14 @@ class FullPostCell: UICollectionViewCell {
             print("  contentView frame: \(contentView.frame)")
             print("  mediaCollectionView frame: \(mediaCollectionView.frame)")
             print("    imageAspectRatioConstraint: \(imageAspectRatioConstraint?.multiplier ?? -1)")
+            // --- Debugging Comment Interaction ---
+            print("  actionsAndStatsStackView frame: \(actionsAndStatsStackView.frame), isUserInteractionEnabled: \(actionsAndStatsStackView.isUserInteractionEnabled)")
+            print("    commentButton frame: \(commentButton.frame), isHidden: \(commentButton.isHidden), isUserInteractionEnabled: \(commentButton.isUserInteractionEnabled)")
+            print("  footerStackView frame: \(footerStackView.frame), isUserInteractionEnabled: \(footerStackView.isUserInteractionEnabled)")
             print("  likeCountLabel frame: \(likeCountLabel.frame)")
             print("  captionLabel frame: \(captionLabel.frame)")
             print("    captionLabel lines: \(captionLabel.numberOfLines)")
-            print("  viewAllCommentsButton frame: \(viewAllCommentsButton.frame), isHidden: \(viewAllCommentsButton.isHidden)")
-            print("    captionBottomConstraint active: \(captionBottomConstraint?.isActive ?? false)")
-            print("    commentsButtonBottomConstraint active: \(commentsButtonBottomConstraint?.isActive ?? false)")
+            // ------------------------------------
             print("------------------------------------------")
         }
     }
@@ -700,5 +673,23 @@ extension FullPostCell: UICollectionViewDelegateFlowLayout {
     // Размер ячейки равен размеру mediaCollectionView
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         return collectionView.bounds.size
+    }
+}
+
+// MARK: - UICollectionViewDataSourcePrefetching (для mediaCollectionView)
+extension FullPostCell: UICollectionViewDataSourcePrefetching {
+    func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+        // Убедимся, что это наш mediaCollectionView
+        guard collectionView == mediaCollectionView else { return }
+
+        let urls = indexPaths.compactMap { indexPath -> URL? in
+            guard indexPath.item < mediaItems.count else { return nil }
+            return URL(string: mediaItems[indexPath.item].url)
+        }
+
+        if !urls.isEmpty {
+            print("FullPostCell [prefetchItemsAt]: Prefetching \(urls.count) images.")
+            ImagePrefetcher(urls: urls).start()
+        }
     }
 } 

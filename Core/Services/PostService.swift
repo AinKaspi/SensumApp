@@ -53,7 +53,7 @@ protocol PostServiceProtocol {
     // MARK: - Comments
     // Новый протокол для комментов
     func fetchComments(for postId: String, completion: @escaping (Result<[Comment], Error>) -> Void)
-    func addComment(_ text: String, for postId: String, completion: @escaping (Error?) -> Void)
+    func addComment(_ text: String, for postId: String, completion: @escaping (Result<Comment, Error>) -> Void)
     
     // Удаляем дубликат createPostWithAspectRatio из конца протокола
     // func createPostWithAspectRatio(imageURL: String, caption: String?, aspectRatio: String, completion: @escaping (Error?) -> Void)
@@ -282,7 +282,11 @@ class PostService: PostServiceProtocol {
                 return
             }
 
-            let posts = documents.compactMap { try? $0.data(as: Post.self) }
+            let posts = documents.compactMap { doc -> Post? in
+                var post = try? doc.data(as: Post.self)
+                post?.id = doc.documentID // <-- Добавляем ID вручную
+                return post
+            }
             let newLastSnapshot = documents.last
             
             print("PostService: Fetched \(posts.count) posts for user \(userID). Last snapshot: \(newLastSnapshot?.documentID ?? "None")")
@@ -317,7 +321,11 @@ class PostService: PostServiceProtocol {
             }
             
             // Декодируем посты
-            let posts = documents.compactMap { try? $0.data(as: Post.self) }
+            let posts = documents.compactMap { doc -> Post? in
+                var post = try? doc.data(as: Post.self)
+                post?.id = doc.documentID // <-- Добавляем ID вручную
+                return post
+            }
             
             // Получаем последний документ для следующей страницы
             let newLastSnapshot = documents.last
@@ -424,10 +432,11 @@ class PostService: PostServiceProtocol {
             }
     }
 
-    // Переделываем на completion handlers вместо async/await
-    func addComment(_ text: String, for postId: String, completion: @escaping (Error?) -> Void) {
+    // Обновляем сигнатуру и логику completion
+    func addComment(_ text: String, for postId: String, completion: @escaping (Result<Comment, Error>) -> Void) {
         guard let currentUserID = authService.currentUserID else {
-            completion(NSError(domain: "PostService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])) 
+            // Оборачиваем ошибку в .failure
+            completion(.failure(NSError(domain: "PostService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))) 
             return
         }
         
@@ -437,7 +446,8 @@ class PostService: PostServiceProtocol {
         // 1. Получаем данные текущего пользователя для денормализации
         userProfileService.fetchUserProfile(userID: currentUserID) { [weak self] result in
             guard let self = self else { 
-                completion(NSError(domain: "PostService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Self is nil"])) 
+                // Оборачиваем ошибку в .failure
+                completion(.failure(NSError(domain: "PostService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Self is nil"]))) 
                 return 
             }
             
@@ -450,7 +460,8 @@ class PostService: PostServiceProtocol {
                 avatarURL = userProfile.avatarURL // Исправлено
             case .failure(let error):
                 print("PostService Error (Add Comment - Fetching User Profile): \(error.localizedDescription)")
-                completion(error) // Ошибка получения профиля
+                // Оборачиваем ошибку в .failure
+                completion(.failure(error)) // Ошибка получения профиля
                 return
             }
             
@@ -485,11 +496,12 @@ class PostService: PostServiceProtocol {
                 return nil // Успех транзакции
             }) { (object, error) in
                 if let error = error {
-                    print("PostService Error (Add Comment Transaction): \(error.localizedDescription)")
+                    print("❌ PostService Error (Add Comment Transaction): \(error.localizedDescription)")
+                    completion(.failure(error)) // Возвращаем ошибку
                 } else {
-                    print("PostService: Комментарий успешно добавлен к посту \(postId)")
+                    print("✅ PostService: Комментарий успешно добавлен к посту \(postId)")
+                    completion(.success(newComment)) // Возвращаем успешный результат с комментарием
                 }
-                completion(error) // Вызываем completion в любом случае
             }
         }
     }

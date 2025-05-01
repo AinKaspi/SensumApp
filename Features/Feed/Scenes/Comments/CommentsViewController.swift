@@ -76,6 +76,14 @@ final class CommentsViewController: UIViewController {
         return indicator
     }()
     
+    // Добавляем Refresh Control
+    private lazy var refreshControl: UIRefreshControl = {
+        let control = UIRefreshControl()
+        control.tintColor = .lightGray // Цвет индикатора
+        control.addTarget(self, action: #selector(handleRefreshControl), for: .valueChanged)
+        return control
+    }()
+    
     // MARK: - Lifecycle
     
     // Возвращаем корректный init
@@ -113,6 +121,8 @@ final class CommentsViewController: UIViewController {
         
         view.addSubview(tableView)
         view.addSubview(inputContainerView)
+        // Добавляем refresh control к таблице
+        tableView.refreshControl = refreshControl
         inputContainerView.addSubview(commentTextView)
         inputContainerView.addSubview(sendButton)
         
@@ -166,6 +176,10 @@ final class CommentsViewController: UIViewController {
                 if isLoading {
                     self?.activityIndicator.startAnimating()
                 } else {
+                    // Останавливаем refresh control, если он был активен
+                    if self?.refreshControl.isRefreshing ?? false {
+                        self?.refreshControl.endRefreshing()
+                    }
                     self?.activityIndicator.stopAnimating()
                 }
             }
@@ -187,6 +201,11 @@ final class CommentsViewController: UIViewController {
                 self?.commentTextView.isEditable = !isSending
             }
             .store(in: &cancellables)
+    }
+    
+    // Обработчик для Refresh Control
+    @objc private func handleRefreshControl() {
+        viewModel.fetchComments()
     }
     
     private func setupKeyboardHandling() {

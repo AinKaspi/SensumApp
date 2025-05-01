@@ -1,70 +1,103 @@
-# SensumApp Roadmap (v2.0)
-
-## Phase 1: MVP Core Features
-
-### Theme: User Profile & Feed Grid ([P1.PROF])
-*   `[X]` [P1.PROF.1] Create `UserProfileFeedViewController` (Basic Structure, UI).
-    *   _Что:_ Создать основной экран профиля пользователя с местом для аватара, имени, статистики и сетки постов.
-    *   _Зачем:_ Это главный экран, где пользователь видит свою (или чужую) информацию и свои публикации.
-*   `[X]` [P1.PROF.2] Implement `UserProfileFeedViewModel` (Data Loading: Profile, Posts).
-    *   _Что:_ Написать логику для загрузки данных пользователя (имя, аватар, статистика) и списка его постов с сервера (Firebase).
-    *   _Зачем:_ Чтобы экран профиля мог отображать актуальную информацию.
-*   `[X]` [P1.PROF.3] Connect Profile VC & VM (Display User Info, Post Grid).
-    *   _Что:_ Связать экран профиля с его логикой, чтобы загруженные данные отображались (имя, аватар, счетчики) и чтобы миниатюры постов появлялись в сетке.
-    *   _Зачем:_ Чтобы пользователь видел свой профиль и свои посты.
-*   `[X]` [P1.PROF.4] Implement Post Grid Cell (`PostGridCell`).
-    *   _Что:_ Создать ячейку для отображения миниатюры поста в сетке на экране профиля.
-    *   _Зачем:_ Чтобы сетка постов на экране профиля могла показывать картинки.
-*   `[X]` [P1.PROF.5] Implement Basic Navigation (from Grid to Post Scroll).
-    *   _Что:_ Сделать так, чтобы при нажатии на миниатюру поста в сетке открывался экран с этим постом на весь экран (`UserPostScrollViewController`).
-    *   _Зачем:_ Чтобы пользователь мог посмотреть пост целиком.
-*   `[X]` [P1.PROF.6] Implement Pull-to-Refresh for Profile/Posts.
-    *   _Что:_ Добавить возможность потянуть экран профиля вниз, чтобы обновить информацию (данные профиля и посты).
-    *   _Зачем:_ Чтобы пользователь мог легко обновить данные, не перезаходя в приложение.
-*   `[X]` [P1.PROF.7] Implement Infinite Scrolling (Pagination) for Post Grid.
-    *   _Что:_ Сделать так, чтобы при прокрутке сетки постов вниз подгружались более старые посты, если они есть.
-    *   _Зачем:_ Чтобы пользователь мог просмотреть всю историю своих постов, а не только последние несколько.
-
-### Theme: Post Creation Flow ([P1.NCP] - New Create Post)
-*   `[X]` [P1.NCP.1] Implement Media Picker (`PHPickerViewController`).
-    *   _Что:_ Реализовать выбор фото (и видео в будущем) из галереи телефона для создания поста.
-    *   _Зачем:_ Чтобы пользователь мог выбрать контент для публикации.
-*   `[X]` [P1.NCP.2] Create `PostMediaSelectionViewController` (Select Aspect Ratio).
-    *   _Что:_ Создать экран, где пользователь может выбрать формат (соотношение сторон, например, квадрат 1:1 или вертикальный 9:16) для своего поста.
-    *   _Зачем:_ Чтобы посты выглядели единообразно в ленте и соответствовали задумке пользователя.
-*   `[~]` [P1.NCP.3] Create `PostCropViewController` & `ImageCropView` (Crop selected media).
-    *   _Что:_ Создать экран и компонент (`ImageCropView`), где пользователь может кадрировать (вырезать нужную часть) выбранное фото под выбранный формат. `ImageCropView` готов, VC частично.
-    *   _Зачем:_ Чтобы пользователь мог точно настроить, как будет выглядеть его фото в посте.
-*   `[X]` [P1.NCP.4] Create `PostReviewViewController` (Add caption, tags, final check).
-    *   _Что:_ Создать экран, где пользователь может добавить описание (текст) к посту, отметить других пользователей или добавить хэштеги перед публикацией.
-    *   _Зачем:_ Чтобы пользователь мог добавить контекст к своему посту и завершить его создание.
-*   `[X]` [P1.NCP.5] Implement `CreatePostViewModel` (Handle cropping, uploading, Firestore save).
-    *   _Что:_ Написать логику, которая обрабатывает кадрирование, загружает фото/видео в хранилище (Firebase Storage) и сохраняет информацию о посте (описание, ссылка на медиа, автор и т.д.) в базу данных (Firestore).
-    *   _Зачем:_ Чтобы пост фактически опубликовался и сохранился на сервере.
-*   `[X]` [P1.NCP.6] Implement Navigation Flow (Media Picker -> Select Aspect -> Crop -> Review -> Publish).
-    *   _Что:_ Настроить переходы между экранами выбора медиа, выбора формата, кадрирования и добавления описания, а также возврат в профиль после публикации.
-    *   _Зачем:_ Чтобы процесс создания поста был логичным и последовательным для пользователя.
-
-### Theme: Post Scrolling Feed ([P1.FEEDSCROLL])
-*   `[ ]` [P1.FEEDSCROLL.1] Fix dynamic cell height in post scroll view (`FullPostCell` + `UserPostScrollViewController`).
-    *   _Что:_ Исправить отображение постов на экране прокрутки (`UserPostScrollViewController`). Сейчас они могут обрезаться или иметь лишнее пустое место, так как высота поста (картинка + текст) рассчитывается неправильно.
-    *   _Зачем:_ Чтобы каждый пост в ленте занимал ровно столько места, сколько нужно, и лента выглядела аккуратно.
-*   `[ ]` [P1.FEEDSCROLL.2] Improve/verify pagination in post scroll view.
-    *   _Что:_ Улучшить подгрузку старых постов при прокрутке ленты вниз. Нужно убедиться, что посты загружаются достаточно быстро и заранее, чтобы пользователь не упирался в конец ленты и не ждал долго.
-    *   _Зачем:_ Чтобы просмотр длинной ленты постов был плавным и без задержек.
-*   `[ ]` [P1.FEEDSCROLL.3] Add animation for caption expand/collapse in post scroll view.
-    *   _Что:_ Добавить плавную анимацию при разворачивании/сворачивании описания под постом в ленте.
-    *   _Зачем:_ Чтобы изменение высоты поста при показе/скрытии текста выглядело красиво, а не происходило резко.
-*   `[ ]` [P1.FEEDSCROLL.4] Implement user-facing error display in post scroll view.
-    *   _Что:_ Показывать пользователю понятное сообщение об ошибке, если не удалось загрузить посты в ленте (например, из-за проблем с интернетом).
-    *   _Зачем:_ Чтобы пользователь понимал, что произошло, если посты не загружаются, а не просто видел пустой экран.
-*   `[ ]` [P1.FEEDSCROLL.5] Review `UserPostScrollViewModel` logic.
-    *   _Что:_ Проверить код (`UserPostScrollViewModel`), отвечающий за загрузку и управление данными для ленты постов.
-    *   _Зачем:_ Чтобы убедиться, что загрузка постов, включая подгрузку старых (пагинацию), работает правильно и эффективно.
-
 ---
 *Легенда:*
 *   `[ ]` - To Do
 *   `[~]` - In Progress
 *   `[X]` - Done
 *   `(Px.THEME.y)` - Phase.Theme.TaskID
+
+## Фаза 1: MVP
+
+### Theme: Core & Foundation
+*   `[X]` (P1.CORE.1) Настроить базовую структуру проекта (папки, основные зависимости CocoaPods).
+*   `[X]` (P1.CORE.2) Определить основные модели данных (User, Post, MediaItem) + Firestore Codable.
+*   `[X]` (P1.CORE.3) Реализовать базовый AuthService (Firebase Auth).
+*   `[X]` (P1.CORE.4) Реализовать базовый UserProfileService (CRUD для User).
+*   `[X]` (P1.CORE.5) Реализовать базовый PostService (CRUD для Post/MediaItem).
+*   `[X]` (P1.CORE.6) Реализовать базовый FollowService.
+*   `[X]` (P1.CORE.7) Реализовать ProgressService (CRUD для ProgressData).
+*   `[X]` (P1.CORE.8) Настроить базовые координаторы (App, TabBar, Auth, Main).
+
+### Theme: Authentication
+*   `[X]` (P1.AUTH.1) Экран входа (LoginViewController + ViewModel).
+*   `[X]` (P1.AUTH.2) Экран регистрации (RegisterViewController + ViewModel).
+*   `[X]` (P1.AUTH.3) Логика перехода между Auth и Main.
+
+### Theme: Profile (Current User)
+*   `[X]` (P1.PROFILE.1) Экран профиля (UserProfileFeedViewController + ViewModel).
+*   `[X]` (P1.PROFILE.2) Отображение данных пользователя (аватар, имя, статистика).
+*   `[X]` (P1.PROFILE.3) Отображение сетки постов пользователя (UserProfileGridCell).
+*   `[X]` (P1.PROFILE.4) Отображение Радар-диаграммы аттрибутов (Stats Tab - DGCharts).
+*   `[X]` (P1.PROFILE.5) Кнопка "Edit Profile" и переход к экрану редактирования.
+*   `[X]` (P1.PROFILE.6) Кнопка "Settings" и переход к экрану настроек (пока заглушка).
+*   `[X]` (P1.PROFILE.7) Реализовать выход из аккаунта (Logout).
+*   `[X]` (P1.PROFILE.8) Загрузка постов пользователя с пагинацией (Firestore).
+*   `[X]` (P1.PROFILE.9) Обновление профиля при Pull-to-refresh.
+
+### Theme: Profile Editing
+*   `[X]` (P1.EDITPRF.1) Экран редактирования профиля (EditProfileViewController + ViewModel).
+*   `[X]` (P1.EDITPRF.2) Возможность изменить имя, username, bio.
+*   `[X]` (P1.EDITPRF.3) Возможность изменить аватар (выбор из галереи, загрузка в Storage).
+
+### Theme: New Post Creation
+*   `[X]` (P1.NEWPOST.1) Логика выбора фото/видео из галереи (Image Picker).
+*   `[X]` (P1.NEWPOST.2) Экран кадрирования (`PostCropViewController` + `ImageCropView` + ViewModel). 
+*   `[X]` (P1.NEWPOST.3) Реализация кадрирования с разными соотношениями сторон (9:16, 1:1, 1.91:1).
+*   `[X]` (P1.NEWPOST.4) Экран добавления описания и публикации (`PostReviewViewController` + ViewModel).
+*   `[X]` (P1.NEWPOST.5) Логика публикации поста (загрузка медиа в Storage, сохранение Post в Firestore).
+*   `[X]` (P1.NEWPOST.6) Обработка нескольких изображений/видео в одном посте (карусель на экране кадрирования/ревью).
+*   `[X]` (P1.NEWPOST.7) Навигация после успешной публикации (возврат к профилю/ленте).
+
+### Theme: Feed (Post Scroll View)
+*   `[X]` (P1.FEEDSCROLL.1) Исправить расчет высоты ячейки `FullPostCell` для разных соотношений сторон.
+*   `[X]` (P1.FEEDSCROLL.2) Реализовать пагинацию при прокрутке ленты постов (`UserPostScrollViewModel`).
+*   `[X]` (P1.FEEDSCROLL.3) Анимация при сворачивании/разворачивании описания поста (`captionLabel`).
+*   `[X]` (P1.FEEDSCROLL.4) Отображение ошибок загрузки/пагинации пользователю (`UserPostScrollViewController`).
+*   `[X]` (P1.FEEDSCROLL.5) Проверить и доработать `UserPostScrollViewModel` (логика лайков, обработка ошибок).
+*   `[X]` (P1.FEEDSCROLL.6) Реализовать поддержку нескольких изображений в посте (`mediaCollectionView` в `FullPostCell`).
+*   `[X]` (P1.FEEDSCROLL.7) Добавить `UIPageControl` для постов с несколькими изображениями.
+*   `[X]` (P1.FEEDSCROLL.8) Реализовать предзагрузку изображений для `mediaCollectionView` (`Kingfisher.ImagePrefetcher`).
+*   `[X]` (P1.FEEDSCROLL.9) Улучшить UI/UX `FullPostCell` (расположение кнопок, лайков, комментов).
+
+### Theme: Comments (MVP)
+*   `[X]` (P1.COMMENT.1) Исправить установку делегата `UserPostScrollViewControllerDelegate` для открытия экрана комментариев.
+*   `[ ]` (P1.COMMENT.2) Реализовать pull-to-refresh в `CommentsViewController`.
+*   `[X]` (P1.COMMENT.3) Оптимизировать добавление комментария (возвращать добавленный `Comment`, не перезагружать все).
+
+## Фаза 2: Улучшения и Новые Фичи
+
+### Theme: Feed (Main)
+*   `[ ]` (P2.FEEDMAIN.1) Реализовать основной экран ленты (`FeedViewController` + `FeedViewModel`).
+*   `[ ]` (P2.FEEDMAIN.2) Загрузка постов от подписок пользователя (агрегация на клиенте или Cloud Functions?).
+*   `[ ]` (P2.FEEDMAIN.3) Pull-to-refresh для основной ленты.
+*   `[ ]` (P2.FEEDMAIN.4) Пагинация для основной ленты.
+
+### Theme: Profile (Other User)
+*   `[ ]` (P2.PROFILEOTH.1) Возможность открыть профиль другого пользователя (из ленты, из комментариев).
+*   `[ ]` (P2.PROFILEOTH.2) Отображение кнопки "Follow"/"Unfollow" и логика подписки/отписки.
+
+### Theme: Search/Explore
+*   `[ ]` (P2.SEARCH.1) Экран поиска пользователей (`SearchViewController` + `SearchViewModel`).
+*   `[ ]` (P2.SEARCH.2) Логика поиска пользователей в Firebase.
+*   `[ ]` (P2.SEARCH.3) Отображение результатов поиска.
+*   `[ ]` (P2.SEARCH.4) (Опционально) Вкладка "Explore" с рекомендуемыми постами/пользователями.
+
+### Theme: Comments (Improvements)
+*   `[ ]` (P2.COMMENT.1) Внедрить real-time обновления для комментариев (Firestore `addSnapshotListener`).
+*   `[ ]` (P2.COMMENT.2) Реализовать лайки для комментариев (UI, Service, ViewModel).
+
+## Фаза 3: Fitness & RPG
+
+### Theme: Pose Estimation
+*   `[ ]` (P3.POSE.1) Интегрировать MediaPipe (`pose_landmarker_full.task`, Float16, 256x256).
+*   `[ ]` (P3.POSE.2) Экран записи упражнения с отображением камеры и оверлея скелета.
+*   `[ ]` (P3.POSE.3) Базовый анализатор для одного-двух упражнений (например, приседания, отжимания).
+*   `[ ]` (P3.POSE.4) Подсчет повторений и оценка качества выполнения.
+
+### Theme: Progress Tracking
+*   `[ ]` (P3.PROG.1) Сохранение результатов тренировок (упражнение, повторения, дата, оценка).
+*   `[ ]` (P3.PROG.2) Отображение истории тренировок пользователя.
+*   `[ ]` (P3.PROG.3) Расчет XP и обновление уровня/ранга пользователя на основе тренировок.
+*   `[ ]` (P3.PROG.4) Расчет и обновление аттрибутов (STR, CON и т.д.) на основе выполненных упражнений.
+
+### Theme: Comments (Advanced)
+*   `[ ]` (P3.COMMENT.1) Реализовать ответы на комментарии (вложенность) (UI, Data Model, Service, ViewModel).

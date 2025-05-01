@@ -69,18 +69,21 @@ class CommentsViewModel {
         isSending = true
         errorMessage = nil
 
-        postService.addComment(text, for: postId) { [weak self] error in
-             DispatchQueue.main.async {
+        // Обновляем обработку completion
+        postService.addComment(text, for: postId) { [weak self] result in
+            DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.isSending = false
-                if let error = error {
+
+                switch result {
+                case .success(let newComment):
+                    // Добавляем новый комментарий в конец массива
+                    self.comments.append(newComment)
+                    print("✅ CommentsViewModel: Comment added locally. ID: \(newComment.id ?? "nil")")
+                    // TODO: Прокрутить таблицу к новому комментарию?
+                case .failure(let error):
                     self.errorMessage = "Ошибка отправки комментария: \(error.localizedDescription)"
-                    print("CommentsViewModel Error adding comment: \(error.localizedDescription)")
-                } else {
-                    print("CommentsViewModel: Comment added successfully. Re-fetching comments...")
-                    // Перезагружаем комментарии, чтобы увидеть добавленный
-                    // В идеале, addComment мог бы возвращать созданный коммент, чтобы не перезагружать все
-                    self.fetchComments()
+                    print("❌ CommentsViewModel Error adding comment: \(error.localizedDescription)")
                 }
             }
         }
