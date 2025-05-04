@@ -24,15 +24,13 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .horizontal
         // Размер теперь будет задаваться через UICollectionViewDelegateFlowLayout
-        // layout.itemSize = CGSize(width: view.bounds.width * 0.8, height: view.bounds.height * 0.5) 
-        // ✅ Добавляем отступы между ячейками (горизонтальный и вертикальный)
         layout.minimumInteritemSpacing = 10 // Отступ между элементами в ОДНОЙ строке
         layout.minimumLineSpacing = 10      // Отступ между СТРОКАМИ (здесь не так важно, но для полноты)
         // Добавляем отступы по краям, чтобы первая/последняя ячейка не прилипала
         layout.sectionInset = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
-        collectionView.isPagingEnabled = true
+        collectionView.isPagingEnabled = false // ❗️ Отключаем пейджинг для консистентности
         collectionView.showsHorizontalScrollIndicator = false
         collectionView.backgroundColor = .black
         // TODO: Зарегистрировать ячейку (ту же PreviewCell?)
@@ -393,23 +391,40 @@ extension PostReviewViewController: UICollectionViewDataSource {
 // MARK: - UICollectionViewDelegateFlowLayout
 extension PostReviewViewController {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        // Увеличиваем высоту превью еще раз
-        let previewHeight: CGFloat = 350 // Было 160
+        // Получаем доступную ширину и высоту внутри collection view, учитывая отступы
+        guard let layout = collectionViewLayout as? UICollectionViewFlowLayout else {
+            // Возвращаем размер по умолчанию или нулевой, если layout некорректен
+            return CGSize(width: 50, height: 50) 
+        }
+        let availableWidth = collectionView.bounds.width - layout.sectionInset.left - layout.sectionInset.right
+        let availableHeight = collectionView.bounds.height - layout.sectionInset.top - layout.sectionInset.bottom // Должно быть 270
+
+        // Получаем соотношение W/H для текущего поста
+        let aspectRatioWH = viewModel.postAspectRatio.ratio // Ширина / Высота
+
+        // Рассчитываем высоту, исходя из доступной ширины
+        // Height = Width / (Width / Height)
+        let calculatedHeight = availableWidth / aspectRatioWH
         
-        // Получаем соотношение сторон поста из ViewModel (Height / Width)
-        let aspectRatio = viewModel.postAspectRatio.ratio
-        
-        // Рассчитываем ширину на основе высоты и соотношения
-        // Width = Height / (Height / Width)
-        let previewWidth = previewHeight / aspectRatio
-        
-        // Уменьшаем высоту для ревью экрана
-        let finalPreviewHeight: CGFloat = 250 // Новая высота, можно подобрать
-        let finalPreviewWidth = finalPreviewHeight / aspectRatio
-        
-        print("📏 Calculating size for review preview [\(indexPath.item)]: AR=\(aspectRatio), H=\(finalPreviewHeight), W=\(finalPreviewWidth)")
-        
-        return CGSize(width: finalPreviewWidth, height: finalPreviewHeight)
+        var finalWidth: CGFloat
+        var finalHeight: CGFloat
+
+        // Проверяем, помещается ли рассчитанная высота в доступное пространство
+        if calculatedHeight <= availableHeight {
+            // Да, помещается. Используем полную доступную ширину.
+            finalWidth = availableWidth
+            finalHeight = calculatedHeight
+        } else {
+            // Нет, высота слишком большая. Ограничиваемся доступной высотой
+            // и пересчитываем ширину для сохранения пропорций.
+            // Width = Height * (Width / Height)
+            finalHeight = availableHeight
+            finalWidth = finalHeight * aspectRatioWH
+        }
+
+        print("📏 Calculating size for review preview [\(indexPath.item)]: AR=\(aspectRatioWH), Available W/H=\(availableWidth)/\(availableHeight), Final W/H=\(finalWidth)/\(finalHeight)")
+
+        return CGSize(width: finalWidth, height: finalHeight)
     }
 }
 
