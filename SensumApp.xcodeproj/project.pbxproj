@@ -81,6 +81,7 @@
 		B1AE8A4D2DB6EEF20089728F /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B1AE8A4C2DB6EEF20089728F /* GoogleSignInSwift */; };
 		B1AE8A522DB7B65B0089728F /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = B1AE8A512DB7B65B0089728F /* Kingfisher */; };
 		B1AE8A652DB8E4F90089728F /* UITextView+Combine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1AE8A622DB8E4F90089728F /* UITextView+Combine.swift */; };
+		B1C119262DC7A7CB00F04CAE /* IQKeyboardManagerSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B1C119252DC7A7CB00F04CAE /* IQKeyboardManagerSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -194,6 +195,7 @@
 				B1A483802DB6CD0000755E25 /* FirebaseMessaging in Frameworks */,
 				B1A4837C2DB6CD0000755E25 /* FirebaseInstallations in Frameworks */,
 				B1686C5D2DC247150074FA46 /* FirebaseAnalytics in Frameworks */,
+				B1C119262DC7A7CB00F04CAE /* IQKeyboardManagerSwift in Frameworks */,
 				B1686C7D2DC247160074FA46 /* FirebaseInstallations in Frameworks */,
 				B1686C7B2DC247160074FA46 /* FirebaseInAppMessaging-Beta in Frameworks */,
 				B1686C6B2DC247160074FA46 /* FirebaseCore in Frameworks */,
@@ -378,6 +380,7 @@
 				B1AE8A492DB6EEF20089728F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				B1AE8A502DB7B65B0089728F /* XCRemoteSwiftPackageReference "Kingfisher" */,
 				B1686C462DC0F7C80074FA46 /* XCRemoteSwiftPackageReference "Inject" */,
+				B1C119242DC7A7CB00F04CAE /* XCRemoteSwiftPackageReference "IQKeyboardManager" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B148666A2DA4351800C4A753 /* Products */;
@@ -708,6 +711,14 @@
 				minimumVersion = 8.3.2;
 			};
 		};
+		B1C119242DC7A7CB00F04CAE /* XCRemoteSwiftPackageReference "IQKeyboardManager" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/hackiftekhar/IQKeyboardManager.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -965,6 +976,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B1AE8A502DB7B65B0089728F /* XCRemoteSwiftPackageReference "Kingfisher" */;
 			productName = Kingfisher;
+		};
+		B1C119252DC7A7CB00F04CAE /* IQKeyboardManagerSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B1C119242DC7A7CB00F04CAE /* XCRemoteSwiftPackageReference "IQKeyboardManager" */;
+			productName = IQKeyboardManagerSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

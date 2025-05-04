@@ -19,6 +19,19 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
     weak var delegate: PostReviewViewControllerDelegate?
 
     // MARK: - UI Elements
+    
+    private lazy var scrollView: UIScrollView = {
+        let scrollView = UIScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.alwaysBounceVertical = true // Разрешаем скролл, даже если контент помещается
+        return scrollView
+    }()
+    
+    private lazy var contentView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
 
     private lazy var previewCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -72,9 +85,6 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
         return indicator
     }()
 
-    // Констрейнт для управления положением кнопки Share
-    private var shareButtonBottomConstraint: NSLayoutConstraint?
-
     // MARK: - Initialization
 
     // Принимаем массив EditableMediaItem и выбранное соотношение
@@ -116,11 +126,9 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
         setupBindings()
         setupCollectionView()
         setupTextView()
-        setupKeyboardHandling()
     }
 
     deinit {
-        NotificationCenter.default.removeObserver(self)
         print("PostReviewViewController deinit")
     }
 
@@ -144,47 +152,80 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
     }
 
     private func setupViews() {
-        view.addSubview(previewCollectionView)
-        view.addSubview(captionTextView)
-        view.addSubview(shareButton)
+        // Добавляем scrollView на главный view
+        view.addSubview(scrollView)
+        // Добавляем contentView внутрь scrollView
+        scrollView.addSubview(contentView)
+        
+        // Добавляем остальные элементы внутрь contentView
+        contentView.addSubview(previewCollectionView)
+        contentView.addSubview(captionTextView)
+        contentView.addSubview(shareButton)
+        
+        // Индикатор активности остается поверх всего и центрируется по главному view
         view.addSubview(activityIndicator)
     }
 
     private func setupConstraints() {
+        
+        // Констрейнты для ScrollView (к краям главного view)
         NSLayoutConstraint.activate([
-            // Карусель превью
-            previewCollectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
-            previewCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            previewCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            // Возвращаем фиксированную высоту, равную высоте ячейки
-            previewCollectionView.heightAnchor.constraint(equalToConstant: 250), 
-            // Убираем привязку низа к верху captionTextView
-            // previewCollectionView.bottomAnchor.constraint(equalTo: captionTextView.topAnchor, constant: -15),
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor) // Привязываем к низу safeArea
+        ])
+        
+        // Констрейнты для ContentView (к краям и размерам ScrollView)
+        NSLayoutConstraint.activate([
+            contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            // Важно: ContentView должен иметь такую же ширину, как ScrollView
+            contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor), 
+            // Высота contentView будет определяться его содержимым
+            // ❗️ Гарантируем, что contentView как минимум такой же высоты, как scrollView (с низким приоритетом)
+        ])
+        
+        // ❗️ Создаем констрейнт минимальной высоты contentView отдельно
+        let contentViewMinHeightConstraint = contentView.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.heightAnchor)
+        // Устанавливаем низкий приоритет
+        contentViewMinHeightConstraint.priority = .defaultLow
+        
+        // Констрейнты для элементов ВНУТРИ ContentView
+        NSLayoutConstraint.activate([
+            // Карусель превью (привязана к верху contentView)
+            previewCollectionView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
+            previewCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            previewCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            // Фиксированная высота для карусели превью (важно для расчета высоты contentView)
+            previewCollectionView.heightAnchor.constraint(equalToConstant: 270), // Ранее высота была ~270
 
-            // Поле для подписи
+            // Поле ввода текста (под каруселью)
             captionTextView.topAnchor.constraint(equalTo: previewCollectionView.bottomAnchor, constant: 15),
-            captionTextView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 15),
-            captionTextView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -15),
-            // Удаляем фиксированную высоту
-            // captionTextView.heightAnchor.constraint(equalToConstant: 120),
-            // Привязываем низ captionTextView к верху кнопки Share
-            captionTextView.bottomAnchor.constraint(equalTo: shareButton.topAnchor, constant: -20),
+            captionTextView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 15),
+            captionTextView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -15),
+            // Даем текстовому полю разумную начальную высоту
+            captionTextView.heightAnchor.constraint(equalToConstant: 100),
 
-            // Кнопка Share
-            shareButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 15),
-            shareButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -15),
-            // Убираем привязку низа к safeArea, будем управлять ею динамически
-            // shareButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -15),
+            // Кнопка Share (под полем ввода)
+            shareButton.topAnchor.constraint(equalTo: captionTextView.bottomAnchor, constant: 20),
+            shareButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 15),
+            shareButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -15),
             shareButton.heightAnchor.constraint(equalToConstant: 50),
+            // Важно: Привязываем низ кнопки к низу contentView, чтобы определить его высоту
+            shareButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -15),
             
-            // Индикатор активности
+            // ❗️ Активируем констрейнт минимальной высоты contentView
+            contentViewMinHeightConstraint
+        ])
+        
+        // Констрейнты для индикатора активности (остаются привязанными к главному view)
+        NSLayoutConstraint.activate([
             activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
-        
-        // Сохраняем констрейнт низа кнопки Share для дальнейшего управления
-        shareButtonBottomConstraint = shareButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -15)
-        shareButtonBottomConstraint?.isActive = true
     }
     
     private func setupCollectionView() {
@@ -198,58 +239,6 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
     private func setupTextView() {
         captionTextView.delegate = self
         addDoneButtonToTextView()
-    }
-    
-    // MARK: - Keyboard Handling
-
-    private func setupKeyboardHandling() {
-        NotificationCenter.default.addObserver(self,
-                                               selector: #selector(keyboardWillShow(notification:)),
-                                               name: UIResponder.keyboardWillShowNotification,
-                                               object: nil)
-        NotificationCenter.default.addObserver(self,
-                                               selector: #selector(keyboardWillHide(notification:)),
-                                               name: UIResponder.keyboardWillHideNotification,
-                                               object: nil)
-    }
-    
-    @objc private func keyboardWillShow(notification: NSNotification) {
-        guard let userInfo = notification.userInfo,
-              let keyboardFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
-              let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval else {
-            return
-        }
-        
-        let keyboardHeight = keyboardFrame.height
-        let safeAreaBottomInset = view.safeAreaInsets.bottom
-        
-        // Новая константа для нижнего констрейнта кнопки
-        // Поднимаем кнопку над клавиатурой, сохраняя исходный отступ 15 от верха клавиатуры
-        let newConstant = -(keyboardHeight - safeAreaBottomInset + 15)
-        
-        // Анимируем изменение констрейнта
-        view.layoutIfNeeded() // Сначала применяем текущий layout
-        shareButtonBottomConstraint?.constant = newConstant
-        UIView.animate(withDuration: duration) {
-            self.view.layoutIfNeeded() // Анимируем к новому состоянию
-        }
-    }
-
-    @objc private func keyboardWillHide(notification: NSNotification) {
-        guard let userInfo = notification.userInfo,
-              let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval else {
-            return
-        }
-
-        // Возвращаем кнопку на исходную позицию (15 от нижнего края safe area)
-        let originalConstant: CGFloat = -15
-        
-        // Анимируем изменение констрейнта
-        view.layoutIfNeeded()
-        shareButtonBottomConstraint?.constant = originalConstant
-        UIView.animate(withDuration: duration) {
-            self.view.layoutIfNeeded()
-        }
     }
     
     // MARK: - Input Accessory View for TextView
@@ -444,5 +433,3 @@ extension PostReviewViewController: UITextViewDelegate {
         }
     }
 }
-
-// TODO: Добавить реализацию UICollectionViewDelegate для карусели превью (если нужна) 

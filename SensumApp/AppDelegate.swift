@@ -8,6 +8,7 @@
 import UIKit
 import FirebaseCore
 import FirebaseAppCheck
+import IQKeyboardManagerSwift // ❗️ Добавляем импорт
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -32,6 +33,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Конфигурируем Firebase ПОСЛЕ настройки App Check
         FirebaseApp.configure()
         
+        // ❗️ Включаем IQKeyboardManager (используем isEnabled для v8+)
+        IQKeyboardManager.shared.isEnabled = true
+        
         return true
     }
 
@@ -54,4 +58,3 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 
 }
-
