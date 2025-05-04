@@ -5,99 +5,125 @@ import Kingfisher // Если будем показывать URL в будущ�
 class PreviewCell: UICollectionViewCell {
     static let identifier = "PreviewCell"
 
+    // MARK: - Properties
+    private var currentImage: UIImage?
+    // ✅ Добавляем контейнер и констрейнты для управления его размером
+    private let containerView = UIView()
+    private var containerWidthConstraint: NSLayoutConstraint?
+    private var containerHeightConstraint: NSLayoutConstraint?
+
     private let imageView: UIImageView = {
-        let imageView = UIImageView()
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.contentMode = .scaleAspectFill
-        imageView.clipsToBounds = true
-        imageView.backgroundColor = .black // Фон, если изображение с прозрачностью
-        // --- УБИРАЕМ DEBUG BORDER ---
-        // imageView.layer.borderColor = UIColor.red.cgColor
-        // imageView.layer.borderWidth = 2.0
-        // --- END DEBUG BORDER ---
-        return imageView
+        let iv = UIImageView()
+        iv.contentMode = .scaleAspectFill
+        iv.clipsToBounds = true
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        return iv
     }()
-    
-    // Убираем aspectRatioOverlayView
-    /*
-    private let aspectRatioOverlayView: UIView = {
-        ...
-    }()
-    */
-    
-    // Убираем ссылки на констрейнты overlay
-    // private var overlayWidthConstraint: NSLayoutConstraint?
-    // private var overlayHeightConstraint: NSLayoutConstraint?
-    // private var overlayAspectRatioConstraint: NSLayoutConstraint?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        contentView.backgroundColor = .black
-        contentView.addSubview(imageView)
-        // Убираем добавление aspectRatioOverlayView
-        // contentView.addSubview(aspectRatioOverlayView)
-        setupConstraints()
-        
-        // --- DEBUG BACKGROUND ---
-        contentView.backgroundColor = .purple // Устанавливаем фон для contentView
-        // --- END DEBUG BACKGROUND ---
+        // ✅ Устанавливаем фон contentView прозрачным
+        contentView.backgroundColor = .clear
+        setupUI()
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    private func setupConstraints() {
+    private func setupUI() {
+        contentView.clipsToBounds = true // Убедимся, что contentView обрезает containerView
+        // ❌ Убираем скругление с основного слоя ячейки
+        // layer.cornerRadius = 10
+        // layer.masksToBounds = true
+        
+        containerView.translatesAutoresizingMaskIntoConstraints = false
+        containerView.clipsToBounds = true // Обрезка по границам контейнера важна
+        // ✅ Применяем скругление к containerView
+        containerView.layer.cornerRadius = 10
+        containerView.layer.masksToBounds = true // Можно и clipsToBounds, но masksToBounds тут тоже подходит
+        
+        contentView.addSubview(containerView)
+        
+        containerView.addSubview(imageView)
+
+        // ✅ Инициализируем констрейнты размера контейнера (сначала 0)
+        containerWidthConstraint = containerView.widthAnchor.constraint(equalToConstant: 0)
+        containerHeightConstraint = containerView.heightAnchor.constraint(equalToConstant: 0)
+        // Устанавливаем приоритет ниже required, чтобы избежать конфликтов при инициализации
+        containerWidthConstraint?.priority = .defaultHigh
+        containerHeightConstraint?.priority = .defaultHigh
+
         NSLayoutConstraint.activate([
-            // ImageView занимает всю ячейку
-            imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            // Центрируем containerView в contentView
+            containerView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            containerView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            // Убедимся, что containerView не вылезает за границы contentView
+            containerView.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor),
+            containerView.heightAnchor.constraint(lessThanOrEqualTo: contentView.heightAnchor),
             
-            // Убираем констрейнты для aspectRatioOverlayView
-            /*
-            aspectRatioOverlayView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            aspectRatioOverlayView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            */
+            // Активируем констрейнты размера
+            containerWidthConstraint!,
+            containerHeightConstraint!,
+            
+            // imageView заполняет containerView
+            imageView.topAnchor.constraint(equalTo: containerView.topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            imageView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
         ])
-        
-        // Убираем создание констрейнтов для overlay
-        /*
-        overlayWidthConstraint = aspectRatioOverlayView.widthAnchor.constraint(equalToConstant: 0)
-        ...
-        */
     }
-    
-    // Упрощаем configure, убираем настройку overlay
-    func configure(with image: UIImage?) { // Убираем targetAspectRatio
+
+    // ✅ Возвращаем configure с aspectRatio
+    func configure(with image: UIImage, aspectRatio: PostAspectRatio) {
         imageView.image = image
+        currentImage = image
         
-        // Убираем всю логику настройки overlay
-        /*
-        if let targetAR = targetAspectRatio {
-            ...
-        } else {
-            ...
+        // Рассчитываем целевой размер для containerView
+        let targetRatio = aspectRatio.ratio // Ширина / Высота
+        let availableSize = contentView.bounds.size
+        
+        guard availableSize.width > 0, availableSize.height > 0 else {
+            // Если размер contentView еще не определен, откладываем расчет
+            // Можно установить дефолтные значения или 0
+            containerWidthConstraint?.constant = 0
+            containerHeightConstraint?.constant = 0
+            print("⚠️ PreviewCell Configure: contentView bounds zero, cannot calculate size yet.")
+            return
         }
-        */
+
+        var targetWidth: CGFloat
+        var targetHeight: CGFloat
+
+        // Рассчитываем максимальный размер, вписывающийся в availableSize с нужным aspectRatio
+        if availableSize.width / availableSize.height >= targetRatio { 
+            // Ограничено высотой availableSize
+            targetHeight = availableSize.height
+            targetWidth = targetHeight * targetRatio
+        } else { 
+            // Ограничено шириной availableSize
+            targetWidth = availableSize.width
+            targetHeight = targetWidth / targetRatio
+        }
+        
+        // 🐞 DEBUG: Логируем расчетные размеры контейнера
+        print("🐞 PreviewCell Configure: AR=\(aspectRatio.stringValue), Available=\(availableSize), Target W=\(targetWidth), H=\(targetHeight)")
+
+        // Обновляем константы констрейнтов
+        containerWidthConstraint?.constant = targetWidth
+        containerHeightConstraint?.constant = targetHeight
+        
+        // Принудительное обновление layout не нужно здесь, 
+        // т.к. изменение констант само вызовет перерасчет при следующем цикле runloop.
+        // contentView.layoutIfNeeded() 
     }
 
     override func prepareForReuse() {
         super.prepareForReuse()
         imageView.image = nil
-        // --- DEBUG BORDER --- 
-        // Убираем рамку при реюзе, configure установит снова если надо
-        // imageView.layer.borderWidth = 0 
-        // --- END DEBUG BORDER ---
-        // --- DEBUG BACKGROUND ---
-        // contentView.backgroundColor = .black // Возвращаем фон при реюзе
-        // --- END DEBUG BACKGROUND ---
-        
-        // Убираем деактивацию констрейнтов overlay
-        /*
-        overlayWidthConstraint?.isActive = false
-        ...
-        */
+        currentImage = nil
+        // Сбрасываем размер контейнера, чтобы избежать артефактов
+        containerWidthConstraint?.constant = 0
+        containerHeightConstraint?.constant = 0
     }
-} 
+}

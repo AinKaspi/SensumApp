@@ -25,7 +25,9 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
         layout.scrollDirection = .horizontal
         // Размер теперь будет задаваться через UICollectionViewDelegateFlowLayout
         // layout.itemSize = CGSize(width: view.bounds.width * 0.8, height: view.bounds.height * 0.5) 
-        layout.minimumLineSpacing = 0
+        // ✅ Добавляем отступы между ячейками (горизонтальный и вертикальный)
+        layout.minimumInteritemSpacing = 10 // Отступ между элементами в ОДНОЙ строке
+        layout.minimumLineSpacing = 10      // Отступ между СТРОКАМИ (здесь не так важно, но для полноты)
         // Добавляем отступы по краям, чтобы первая/последняя ячейка не прилипала
         layout.sectionInset = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
@@ -372,8 +374,18 @@ extension PostReviewViewController: UICollectionViewDataSource {
             print("🖼️ Review Cell [\(indexPath.item)]: Failed to generate image.")
         }
         
-        // Отображаем финальное превью без рамки соотношения
-        cell.configure(with: previewImage)
+        // ✅ Безопасно разворачиваем опциональное изображение
+        guard let imageToConfigure = previewImage else {
+            // Если изображение не сгенерировалось, конфигурируем с пустым или плейсхолдером
+            // и передаем текущее соотношение сторон
+            // Важно: передать соотношение сторон, чтобы размер ячейки был правильным
+            print("ERROR: Failed to generate preview image for cell at \(indexPath.item). Configuring with empty.")
+            cell.configure(with: UIImage(), aspectRatio: viewModel.postAspectRatio)
+            return cell // Возвращаем ячейку с плейсхолдером
+        }
+        
+        // ✅ Передаем развернутое изображение и соотношение сторон из ViewModel
+        cell.configure(with: imageToConfigure, aspectRatio: viewModel.postAspectRatio)
         return cell
     }
 }

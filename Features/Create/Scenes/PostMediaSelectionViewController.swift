@@ -25,15 +25,14 @@ class PostMediaSelectionViewController: UIViewController {
     private lazy var previewCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .horizontal
-        // Размер делаем адаптирующимся к высоте экрана
-        let availableHeight = view.bounds.height * 0.6 // 60% высоты view
-        layout.itemSize = CGSize(width: view.bounds.width * 0.8, height: availableHeight) 
-        layout.minimumLineSpacing = 0
+        // ✅ Добавляем небольшой отступ между ячейками
+        layout.minimumLineSpacing = 10 // Подберите значение
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
-        collectionView.isPagingEnabled = true
+        collectionView.isPagingEnabled = true // Оставим пейджинг, но с отступом
         collectionView.showsHorizontalScrollIndicator = false
-        collectionView.backgroundColor = .black
+        collectionView.backgroundColor = .black // Возвращаем черный фон
+        collectionView.register(PreviewCell.self, forCellWithReuseIdentifier: PreviewCell.identifier)
         return collectionView
     }()
 
@@ -109,11 +108,12 @@ class PostMediaSelectionViewController: UIViewController {
         // Констрейнты для UI элементов
         NSLayoutConstraint.activate([
             previewCollectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            previewCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            previewCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            // Используем те же 60% высоты, что и при расчете itemSize
-            previewCollectionView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.6),
-
+            // ✅ Добавляем боковые отступы
+            previewCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
+            previewCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
+            // ✅ Уменьшаем высоту CollectionView (подберите значение, начнем с 0.5)
+            previewCollectionView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.5),
+            // ✅ Восстанавливаем привязку верха SegmentedControl к низу CollectionView
             aspectRatioSegmentedControl.topAnchor.constraint(equalTo: previewCollectionView.bottomAnchor, constant: 20),
             aspectRatioSegmentedControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             aspectRatioSegmentedControl.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
@@ -122,7 +122,6 @@ class PostMediaSelectionViewController: UIViewController {
     }
     
     private func setupCollectionView() {
-        previewCollectionView.register(PreviewCell.self, forCellWithReuseIdentifier: PreviewCell.identifier)
         previewCollectionView.dataSource = self
         previewCollectionView.delegate = self
     }
@@ -141,9 +140,16 @@ class PostMediaSelectionViewController: UIViewController {
     @objc private func aspectRatioChanged(_ sender: UISegmentedControl) {
         let newIndex = sender.selectedSegmentIndex
         guard newIndex >= 0 && newIndex < PostAspectRatio.allCases.count else { return }
-        selectedAspectRatio = PostAspectRatio.allCases[newIndex]
-        print("🕹️ Aspect Ratio Changed: Index=\(newIndex), New AR=\(selectedAspectRatio.stringValue) (\(selectedAspectRatio.ratio))")
-        previewCollectionView.reloadData() // Перезагружаем для обновления рамок
+        let newAspectRatio = PostAspectRatio.allCases[newIndex]
+        
+        // Сохраняем выбранное значение
+        selectedAspectRatio = newAspectRatio
+        
+        // 🐞 DEBUG: Логируем изменение
+        print("🕹️ Aspect Ratio Selection Changed: Index=\(newIndex), New AR=\(newAspectRatio.stringValue) (\(newAspectRatio.ratio))")
+        
+        // ✅ Перезагружаем данные, чтобы ячейки обновились с новым aspectRatio
+        previewCollectionView.reloadData()
     }
     
     // MARK: - Public Methods
@@ -173,9 +179,12 @@ extension PostMediaSelectionViewController: UICollectionViewDataSource {
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PreviewCell.identifier, for: indexPath) as? PreviewCell else {
             fatalError("Unable to dequeue PreviewCell")
         }
-        let item = editableMedia[indexPath.item]
-        // Убираем targetAspectRatio из вызова configure
-        cell.configure(with: item.originalImage)
+        
+        let mediaItem = editableMedia[indexPath.item]
+        // ✅ Исправляем: Используем только originalImage
+        // ✅ Передаем текущий selectedAspectRatio
+        cell.configure(with: mediaItem.originalImage, aspectRatio: selectedAspectRatio)
+        
         return cell
     }
 }
@@ -200,5 +209,18 @@ extension PostMediaSelectionViewController: UICollectionViewDelegate {
     }
 }
 
-// TODO: Добавить реализацию UICollectionViewDelegateFlowLayout если нужен кастомный размер/отступы
-// extension PostMediaSelectionViewController: UICollectionViewDelegateFlowLayout {}
+// MARK: - UICollectionViewDelegateFlowLayout
+extension PostMediaSelectionViewController: UICollectionViewDelegateFlowLayout {
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        // ✅ Размер ЯЧЕЙКИ остается НЕИЗМЕННЫМ (альбомным)
+        // Визуальное изменение формата происходит ВНУТРИ ячейки за счет containerView
+        let cellHeight = collectionView.bounds.height 
+        let cellWidth = collectionView.bounds.width * 0.9 
+        
+        // 🐞 DEBUG: Логируем размер ячейки
+        print("🐞 sizeForItemAt: Returning size \(cellWidth)x\(cellHeight)")
+        
+        return CGSize(width: cellWidth, height: cellHeight)
+    }
+}
