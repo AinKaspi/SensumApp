@@ -5,10 +5,12 @@ protocol PostMediaSelectionDelegate: AnyObject {
     func postMediaSelectionDidTapNext(items: [EditableMediaItem], aspectRatio: PostAspectRatio)
     func postMediaSelectionDidTapItem(at index: Int, currentItems: [EditableMediaItem], aspectRatio: PostAspectRatio)
     func postMediaSelectionDidCancel()
+    // ✅ Добавляем метод для уведомления о завершении кропа (чтобы координатор закрыл экран)
+    func postMediaSelectionDidFinishCropping()
 }
 
 /// Экран для выбора единого соотношения сторон поста и предпросмотра/выбора медиа для кропа.
-class PostMediaSelectionViewController: UIViewController {
+class PostMediaSelectionViewController: UIViewController, UIScrollViewDelegate, CropDelegate {
 
     // Добавляем ViewModel (пока опционально)
     // private var viewModel: PostMediaSelectionViewModel?
@@ -181,9 +183,10 @@ extension PostMediaSelectionViewController: UICollectionViewDataSource {
         }
         
         let mediaItem = editableMedia[indexPath.item]
-        // ✅ Исправляем: Используем только originalImage
-        // ✅ Передаем текущий selectedAspectRatio
-        cell.configure(with: mediaItem.originalImage, aspectRatio: selectedAspectRatio)
+        // ✅ Приоритет отдаем finalImage (результат кропа), если он есть
+        let imageToDisplay = mediaItem.finalImage ?? mediaItem.originalImage
+        
+        cell.configure(with: imageToDisplay, aspectRatio: selectedAspectRatio)
         
         return cell
     }
@@ -222,5 +225,28 @@ extension PostMediaSelectionViewController: UICollectionViewDelegateFlowLayout {
         print("🐞 sizeForItemAt: Returning size \(cellWidth)x\(cellHeight)")
         
         return CGSize(width: cellWidth, height: cellHeight)
+    }
+}
+
+// MARK: - CropDelegate Implementation
+extension PostMediaSelectionViewController {
+    func cropViewControllerDidFinishCropping(item: EditableMediaItem) {
+        // 1. Находим индекс обновленного элемента в нашем массиве
+        guard let index = editableMedia.firstIndex(where: { $0.id == item.id }) else {
+            print("⚠️ CropDelegate Error: Could not find item with id \(item.id) to update.")
+            return
+        }
+        
+        // 2. Обновляем элемент в массиве
+        editableMedia[index] = item
+        
+        // 3. Перезагружаем ТОЛЬКО измененную ячейку
+        let indexPath = IndexPath(item: index, section: 0)
+        previewCollectionView.reloadItems(at: [indexPath])
+        
+        print("✅ CropDelegate: Updated item at index \(index) and reloaded cell.")
+        
+        // ✅ Уведомляем делегата о завершении кропа
+        delegate?.postMediaSelectionDidFinishCropping()
     }
 }

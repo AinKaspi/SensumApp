@@ -10,7 +10,8 @@ protocol PostCropViewControllerDelegate: AnyObject {
 class PostCropViewController: UIViewController {
 
     weak var delegate: PostCropViewControllerDelegate?
-    
+    weak var cropDelegate: CropDelegate?
+
     private var editableMediaItem: EditableMediaItem
     private let postAspectRatio: PostAspectRatio // Единое соотношение для поста
 
@@ -105,19 +106,20 @@ class PostCropViewController: UIViewController {
     }
 
     @objc private func doneTapped() {
-        // 1. Сохраняем параметры кропа из cropView
+        // 1. Сохраняем параметры кропа из cropView (если они еще нужны где-то)
         editableMediaItem.manualZoomScale = cropView.currentZoomScale
         editableMediaItem.manualContentOffset = cropView.currentContentOffset
-        // Опционально: можно генерировать и сохранять finalImage здесь, 
-        // но это может быть преждевременно, если пользователь вернется к кропу.
-        // editableMediaItem.finalImage = cropView.croppedImage()
         
-        print("✅ PostCropVC: Done tapped. Saved crop parameters: zoom=\(cropView.currentZoomScale), offset=\(cropView.currentContentOffset)")
+        // ✅ 2. Генерируем обрезанное изображение! Используем новый метод.
+        let croppedImage = cropView.getCroppedImage() // <- Новый правильный вызов
+        editableMediaItem.finalImage = croppedImage
         
-        // 2. Уведомляем делегата
-        delegate?.postCropDidFinish(item: editableMediaItem)
+        print("✅ PostCropVC: Done tapped. Generated finalImage using getCroppedImage(). Saved crop parameters: zoom=\(cropView.currentZoomScale), offset=\(cropView.currentContentOffset)")
         
-        // 3. Закрываем экран
+        // 3. Уведомляем делегата об УСПЕШНОМ завершении с обновленным item
+        cropDelegate?.cropViewControllerDidFinishCropping(item: editableMediaItem)
+        
+        // 4. Закрываем экран (предполагая, что это делается координатором или вызывающим кодом)
         // dismiss(animated: true)
     }
 } 

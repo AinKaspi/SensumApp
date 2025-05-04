@@ -13,6 +13,9 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
     
+    // ✅ Добавляем слабую ссылку на показываемый VC выбора медиа
+    weak var currentPostMediaSelectionVC: PostMediaSelectionViewController?
+
     // Добавляем зависимости
     private let authService: AuthServiceProtocol
     private let userProfileService: UserProfileServiceProtocol
@@ -142,17 +145,23 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
         // TODO: Установить делегата (vc.delegate = self), когда протокол будет определен
         vc.delegate = self
         
+        // ✅ Сохраняем слабую ссылку на созданный VC
+        self.currentPostMediaSelectionVC = vc 
+        
         // Показываем экран (push в текущий стек)
         navigationController.isNavigationBarHidden = false // Показываем навбар для этого флоу
         navigationController.pushViewController(vc, animated: true)
     }
     
     // 2. Добавляем showPostCrop
-    func showPostCrop(item: EditableMediaItem, aspectRatio: PostAspectRatio /*, delegate: PostCropViewControllerDelegate */) {
+    // ✅ Изменяем сигнатуру: добавляем делегата типа CropDelegate
+    func showPostCrop(item: EditableMediaItem, aspectRatio: PostAspectRatio, delegate: CropDelegate?) {
         print("✂️ Coordinator: Showing Post Crop screen for item \(item.id).")
         let vc = PostCropViewController(item: item, aspectRatio: aspectRatio)
-        // TODO: Установить делегата (vc.delegate = delegate), когда протокол будет определен
-        vc.delegate = self // Устанавливаем координатор делегатом для PostCropVC
+        // ❌ Удаляем старую/неверную установку делегата
+        // vc.delegate = self // Старый делегат, не тот тип и не тот объект
+        // ✅ Устанавливаем ПРАВИЛЬНЫЙ делегат
+        vc.cropDelegate = delegate 
         
         // Представляем модально в новом NavigationController для своего навбара
         let cropNavController = UINavigationController(rootViewController: vc)
@@ -304,14 +313,29 @@ class CurrentUserProfileCoordinator: Coordinator, UserProfileFeedViewControllerD
     func postMediaSelectionDidTapItem(at index: Int, currentItems: [EditableMediaItem], aspectRatio: PostAspectRatio) {
         guard index >= 0 && index < currentItems.count else { return }
         let itemToCrop = currentItems[index]
+        
+        // ❗️ ПРОБЛЕМА: Откуда взять делегата (viewController) для showPostCrop?
+        //    Нужно найти ссылку на текущий PostMediaSelectionViewController.
+        // ✅ РЕШЕНИЕ: Используем сохраненную ссылку из свойства координатора.
+        // let delegate: CropDelegate? = nil // ЗАГЛУШКА
+        let delegate = self.currentPostMediaSelectionVC
+
         // Переходим к экрану кропа для выбранного элемента
-        showPostCrop(item: itemToCrop, aspectRatio: aspectRatio)
+        // showPostCrop(item: itemToCrop, aspectRatio: aspectRatio, delegate: viewController) // <- Старый неверный вызов
+        // ✅ Передаем найденного делегата
+        showPostCrop(item: itemToCrop, aspectRatio: aspectRatio, delegate: delegate)
     }
 
     func postMediaSelectionDidCancel() {
         // Закрываем экран выбора формата (возвращаемся к профилю)
         navigationController.popViewController(animated: true)
         navigationController.isNavigationBarHidden = true // Скрываем навбар снова
+    }
+    
+    // ✅ Реализуем новый метод для закрытия экрана кропа
+    func postMediaSelectionDidFinishCropping() {
+        print("✅ Coordinator: Received postMediaSelectionDidFinishCropping. Dismissing crop screen.")
+        navigationController.dismiss(animated: true)
     }
 
     // MARK: - PostCropViewControllerDelegate

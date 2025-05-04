@@ -529,6 +529,60 @@ class ImageCropView: UIView {
             // НЕ сбрасываем needsInitialSetup, т.к. начальная настройка все еще нужна
         }
     }
+    
+    // ✅ Новый метод для получения обрезанного изображения
+    func getCroppedImage() -> UIImage? {
+        guard let source = sourceImage, let cgImage = source.cgImage else {
+            print("⛔️ getCroppedImage Error: No source image or CGImage available.")
+            return nil
+        }
+
+        // Текущие параметры масштабирования и смещения
+        let zoomScale = scrollView.zoomScale
+        let offsetX = scrollView.contentOffset.x
+        let offsetY = scrollView.contentOffset.y
+        
+        // Размер рамки кропа (containerView)
+        let cropBoxWidth = containerView.bounds.width
+        let cropBoxHeight = containerView.bounds.height
+
+        // --- Расчет прямоугольника кропа в координатах ИСХОДНОГО изображения --- 
+
+        // 1. Определяем видимую область scrollView в координатах imageView (контент scrollView)
+        //    Учитываем, что contentOffset измеряется от верхнего левого угла *видимой области* scrollView,
+        //    а не от начала контента.
+        //    Масштабируем видимую область обратно к масштабу 1.0
+        let visibleRectInContentCoords = CGRect(
+            x: offsetX / zoomScale, 
+            y: offsetY / zoomScale,
+            width: cropBoxWidth / zoomScale, 
+            height: cropBoxHeight / zoomScale
+        )
+
+        // 2. Переводим этот прямоугольник в систему координат CGImage
+        //    CGImage имеет начало координат в *верхнем левом* углу.
+        //    UIImage.scale учитывает плотность пикселей (@2x, @3x).
+        let imageScale = source.scale
+        let cropRectInImageCoords = CGRect(
+            x: visibleRectInContentCoords.origin.x * imageScale,
+            y: visibleRectInContentCoords.origin.y * imageScale,
+            width: visibleRectInContentCoords.width * imageScale,
+            height: visibleRectInContentCoords.height * imageScale
+        )
+
+        // 3. Обрезаем CGImage
+        guard let croppedCGImage = cgImage.cropping(to: cropRectInImageCoords) else {
+            print("⛔️ getCroppedImage Error: Failed to crop CGImage. Calculated rect: \(cropRectInImageCoords)")
+            return nil
+        }
+
+        // 4. Создаем UIImage из обрезанного CGImage
+        //    Важно сохранить исходную ориентацию и масштаб
+        let croppedImage = UIImage(cgImage: croppedCGImage, scale: imageScale, orientation: source.imageOrientation)
+        
+        print("✅ getCroppedImage: Successfully created cropped image. Size: \(croppedImage.size)")
+        return croppedImage
+    }
 
     // Применяет отложенное состояние, если оно было установлено
     private func applyPendingCropStateIfNeeded() {
@@ -571,4 +625,3 @@ extension ImageCropView: UIScrollViewDelegate {
         // print("↕️ scrollViewDidScroll: Offset = \(scrollView.contentOffset)")
     }
 } 
-
