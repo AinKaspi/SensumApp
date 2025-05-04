@@ -15,7 +15,8 @@ class DIContainer {
     // PostService зависит от AuthService и UserProfileService
     lazy var postService: PostServiceProtocol = PostService(
         authService: self.authService,
-        userProfileService: self.userProfileService
+        userProfileService: self.userProfileService,
+        storageService: self.storageService
     )
     
     // FollowService может зависеть от AuthService и UserProfileService (проверить его init)

@@ -28,7 +28,7 @@ class UserPostScrollViewController: UIViewController, UICollectionViewDelegateFl
         // Создаем layout: одна ячейка на всю ширину экрана
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .vertical
-        layout.minimumLineSpacing = 0 // Убираем промежутки между ячейками
+        layout.minimumLineSpacing = 15 // Увеличиваем промежуток между постами (было 0)
         layout.minimumInteritemSpacing = 0
         // Размер ячейки будет задаваться делегатом --> УДАЛЯЕМ
         
@@ -224,8 +224,8 @@ extension UserPostScrollViewController: UICollectionViewDataSource {
             fatalError("Unable to dequeue FullPostCell")
         }
         let post = viewModel.posts[indexPath.item]
-        // TODO: Передать замыкание для обновления layout? --> КОММЕНТАРИЙ УСТАРЕЛ
-        cell.configure(with: post, indexPath: indexPath)
+        // ✅ Получаем currentUserID из viewModel и передаем в configure
+        cell.configure(with: post, currentUserID: viewModel.currentUserID, indexPath: indexPath)
         cell.delegate = self // Устанавливаем делегата
         return cell
     }
@@ -274,7 +274,8 @@ extension UserPostScrollViewController {
   
         // 4. Устанавливаем ширину ячейки, конфигурируем ее
         cell.bounds.size.width = targetWidth
-        cell.configure(with: post, indexPath: indexPath)
+        // ✅ Передаем currentUserID из viewModel
+        cell.configure(with: post, currentUserID: viewModel.currentUserID, indexPath: indexPath)
         cell.layoutIfNeeded() // ВАЖНО: Рассчитать layout ДО измерения subviews
   
         // 5. Рассчитываем итоговый размер всей contentView ячейки
@@ -382,6 +383,50 @@ extension UserPostScrollViewController {
         // Передаем nil в updates, так как изменения (numberOfLines) уже произошли в ячейке,
         // а collectionView просто нужно пересчитать layout.
         collectionView.performBatchUpdates(nil, completion: nil)
+    }
+    
+    // ✅ Реализация делегата для кнопки опций
+    func didTapOptionsButton(in cell: FullPostCell, forPostId postId: String) {
+        print("UserPostScrollVC: Options button tapped for post ID: \(postId)")
+        showDeleteConfirmation(for: postId)
+    }
+}
+
+// MARK: - Private Helpers
+private extension UserPostScrollViewController {
+    
+    // ✅ Показ подтверждения удаления
+    func showDeleteConfirmation(for postId: String) {
+        let alertController = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        
+        let deleteAction = UIAlertAction(title: "Удалить", style: .destructive) { [weak self] _ in
+            print("UserPostScrollVC: Delete confirmed for post ID: \(postId)")
+            // ✅ Оборачиваем вызов async функции в Task
+            Task {
+                await self?.viewModel.deletePost(postId: postId)
+            }
+        }
+        
+        let cancelAction = UIAlertAction(title: "Отмена", style: .cancel)
+        
+        alertController.addAction(deleteAction)
+        alertController.addAction(cancelAction)
+        
+        // Для iPad
+        if let popoverController = alertController.popoverPresentationController {
+            // Находим ячейку, чтобы указать источник для popover
+            if let index = viewModel.posts.firstIndex(where: { $0.id == postId }),
+               let cell = collectionView.cellForItem(at: IndexPath(item: index, section: 0)) {
+                popoverController.sourceView = cell
+                popoverController.sourceRect = cell.bounds // Можно уточнить до кнопки
+            } else {
+                popoverController.sourceView = self.view
+                popoverController.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
+            }
+            popoverController.permittedArrowDirections = [] // Убираем стрелку для чистоты
+        }
+        
+        present(alertController, animated: true)
     }
 }
 

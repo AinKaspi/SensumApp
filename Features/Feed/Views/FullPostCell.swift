@@ -11,6 +11,8 @@ protocol FullPostCellDelegate: AnyObject {
     // func fullPostCellDidToggleCaption(_ cell: FullPostCell, at indexPath: IndexPath)
     // ДОБАВЛЯЕМ новый метод делегата для запроса обновления layout
     func fullPostCellDidRequestLayoutUpdate(at indexPath: IndexPath)
+    // ✅ Добавляем новый метод делегата для кнопки опций
+    func didTapOptionsButton(in cell: FullPostCell, forPostId postId: String)
 }
 
 class FullPostCell: UICollectionViewCell {
@@ -18,6 +20,9 @@ class FullPostCell: UICollectionViewCell {
     static let identifier = "FullPostCell"
     weak var delegate: FullPostCellDelegate?
     var indexPath: IndexPath?
+    
+    // Добавляем свойство для хранения ID поста
+    private var currentPostId: String?
     
     // УДАЛЯЕМ замыкание для запроса обновления layout
     // var needsLayoutUpdateAction: ((IndexPath, CGFloat) -> Void)?
@@ -34,6 +39,17 @@ class FullPostCell: UICollectionViewCell {
     // Добавляем свойства для хранения констрейнтов, управляющих низом ячейки
     private var captionBottomConstraint: NSLayoutConstraint?
     private var commentsButtonBottomConstraint: NSLayoutConstraint?
+
+    // Добавляем контейнер для контента поста
+    private lazy var postContainerView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = .black // Или другой цвет фона, если нужно
+        // Можно добавить скругление и для контейнера, если хочешь
+        // view.layer.cornerRadius = 10
+        // view.clipsToBounds = true
+        return view
+    }()
 
     // === НОВЫЕ ЭЛЕМЕНТЫ для МЕДИА ===
     private lazy var mediaCollectionView: UICollectionView = {
@@ -84,12 +100,29 @@ class FullPostCell: UICollectionViewCell {
         return imageView
     }()
 
+    // ✅ Новая кнопка "три точки" (Опции)
+    private lazy var optionsButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setImage(UIImage(systemName: "ellipsis"), for: .normal)
+        button.tintColor = .white // Цвет иконки
+        // Увеличим область нажатия, если иконка мелкая
+        button.contentEdgeInsets = UIEdgeInsets(top: 5, left: 10, bottom: 5, right: 5) 
+        button.addTarget(self, action: #selector(optionsButtonTapped), for: .touchUpInside)
+        button.isHidden = true // Скрыта по умолчанию
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        return button
+    }()
+
     private lazy var usernameAndFollowStackView: UIStackView = { // Стек для имени и кнопки Follow
-        let stackView = UIStackView(arrangedSubviews: [authorUsernameButton, followButton])
+        let spacer = UIView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal) // Растягиваем пространство
+        let stackView = UIStackView(arrangedSubviews: [authorUsernameButton, followButton, spacer, optionsButton])
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.axis = .horizontal
-        stackView.spacing = 8
-        stackView.alignment = .center
+        stackView.spacing = 8 // Отступ между элементами
+        stackView.alignment = .center // Выравнивание по центру вертикали
         return stackView
     }()
 
@@ -248,13 +281,16 @@ class FullPostCell: UICollectionViewCell {
     // MARK: - Setup
 
     private func setupViews() {
-        contentView.addSubview(authorAvatarImageView)
-        contentView.addSubview(usernameAndFollowStackView)
-        // Добавляем mediaCollectionView и pageControl
-        contentView.addSubview(mediaCollectionView)
-        contentView.addSubview(pageControl)
-        contentView.addSubview(footerStackView)
-        contentView.addSubview(actionsAndStatsStackView)
+        // Добавляем postContainerView в contentView
+        contentView.addSubview(postContainerView)
+
+        // Добавляем все остальные элементы ВНУТРЬ postContainerView
+        postContainerView.addSubview(authorAvatarImageView)
+        postContainerView.addSubview(usernameAndFollowStackView)
+        postContainerView.addSubview(mediaCollectionView)
+        postContainerView.addSubview(pageControl)
+        postContainerView.addSubview(footerStackView)
+        postContainerView.addSubview(actionsAndStatsStackView)
 
         // Добавляем саб-стеки и кнопку Share ВНУТРЬ actionsAndStatsStackView
         // Spacer нужен, чтобы разнести кнопку Share вправо
@@ -280,42 +316,46 @@ class FullPostCell: UICollectionViewCell {
             // УДАЛЯЕМ КОНСТРЕЙНТ ШИРИНЫ contentView
             // contentView.widthAnchor.constraint(equalToConstant: UIScreen.main.bounds.width),
             
-            // ---> ДОБАВЛЯЕМ ЭТОТ КОНСТРЕЙНТ <--- 
-            // Принудительно устанавливаем ширину contentView равной ширине ячейки
-            contentView.widthAnchor.constraint(equalTo: widthAnchor),
+            // Констрейнты для postContainerView (с отступами 10pt слева/справа)
+            postContainerView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            postContainerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            postContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding), // Используем padding = 10
+            postContainerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding), // Используем padding = 10
+
+            // --- Обновляем констрейнты, чтобы они были относительно postContainerView ---
             
             // Header
-            authorAvatarImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: padding),
-            authorAvatarImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
+            authorAvatarImageView.topAnchor.constraint(equalTo: postContainerView.topAnchor, constant: padding),
+            authorAvatarImageView.leadingAnchor.constraint(equalTo: postContainerView.leadingAnchor, constant: padding),
             authorAvatarImageView.widthAnchor.constraint(equalToConstant: 30),
             authorAvatarImageView.heightAnchor.constraint(equalToConstant: 30),
             
             // StackView для имени и кнопки Follow
             usernameAndFollowStackView.leadingAnchor.constraint(equalTo: authorAvatarImageView.trailingAnchor, constant: padding),
-            usernameAndFollowStackView.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -padding), // Не прижимаем к правому краю жестко
+            usernameAndFollowStackView.trailingAnchor.constraint(lessThanOrEqualTo: postContainerView.trailingAnchor, constant: -padding), // Не прижимаем к правому краю жестко
             usernameAndFollowStackView.centerYAnchor.constraint(equalTo: authorAvatarImageView.centerYAnchor),
             
-            // Media Collection View (Занимает место postImageView)
+            // Media Collection View
             mediaCollectionView.topAnchor.constraint(equalTo: authorAvatarImageView.bottomAnchor, constant: padding),
-            mediaCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            mediaCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            mediaCollectionView.leadingAnchor.constraint(equalTo: postContainerView.leadingAnchor), // Привязываем к postContainerView БЕЗ отступа
+            mediaCollectionView.trailingAnchor.constraint(equalTo: postContainerView.trailingAnchor), // Привязываем к postContainerView БЕЗ отступа
             // Констрейнт соотношения сторон будет применяться к mediaCollectionView в configure
 
             // Page Control (Под mediaCollectionView)
             pageControl.topAnchor.constraint(equalTo: mediaCollectionView.bottomAnchor, constant: 4), // Небольшой отступ сверху
-            pageControl.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            pageControl.centerXAnchor.constraint(equalTo: postContainerView.centerXAnchor),
             pageControl.heightAnchor.constraint(equalToConstant: 20), // Стандартная высота
 
             // Actions and Stats Stack View (Под PageControl)
             actionsAndStatsStackView.topAnchor.constraint(equalTo: pageControl.bottomAnchor, constant: buttonSpacing - 4),
-            actionsAndStatsStackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
-            actionsAndStatsStackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
+            actionsAndStatsStackView.leadingAnchor.constraint(equalTo: postContainerView.leadingAnchor, constant: padding),
+            actionsAndStatsStackView.trailingAnchor.constraint(equalTo: postContainerView.trailingAnchor, constant: -padding),
 
             // Footer Stack View (Теперь под actionsAndStatsStackView)
             footerStackView.topAnchor.constraint(equalTo: actionsAndStatsStackView.bottomAnchor, constant: footerPadding), // Отступ от строки статов
-            footerStackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
-            footerStackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
-            footerStackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -footerPadding) // Привязываем низ стека к низу ячейки
+            footerStackView.leadingAnchor.constraint(equalTo: postContainerView.leadingAnchor, constant: padding),
+            footerStackView.trailingAnchor.constraint(equalTo: postContainerView.trailingAnchor, constant: -padding),
+            footerStackView.bottomAnchor.constraint(equalTo: postContainerView.bottomAnchor, constant: -footerPadding) // Привязываем низ стека к низу postContainerView
         ])
         
         // Создаем, но НЕ активируем констрейнты для низа ячейки
@@ -368,7 +408,8 @@ class FullPostCell: UICollectionViewCell {
     // MARK: - Configuration
     
     // УДАЛЯЕМ параметр needsLayoutUpdateAction
-    func configure(with post: Post, indexPath: IndexPath) {
+    // ✅ Добавляем currentUserID как параметр
+    func configure(with post: Post, currentUserID: String?, indexPath: IndexPath) {
         self.indexPath = indexPath
         // self.needsLayoutUpdateAction = needsLayoutUpdateAction --> УДАЛЕНО
         print("FullPostCell: Начало конфигурации с постом ID=\(post.id ?? "nil"), indexPath: \(indexPath)")
@@ -444,6 +485,13 @@ class FullPostCell: UICollectionViewCell {
         // Вызываем updateCaptionDisplay ПОСЛЕ установки констрейнта aspect ratio
         updateCaptionDisplay()
         
+        // ✅ Добавляем postId и currentUserID
+        self.currentPostId = post.id
+        
+        // ✅ Показываем кнопку опций только если текущий пользователь - автор поста
+        // Используем переданный currentUserID
+        optionsButton.isHidden = (post.userID != currentUserID)
+
         print("FullPostCell: Конфигурация завершена для indexPath \(indexPath)")
     }
     
@@ -501,6 +549,12 @@ class FullPostCell: UICollectionViewCell {
         delegate?.didTapFollowButton(in: self)
     }
 
+    // ✅ Обработчик нажатия кнопки опций
+    @objc private func optionsButtonTapped() {
+        guard let postId = currentPostId else { return }
+        delegate?.didTapOptionsButton(in: self, forPostId: postId)
+    }
+
     // Вспомогательный метод для создания кнопок (добавляем таргеты)
     private func createActionButton(systemName: String, selector: Selector) -> UIButton {
         let button = UIButton(type: .system)
@@ -544,8 +598,8 @@ class FullPostCell: UICollectionViewCell {
         // УДАЛЕНО: delegate?.fullPostCellDidToggleCaption(self, at: indexPath)
         
         // Запрашиваем обновление layout для этой ячейки
-        // УДАЛЯЕМ: self.contentView.setNeedsLayout()
-        // УДАЛЯЕМ: self.contentView.layoutIfNeeded()
+        // УДАЛЕНО: self.contentView.setNeedsLayout()
+        // УДАЛЕНО: self.contentView.layoutIfNeeded()
         
         // Сообщаем CollectionView, что layout нужно обновить (лучше делать в контроллере)
         // УДАЛЯЕМ прямую инвалидацию layout из ячейки
@@ -625,6 +679,7 @@ class FullPostCell: UICollectionViewCell {
         if let indexPath = indexPath {
             print("--- LayoutSubviews for Cell [\(indexPath.item)] ---")
             print("  contentView frame: \(contentView.frame)")
+            print("  postContainerView frame: \(postContainerView.frame)") // Логируем новый контейнер
             print("  mediaCollectionView frame: \(mediaCollectionView.frame)")
             print("    imageAspectRatioConstraint: \(imageAspectRatioConstraint?.multiplier ?? -1)")
             // --- Debugging Comment Interaction ---

@@ -10,6 +10,9 @@ class MediaItemCell: UICollectionViewCell {
         imageView.contentMode = .scaleAspectFill // Заполняем ячейку
         imageView.clipsToBounds = true
         imageView.backgroundColor = .secondarySystemBackground // Placeholder
+        // Добавляем скругление углов
+        imageView.layer.cornerRadius = 8 // Можешь изменить значение по вкусу
+        imageView.layer.masksToBounds = true // Убедимся, что обрезка по маске включена
         return imageView
     }()
 

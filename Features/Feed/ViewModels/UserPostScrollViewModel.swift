@@ -41,6 +41,11 @@ class UserPostScrollViewModel {
         print("UserPostScrollViewModel initialized for userID: \(userID) with \(initialPosts.count) initial posts.")
     }
 
+    // ✅ Добавляем computed property для доступа к ID текущего пользователя
+    var currentUserID: String? {
+        return authService.currentUserID
+    }
+
     // MARK: - Data Fetching
     func fetchMorePosts() {
         // Загружаем еще, только если не идет загрузка и есть что загружать
@@ -123,6 +128,35 @@ class UserPostScrollViewModel {
             postService.likePost(postID: postID, completion: completion)
         } else {
             postService.unlikePost(postID: postID, completion: completion)
+        }
+    }
+    
+    // MARK: - Deleting Posts
+    func deletePost(postId: String) async {
+        // Опционально: Устанавливаем флаг загрузки
+        // isLoading = true // Или другой флаг isDeleting
+        errorMessage = nil
+
+        // Используем Task для вызова асинхронной функции
+        // и do-catch для обработки ошибок
+        do {
+            try await postService.deletePost(postID: postId)
+            
+            // Обновляем UI на главном потоке после успешного удаления
+            await MainActor.run { // Переключаемся на главный поток
+                print("UserPostScrollViewModel (async): Post \(postId) deleted successfully.")
+                // Удаляем пост из локального массива
+                self.posts.removeAll { $0.id == postId }
+                // @Published сработает и обновит UI
+                // isLoading = false
+            }
+        } catch {
+            // Обрабатываем ошибку на главном потоке
+             await MainActor.run { // Переключаемся на главный поток
+                 print("UserPostScrollViewModel Error deleting post \(postId) (async): \(error.localizedDescription)")
+                 self.errorMessage = "Не удалось удалить пост: \(error.localizedDescription)"
+                 // isLoading = false
+             }
         }
     }
 }

@@ -7,9 +7,9 @@ protocol StorageServiceProtocol {
     // Загружает изображение и возвращает URL для скачивания
     func uploadImage(_ image: UIImage, directory: String, completion: @escaping (Result<URL, Error>) -> Void) -> StorageUploadTask?
     // TODO: Добавить метод для загрузки по URL?
-    // func downloadImage(from url: URL, completion: ...) 
-    // TODO: Добавить метод для удаления?
-    // func deleteImage(at path: String, completion: ...)
+    // func downloadImage(from url: URL, completion: ...)
+    // ✅ Добавляем метод для удаления файла по URL
+    func deleteFile(at url: URL, completion: @escaping (Error?) -> Void)
     func uploadPostImage(_ image: UIImage, completion: @escaping (Result<URL, Error>) -> Void)
     // Добавляем метод для загрузки аватара
     func uploadAvatarImage(_ image: UIImage, forUserID userID: String, completion: @escaping (Result<URL, Error>) -> Void)
@@ -150,6 +150,33 @@ class StorageService: StorageServiceProtocol {
                 } else {
                     completion(.failure(NSError(domain: "StorageService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Failed to get download URL for avatar"])))
                 }
+            }
+        }
+    }
+    
+    // MARK: - File Deletion
+    
+    func deleteFile(at url: URL, completion: @escaping (Error?) -> Void) {
+        // Получаем ссылку на файл в Storage по его URL
+        let storageRef = storage.reference(forURL: url.absoluteString)
+        
+        print("🗑️ StorageService: Attempting to delete file at URL: \(url.absoluteString)")
+        
+        storageRef.delete { error in
+            if let error = error {
+                // Проверяем, не является ли ошибка 'object not found' (код 404)
+                // В Firebase Storage ошибка 'object not found' имеет код -13010 в домене StorageErrorDomain
+                let nsError = error as NSError
+                if nsError.domain == StorageErrorDomain && nsError.code == StorageErrorCode.objectNotFound.rawValue {
+                    print("⚠️ StorageService: File not found at URL \(url.absoluteString), considering deletion successful.")
+                    completion(nil) // Считаем успешным, если файла и так нет
+                } else {
+                    print("❌ StorageService Error (Delete File): \(error.localizedDescription)")
+                    completion(error)
+                }
+            } else {
+                print("✅ StorageService: File deleted successfully at URL: \(url.absoluteString)")
+                completion(nil)
             }
         }
     }

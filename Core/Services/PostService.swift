@@ -49,6 +49,10 @@ protocol PostServiceProtocol {
     func likePost(postID: String, completion: @escaping (Error?) -> Void)
     func unlikePost(postID: String, completion: @escaping (Error?) -> Void)
     // TODO: Добавить методы для пагинации, лайков, комментариев, удаления и т.д.
+    // ✅ Добавляем метод удаления поста
+    // func deletePost(postID: String, completion: @escaping (Error?) -> Void)
+    // ✅ ОБНОВЛЯЕМ: Делаем метод async throws
+    func deletePost(postID: String) async throws
     
     // MARK: - Comments
     // Новый протокол для комментов
@@ -69,6 +73,7 @@ class PostService: PostServiceProtocol {
     // Добавляем зависимости
     private let authService: AuthServiceProtocol
     private let userProfileService: UserProfileServiceProtocol
+    private let storageService: StorageServiceProtocol // ✅ Добавляем storageService
     
     private var postsCollection: CollectionReference {
         return db.collection("posts")
@@ -76,9 +81,11 @@ class PostService: PostServiceProtocol {
     
     // Обновляем init
     init(authService: AuthServiceProtocol = AuthService(),
-         userProfileService: UserProfileServiceProtocol = UserProfileService()) {
+         userProfileService: UserProfileServiceProtocol = UserProfileService(),
+         storageService: StorageServiceProtocol = StorageService()) { // ✅ Добавляем storageService
         self.authService = authService
         self.userProfileService = userProfileService
+        self.storageService = storageService // ✅ Присваиваем storageService
     }
     
     // Удаляем реализацию старого метода createPost(imageURL:caption:completion:)
@@ -150,17 +157,18 @@ class PostService: PostServiceProtocol {
         print("🔶 PostService: Начинаем создание поста с AspectRatio: \(aspectRatio)")
         guard let currentUserID = authService.currentUserID else {
             print("❌ PostService: Ошибка - пользователь не авторизован")
-            completion(NSError(domain: "PostService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))
+            completion(NSError(domain: "PostService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])) 
             return
         }
-
+        
         print("🔶 PostService: Получаем данные пользователя \(currentUserID)")
+        // 1. Получаем данные текущего пользователя для денормализации
         userProfileService.fetchUserProfile(userID: currentUserID) { [weak self] result in
             guard let self = self else {
                 print("❌ PostService: Ошибка - self потерян")
                 return
             }
-
+            
             switch result {
             case .success(let user):
                 print("🔶 PostService: Получены данные пользователя. username: \(user.username), avatarURL: \(user.avatarURL ?? "nil")")
@@ -182,6 +190,7 @@ class PostService: PostServiceProtocol {
                 )
 
                 print("🔶 PostService: Создан объект Post с aspectRatio, сохраняем в Firestore")
+                // 3. Сохраняем пост в Firestore
                 do {
                     _ = try self.postsCollection.addDocument(from: newPost) { error in
                         if let error = error {
@@ -398,6 +407,93 @@ class PostService: PostServiceProtocol {
                 print("PostService Error (Unlike Transaction): \(error.localizedDescription)")
             }
             completion(error)
+        }
+    }
+    
+    // MARK: - Post Deletion
+    
+    func deletePost(postID: String) async throws {
+        print("🗑️ PostService: Attempting to delete post with ID: \(postID)")
+        
+        guard let currentUserID = authService.currentUserID else {
+            print("❌ PostService (Delete): User not logged in.")
+            throw NSError(domain: "PostService", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        
+        let postRef = postsCollection.document(postID)
+        
+        // 1. Получаем документ поста, чтобы проверить авторство и получить URL медиа
+        let post: Post
+        do {
+            post = try await postRef.getDocument(as: Post.self)
+        } catch {
+            print("❌ PostService Error (Delete - Fetching Post): \(error.localizedDescription)")
+            throw error // Передаем ошибку дальше
+        }
+        
+        guard post.userID == currentUserID else {
+            print("❌ PostService Error (Delete): User is not the author.")
+            throw NSError(domain: "PostService", code: 403, userInfo: [NSLocalizedDescriptionKey: "User is not the author of the post."])
+        }
+        
+        // 2. Удаляем медиафайлы из Storage
+        // Собираем все URL для удаления (медиа и превью)
+        var urlsToDelete: [URL] = []
+        for item in post.mediaItems {
+            if let url = URL(string: item.url) {
+                urlsToDelete.append(url)
+            }
+        }
+        // Добавляем URL превью, если он есть и не пустой
+        if !post.gridThumbnailURL.isEmpty, let gridUrl = URL(string: post.gridThumbnailURL) {
+             // Проверяем, не дублируется ли URL (если превью совпадает с одним из медиа)
+            if !urlsToDelete.contains(gridUrl) {
+                 urlsToDelete.append(gridUrl)
+            }
+        }
+
+        if !urlsToDelete.isEmpty {
+            print("🔶 PostService (async): Deleting \(urlsToDelete.count) media files...")
+            // Используем `withCheckedThrowingContinuation` чтобы обернуть DispatchGroup в async/await
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                let dispatchGroup = DispatchGroup()
+                var firstError: Error? = nil
+
+                for url in urlsToDelete {
+                    dispatchGroup.enter()
+                    storageService.deleteFile(at: url) { error in
+                        if let error = error {
+                            print("❌ PostService Error (Delete Media - URL: \(url.absoluteString)): \(error.localizedDescription)")
+                            // Запоминаем первую ошибку
+                            if firstError == nil { firstError = error }
+                        } else {
+                            print("✅ PostService: Deleted media file at URL: \(url.absoluteString)")
+                        }
+                        dispatchGroup.leave()
+                    }
+                }
+
+                dispatchGroup.notify(queue: .main) {
+                    if let error = firstError {
+                        continuation.resume(throwing: error)
+                    } else {
+                        print("✅ PostService (async): All media files deleted successfully.")
+                        continuation.resume(returning: ())
+                    }
+                }
+            }
+            // Если withCheckedThrowingContinuation выбросило ошибку, она пробросится дальше
+        } else {
+            print("🔶 PostService (async): No media files to delete.")
+        }
+        
+        // 3. Удаляем документ поста из Firestore
+        do {
+            try await postRef.delete()
+            print("✅ PostService (async): Post document \(postID) deleted successfully from Firestore.")
+        } catch {
+            print("❌ PostService Error (Delete async - Firestore Delete): \(error.localizedDescription)")
+            throw error // Передаем ошибку Firestore дальше
         }
     }
     
