@@ -52,8 +52,12 @@ protocol PostServiceProtocol {
     
     // MARK: - Comments
     // Новый протокол для комментов
-    func fetchComments(for postId: String, completion: @escaping (Result<[Comment], Error>) -> Void)
-    func addComment(_ text: String, for postId: String, completion: @escaping (Result<Comment, Error>) -> Void)
+    // Удаляем старый fetchComments
+    // func fetchComments(for postId: String, completion: @escaping (Result<[Comment], Error>) -> Void)
+    // Добавляем метод для прослушивания комментариев
+    func listenForComments(for postId: String, listener: @escaping (Result<[Comment], Error>) -> Void) -> ListenerRegistration?
+    // Изменяем completion, чтобы возвращать добавленный комментарий
+    func addComment(_ text: String, for postId: String, parentCommentId: String?, completion: @escaping (Result<Comment, Error>) -> Void)
     
     // Удаляем дубликат createPostWithAspectRatio из конца протокола
     // func createPostWithAspectRatio(imageURL: String, caption: String?, aspectRatio: String, completion: @escaping (Error?) -> Void)
@@ -399,41 +403,46 @@ class PostService: PostServiceProtocol {
     
     // MARK: - Comments
     
-    // Переделываем на completion handlers вместо async/await
-    func fetchComments(for postId: String, completion: @escaping (Result<[Comment], Error>) -> Void) {
+    // Реализуем метод для прослушивания комментариев
+    func listenForComments(for postId: String, listener: @escaping (Result<[Comment], Error>) -> Void) -> ListenerRegistration? {
         let commentsCollection = postsCollection.document(postId).collection("comments")
         
-        commentsCollection
+        // Создаем listener
+        let registration = commentsCollection
             .order(by: "timestamp", descending: false)
-            .getDocuments { snapshot, error in
+            .addSnapshotListener { snapshot, error in
                 if let error = error {
-                    print("PostService Error (Fetch Comments): \(error.localizedDescription)")
-                    completion(.failure(error))
+                    print("❌ PostService Error (Listen Comments): \(error.localizedDescription)")
+                    listener(.failure(error))
                     return
                 }
                 
                 guard let documents = snapshot?.documents else {
-                    completion(.success([]))
+                    // Если нет ошибки, но нет и документов, возвращаем пустой массив
+                    print("ℹ️ PostService (Listen Comments): Snapshot exists but no documents found for postId \(postId).")
+                    listener(.success([]))
                     return
                 }
                 
                 // Теперь декодируем напрямую в модель Comment
                 let comments = documents.compactMap { doc -> Comment? in
                     var comment = try? doc.data(as: Comment.self)
-                    // Устанавливаем ID из документа, если он не был декодирован (@DocumentID может не работать без FirestoreSwift)
+                    // ВАЖНО: Устанавливаем ID из документа вручную
                     if comment != nil && comment?.id == nil {
-                         // comment?.id = doc.documentID // У Comment нет id
-                         print("Warning: Comment ID missing after decoding, document ID: \(doc.documentID)")
+                        comment?.id = doc.documentID
                     }
                     return comment
                 }
                 
-                completion(.success(comments))
+                // Отправляем обновленный список комментариев подписчику
+                listener(.success(comments))
             }
+        
+        return registration // Возвращаем регистрацию для возможности отмены
     }
 
     // Обновляем сигнатуру и логику completion
-    func addComment(_ text: String, for postId: String, completion: @escaping (Result<Comment, Error>) -> Void) {
+    func addComment(_ text: String, for postId: String, parentCommentId: String? = nil, completion: @escaping (Result<Comment, Error>) -> Void) {
         guard let currentUserID = authService.currentUserID else {
             // Оборачиваем ошибку в .failure
             completion(.failure(NSError(domain: "PostService", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"]))) 
@@ -451,57 +460,57 @@ class PostService: PostServiceProtocol {
                 return 
             }
             
-            var username: String = "Unknown"
-            var avatarURL: String? = nil
-            
             switch result {
             case .success(let userProfile):
-                username = userProfile.username
-                avatarURL = userProfile.avatarURL // Исправлено
+                // 2. Создаем объект Comment
+                // Генерируем ID для нового комментария
+                let newCommentRef = commentsCollection.document()
+                let commentId = newCommentRef.documentID
+                
+                // Создаем комментарий с новой структурой
+                let newComment = Comment(
+                    id: commentId,
+                    postId: postId,
+                    userId: currentUserID,
+                    text: text,
+                    timestamp: Timestamp(),
+                    user: userProfile,
+                    parentCommentId: parentCommentId // Добавляем ID родительского комментария
+                )
+                
+                // 3. Используем транзакцию для добавления комментария и обновления счетчика
+                self.db.runTransaction({ (transaction, errorPointer) -> Any? in
+                    // Добавляем документ комментария
+                    do {
+                        try transaction.setData(from: newComment, forDocument: newCommentRef)
+                    } catch let error {
+                        errorPointer?.pointee = error as NSError
+                        return nil
+                    }
+                    
+                    // Обновляем счетчик комментариев в посте
+                    transaction.updateData(["commentCount": FieldValue.increment(Int64(1))], forDocument: postRef)
+                    
+                    return nil // Успех транзакции
+                }) { (object, error) in
+                    if let error = error {
+                        print("❌ PostService Error (Add Comment Transaction): \(error.localizedDescription)")
+                        completion(.failure(error)) // Возвращаем ошибку
+                    } else {
+                        if let parentId = parentCommentId {
+                            print("✅ PostService: Ответ на комментарий \(parentId) успешно добавлен к посту \(postId)")
+                        } else {
+                            print("✅ PostService: Комментарий успешно добавлен к посту \(postId)")
+                        }
+                        completion(.success(newComment)) // Возвращаем успешный результат с комментарием
+                    }
+                }
+                
             case .failure(let error):
                 print("PostService Error (Add Comment - Fetching User Profile): \(error.localizedDescription)")
                 // Оборачиваем ошибку в .failure
                 completion(.failure(error)) // Ошибка получения профиля
                 return
-            }
-            
-            // 2. Создаем объект Comment
-            // Генерируем ID для нового комментария
-            let newCommentRef = commentsCollection.document()
-            let commentId = newCommentRef.documentID
-            
-            let newComment = Comment(
-                id: commentId, // Используем сгенерированный ID
-                postId: postId,
-                authorUid: currentUserID,
-                authorUsername: username,
-                authorAvatarUrl: avatarURL,
-                text: text,
-                timestamp: Timestamp() // Используем Timestamp
-            )
-            
-            // 3. Используем транзакцию для добавления комментария и обновления счетчика
-            self.db.runTransaction({ (transaction, errorPointer) -> Any? in
-                // Добавляем документ комментария
-                do {
-                    try transaction.setData(from: newComment, forDocument: newCommentRef)
-                } catch let error {
-                    errorPointer?.pointee = error as NSError
-                    return nil
-                }
-                
-                // Обновляем счетчик комментариев в посте
-                transaction.updateData(["commentCount": FieldValue.increment(Int64(1))], forDocument: postRef)
-                
-                return nil // Успех транзакции
-            }) { (object, error) in
-                if let error = error {
-                    print("❌ PostService Error (Add Comment Transaction): \(error.localizedDescription)")
-                    completion(.failure(error)) // Возвращаем ошибку
-                } else {
-                    print("✅ PostService: Комментарий успешно добавлен к посту \(postId)")
-                    completion(.success(newComment)) // Возвращаем успешный результат с комментарием
-                }
             }
         }
     }
@@ -629,4 +638,4 @@ class PostService: PostServiceProtocol {
             }
         }
     }
-} 
+}

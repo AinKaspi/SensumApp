@@ -26,6 +26,9 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     weak var delegate: UserProfileFeedViewControllerDelegate?
     private var cancellables = Set<AnyCancellable>() // Для хранения подписок Combine
 
+    // Контекст для KVO высоты CollectionView
+    private static var postsCollectionViewContext = 0 // <-- ОБЪЯВЛЯЕМ КОНТЕКСТ
+
     // TODO: Добавить ViewModel для загрузки данных профиля и постов
 
     // MARK: - UI Elements
@@ -274,36 +277,19 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
     // --- Сетка Постов ---
     lazy var postsCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
-        layout.minimumLineSpacing = 3 // Меньше расстояние между строками
-        layout.minimumInteritemSpacing = 3 // Меньше расстояние между ячейками
-        layout.sectionInset = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0) // Убираем отступы секции
+        layout.minimumInteritemSpacing = 3 // Горизонтальный отступ
+        layout.minimumLineSpacing = 3 // Вертикальный отступ (ИСПРАВЛЕНО)
+        layout.scrollDirection = .vertical
+        // layout.minimumLineSpacing = 1 // Удаляем дублирующую строку
+        layout.sectionInset = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10) // Отступы секции (уменьшены до 10)
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView.backgroundColor = .black
+        collectionView.isScrollEnabled = false // Отключаем внутреннюю прокрутку
+        collectionView.backgroundColor = .black // Возвращаем темный фон
+        collectionView.dataSource = self
         collectionView.register(PostGridCell.self, forCellWithReuseIdentifier: PostGridCell.identifier)
         collectionView.register(LoadingFooterView.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter, withReuseIdentifier: "LoadingFooter")
         return collectionView
     }()
-
-    // Удаляем Placeholder View для вкладки Programs
-    /*
-    private lazy var programsPlaceholderView: UIView = {
-        let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        view.backgroundColor = .clear // или .black
-        let label = UILabel()
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.text = "Программы тренировок (скоро)"
-        label.textColor = .lightGray
-        label.textAlignment = .center
-        view.addSubview(label)
-        NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: view.centerYAnchor)
-        ])
-        view.isHidden = true // Скрыт по умолчанию
-        return view
-    }()
-    */
 
     // Add missing UI elements
     private lazy var activityIndicator: UIActivityIndicatorView = {
@@ -360,6 +346,16 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         if viewModel.userProfile == nil {
             viewModel.fetchAllUserData()
         }
+        
+        // Добавляем KVO для contentSize
+        postsCollectionView.addObserver(self,
+                                      forKeyPath: "contentSize",
+                                      options: [.new],
+                                      context: &UserProfileFeedViewController.postsCollectionViewContext) // <-- ИСПОЛЬТЬ МЕТОДА
+
+        // Добавляем индикатор загрузки
+        view.addSubview(activityIndicator)
+        view.addSubview(errorLabel)
     }
 
     // MARK: - Setup UI
@@ -911,6 +907,22 @@ class UserProfileFeedViewController: UIViewController, PHPickerViewControllerDel
         //     self.view.layoutIfNeeded()
         // }
     }
+
+    // MARK: - Deinitialization
+    deinit {
+        // Используем try? для безопасного удаления, если наблюдатель по какой-то причине не был добавлен
+        // Remove observer using the static context
+        // Проверяем, был ли добавлен наблюдатель перед удалением
+        // (Это хорошая практика, но KVO обычно добавляется в viewDidLoad/init)
+        // В данном случае, если postsCollectionView существует, наблюдатель должен быть.
+        // Можно добавить проверку, если есть сомнения:
+        // if postsCollectionView.observationInfo != nil { ... }
+        // Но стандартный подход - просто удалить. Ошибка возникнет, если его не было.
+        // Для большей надежности можно обернуть в try-catch или использовать более сложные проверки,
+        // но для KVO это обычно избыточно.
+        postsCollectionView.removeObserver(self, forKeyPath: #keyPath(UICollectionView.contentSize), context: &UserProfileFeedViewController.postsCollectionViewContext)
+        print("UserProfileFeedViewController deinit")
+    }
 }
 
 // MARK: - UICollectionViewDataSource
@@ -1137,5 +1149,25 @@ extension UserProfileFeedViewController {
         }
         
         return UICollectionReusableView()
+    }
+}
+
+// MARK: - KVO for CollectionView Height
+extension UserProfileFeedViewController {
+    override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+        if context == &UserProfileFeedViewController.postsCollectionViewContext { // <-- Use static context
+            if keyPath == #keyPath(UICollectionView.contentSize),
+               let newSize = change?[.newKey] as? CGSize {
+                // Обновляем констрейнт высоты, только если он не равен 0 (избегаем обновления при инициализации)
+                if newSize.height > 0 {
+                    collectionViewHeightConstraint.constant = newSize.height // <-- REMOVE ?
+                    // Можно добавить анимацию, если нужно
+                    // UIView.animate(withDuration: 0.2) { self.view.layoutIfNeeded() }
+                    print("🔄 Updated CollectionView Height: \(newSize.height)")
+                }
+            }
+        } else {
+            super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
+        }
     }
 }

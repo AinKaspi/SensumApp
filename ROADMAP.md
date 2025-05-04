@@ -60,7 +60,7 @@
 
 ### Theme: Comments (MVP)
 *   `[X]` (P1.COMMENT.1) Исправить установку делегата `UserPostScrollViewControllerDelegate` для открытия экрана комментариев.
-*   `[ ]` (P1.COMMENT.2) Реализовать pull-to-refresh в `CommentsViewController`.
+*   `[X]` (P1.COMMENT.2) Реализовать pull-to-refresh в `CommentsViewController`.
 *   `[X]` (P1.COMMENT.3) Оптимизировать добавление комментария (возвращать добавленный `Comment`, не перезагружать все).
 
 ## Фаза 2: Улучшения и Новые Фичи

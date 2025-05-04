@@ -43,6 +43,32 @@ final class CommentsViewController: UIViewController {
         return view
     }()
     
+    // Добавляем индикатор режима ответа
+    private lazy var replyIndicatorView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = UIColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0)
+        view.isHidden = true
+        return view
+    }()
+    
+    private lazy var replyToUsernameLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .systemFont(ofSize: 12, weight: .semibold)
+        label.textColor = .white
+        return label
+    }()
+    
+    private lazy var cancelReplyButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setImage(UIImage(systemName: "xmark"), for: .normal)
+        button.tintColor = .lightGray
+        button.addTarget(self, action: #selector(cancelReply), for: .touchUpInside)
+        return button
+    }()
+    
     private lazy var commentTextView: UITextView = {
         let textView = UITextView()
         textView.translatesAutoresizingMaskIntoConstraints = false
@@ -104,8 +130,8 @@ final class CommentsViewController: UIViewController {
         // Раскомментируем биндинги
         setupBindings()
         setupKeyboardHandling()
-        // Раскомментируем вызов ViewModel
-        viewModel.fetchComments()
+        // Раскомментируем вызов ViewModel - БОЛЬШЕ НЕ НУЖЕН, listener стартует в init ViewModel
+        // viewModel.fetchComments()
     }
     
     deinit {
@@ -123,6 +149,12 @@ final class CommentsViewController: UIViewController {
         view.addSubview(inputContainerView)
         // Добавляем refresh control к таблице
         tableView.refreshControl = refreshControl
+        
+        // Настраиваем UI для режима ответа
+        inputContainerView.addSubview(replyIndicatorView)
+        replyIndicatorView.addSubview(replyToUsernameLabel)
+        replyIndicatorView.addSubview(cancelReplyButton)
+        
         inputContainerView.addSubview(commentTextView)
         inputContainerView.addSubview(sendButton)
         
@@ -145,9 +177,24 @@ final class CommentsViewController: UIViewController {
             inputContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             inputContainerView.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor),
             
+            // Reply indicator view
+            replyIndicatorView.topAnchor.constraint(equalTo: inputContainerView.topAnchor),
+            replyIndicatorView.leadingAnchor.constraint(equalTo: inputContainerView.leadingAnchor),
+            replyIndicatorView.trailingAnchor.constraint(equalTo: inputContainerView.trailingAnchor),
+            replyIndicatorView.heightAnchor.constraint(equalToConstant: 30),
+            
+            replyToUsernameLabel.leadingAnchor.constraint(equalTo: replyIndicatorView.leadingAnchor, constant: 12),
+            replyToUsernameLabel.centerYAnchor.constraint(equalTo: replyIndicatorView.centerYAnchor),
+            replyToUsernameLabel.trailingAnchor.constraint(lessThanOrEqualTo: cancelReplyButton.leadingAnchor, constant: -8),
+            
+            cancelReplyButton.trailingAnchor.constraint(equalTo: replyIndicatorView.trailingAnchor, constant: -12),
+            cancelReplyButton.centerYAnchor.constraint(equalTo: replyIndicatorView.centerYAnchor),
+            cancelReplyButton.widthAnchor.constraint(equalToConstant: 24),
+            cancelReplyButton.heightAnchor.constraint(equalToConstant: 24),
+            
             commentTextView.leadingAnchor.constraint(equalTo: inputContainerView.leadingAnchor, constant: 12),
             commentTextView.trailingAnchor.constraint(equalTo: sendButton.leadingAnchor, constant: -8),
-            commentTextView.topAnchor.constraint(equalTo: inputContainerView.topAnchor, constant: 8),
+            commentTextView.topAnchor.constraint(equalTo: replyIndicatorView.bottomAnchor, constant: 8),
             commentTextView.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -8),
             textViewHeightConstraint,
             
@@ -201,11 +248,35 @@ final class CommentsViewController: UIViewController {
                 self?.commentTextView.isEditable = !isSending
             }
             .store(in: &cancellables)
+            
+        // Добавляем биндинг для состояния ответа на комментарий
+        viewModel.$isInReplyMode
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isInReplyMode in
+                self?.replyIndicatorView.isHidden = !isInReplyMode
+            }
+            .store(in: &cancellables)
+            
+        viewModel.$replyingToComment
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] comment in
+                guard let self = self, let comment = comment else { return }
+                if let username = comment.user?.username {
+                    self.replyToUsernameLabel.text = "Ответ \(username)"
+                } else {
+                    self.replyToUsernameLabel.text = "Ответ на комментарий"
+                }
+            }
+            .store(in: &cancellables)
     }
     
     // Обработчик для Refresh Control
     @objc private func handleRefreshControl() {
-        viewModel.fetchComments()
+        // viewModel.fetchComments() // TODO: Переосмыслить pull-to-refresh при real-time обновлениях. Пока просто убираем вызов.
+        // Можно просто завершить анимацию, если пользователь потянул
+         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in // Небольшая задержка для визуального эффекта
+             self?.refreshControl.endRefreshing()
+         }
     }
     
     private func setupKeyboardHandling() {
@@ -228,6 +299,10 @@ final class CommentsViewController: UIViewController {
     
     @objc private func dismissKeyboard() {
         view.endEditing(true)
+    }
+    
+    @objc private func cancelReply() {
+        viewModel.cancelReply()
     }
     
     // MARK: - Helpers
@@ -284,6 +359,7 @@ extension CommentsViewController: UITableViewDataSource {
         
         let comment = viewModel.comments[indexPath.row]
         cell.configure(with: comment)
+        cell.delegate = self // Устанавливаем ViewController как делегат
         
         return cell
     }
@@ -302,6 +378,14 @@ extension CommentsViewController: UITextViewDelegate {
         sendButton.isEnabled = hasText && !viewModel.isSending
         
         adjustTextViewHeight(textView: textView)
+    }
+}
+
+// MARK: - CommentCellDelegate
+extension CommentsViewController: CommentCellDelegate {
+    func didTapReplyButton(for comment: Comment) {
+        viewModel.startReplyTo(comment: comment)
+        commentTextView.becomeFirstResponder() // Фокус на поле ввода
     }
 }
 

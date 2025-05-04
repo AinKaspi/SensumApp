@@ -1,10 +1,19 @@
 import UIKit
 import Kingfisher
 
+protocol CommentCellDelegate: AnyObject {
+    func didTapReplyButton(for comment: Comment)
+}
+
 class CommentCell: UITableViewCell {
 
     static let identifier = "CommentCell"
-
+    
+    // MARK: - Properties
+    
+    private var comment: Comment?
+    weak var delegate: CommentCellDelegate?
+    
     // MARK: - UI Elements
 
     private let avatarImageView: UIImageView = {
@@ -48,6 +57,37 @@ class CommentCell: UITableViewCell {
         label.numberOfLines = 0 // Позволяем тексту переноситься
         return label
     }()
+    
+    // Добавляем кнопку "Ответить"
+    private let replyButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setTitle("Ответить", for: .normal)
+        button.setTitleColor(.systemBlue, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 12, weight: .semibold)
+        button.addTarget(self, action: #selector(handleReplyTap), for: .touchUpInside)
+        return button
+    }()
+    
+    // Добавляем контейнер для визуального отступа в случае ответа на комментарий
+    private let indentationView: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = .systemBlue.withAlphaComponent(0.3)
+        view.layer.cornerRadius = 1.5
+        view.isHidden = true  // По умолчанию скрыт
+        return view
+    }()
+    
+    // Добавляем индикатор "В ответ пользователю" для ответов
+    private let replyToLabel: UILabel = {
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .systemFont(ofSize: 12, weight: .regular)
+        label.textColor = .lightGray
+        label.isHidden = true // По умолчанию скрыт
+        return label
+    }()
 
     // MARK: - Init
 
@@ -72,26 +112,48 @@ class CommentCell: UITableViewCell {
         usernameLabel.text = nil
         commentTextLabel.text = nil
         timestampLabel.text = nil
+        indentationView.isHidden = true
+        replyToLabel.isHidden = true
+        replyToLabel.text = nil
+        comment = nil
+    }
+    
+    // MARK: - Actions
+    
+    @objc private func handleReplyTap() {
+        guard let comment = comment else { return }
+        delegate?.didTapReplyButton(for: comment)
     }
 
     // MARK: - Setup
 
     private func setupViews() {
+        contentView.addSubview(indentationView)
         contentView.addSubview(avatarImageView)
         contentView.addSubview(usernameLabel)
         contentView.addSubview(timestampLabel)
+        contentView.addSubview(replyToLabel)
         contentView.addSubview(commentTextLabel)
+        contentView.addSubview(replyButton)
     }
 
     private func setupConstraints() {
         let padding: CGFloat = 12
         let smallPadding: CGFloat = 8
         let avatarSize: CGFloat = 36
+        let indentWidth: CGFloat = 3
+        let indentLeading: CGFloat = padding / 2
 
         NSLayoutConstraint.activate([
-            // Аватар
+            // Линия индентации (для вложенных комментариев)
+            indentationView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: padding),
+            indentationView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: indentLeading),
+            indentationView.widthAnchor.constraint(equalToConstant: indentWidth),
+            indentationView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -padding),
+            
+            // Аватар - сдвигаем немного вправо в случае ответа
             avatarImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: padding),
-            avatarImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
+            avatarImageView.leadingAnchor.constraint(equalTo: indentationView.trailingAnchor, constant: padding - indentLeading),
             avatarImageView.widthAnchor.constraint(equalToConstant: avatarSize),
             avatarImageView.heightAnchor.constraint(equalToConstant: avatarSize),
             // Низ аватара необязательно привязывать, т.к. есть commentTextLabel
@@ -104,13 +166,21 @@ class CommentCell: UITableViewCell {
             timestampLabel.centerYAnchor.constraint(equalTo: usernameLabel.centerYAnchor),
             timestampLabel.leadingAnchor.constraint(equalTo: usernameLabel.trailingAnchor, constant: smallPadding),
             timestampLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
+            
+            // Лейбл "в ответ кому-то"
+            replyToLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 1),
+            replyToLabel.leadingAnchor.constraint(equalTo: usernameLabel.leadingAnchor),
+            replyToLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
 
             // Текст комментария
-            commentTextLabel.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: smallPadding / 2),
+            commentTextLabel.topAnchor.constraint(equalTo: replyToLabel.bottomAnchor, constant: 4),
             commentTextLabel.leadingAnchor.constraint(equalTo: usernameLabel.leadingAnchor), // Начинается там же, где имя
             commentTextLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
-            // Привязываем низ текста к низу контента ячейки
-            commentTextLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -padding)
+            
+            // Кнопка Reply
+            replyButton.topAnchor.constraint(equalTo: commentTextLabel.bottomAnchor, constant: 6),
+            replyButton.leadingAnchor.constraint(equalTo: commentTextLabel.leadingAnchor),
+            replyButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -padding)
         ])
         
         // Чтобы timestampLabel не перекрывал usernameLabel
@@ -121,21 +191,41 @@ class CommentCell: UITableViewCell {
     // MARK: - Configuration
 
     func configure(with comment: Comment) {
-        usernameLabel.text = comment.authorUsername
+        self.comment = comment
+        
+        // Используем обновленную модель Comment
+        if let user = comment.user {
+            usernameLabel.text = user.username
+            
+            let placeholder = UIImage(systemName: "person.circle.fill")?.withTintColor(.lightGray, renderingMode: .alwaysOriginal)
+            if let avatarURLString = user.avatarURL, let url = URL(string: avatarURLString) {
+                avatarImageView.kf.setImage(with: url, placeholder: placeholder, options: [.transition(.fade(0.2))])
+            } else {
+                avatarImageView.image = placeholder
+            }
+        } else {
+            usernameLabel.text = "Неизвестный пользователь"
+            avatarImageView.image = UIImage(systemName: "person.circle.fill")?.withTintColor(.lightGray, renderingMode: .alwaysOriginal)
+        }
+        
         commentTextLabel.text = comment.text
         
-        // Временная замена timeAgoDisplay на DateFormatter
+        // Настраиваем отображение даты
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .short
         dateFormatter.timeStyle = .short
-        timestampLabel.text = dateFormatter.string(from: comment.date) 
-        // timestampLabel.text = comment.date.timeAgoDisplay() // Используем расширение Date
-
-        let placeholder = UIImage(systemName: "person.circle.fill")?.withTintColor(.lightGray, renderingMode: .alwaysOriginal)
-        if let avatarUrlString = comment.authorAvatarUrl, let url = URL(string: avatarUrlString) {
-            avatarImageView.kf.setImage(with: url, placeholder: placeholder, options: [.transition(.fade(0.2))])
+        timestampLabel.text = dateFormatter.string(from: comment.timestamp.dateValue())
+        
+        // Настраиваем вид для ответа на комментарий
+        if let _ = comment.parentCommentId {
+            indentationView.isHidden = false
+            replyToLabel.isHidden = false
+            // TODO: Показать, на чей комментарий это ответ, но пока это требует
+            // дополнительного запроса или загрузки родительского комментария
+            replyToLabel.text = "Ответ на комментарий"
         } else {
-            avatarImageView.image = placeholder
+            indentationView.isHidden = true
+            replyToLabel.isHidden = true
         }
     }
 }
