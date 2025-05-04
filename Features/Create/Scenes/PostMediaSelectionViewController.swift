@@ -5,7 +5,7 @@ protocol PostMediaSelectionDelegate: AnyObject {
     func postMediaSelectionDidTapNext(items: [EditableMediaItem], aspectRatio: PostAspectRatio)
     func postMediaSelectionDidTapItem(at index: Int, currentItems: [EditableMediaItem], aspectRatio: PostAspectRatio)
     func postMediaSelectionDidCancel()
-    // ✅ Добавляем метод для уведомления о завершении кропа (чтобы координатор закрыл экран)
+    // Добавляем метод для уведомления о завершении кропа (чтобы координатор закрыл экран)
     func postMediaSelectionDidFinishCropping()
 }
 
@@ -27,13 +27,19 @@ class PostMediaSelectionViewController: UIViewController, UIScrollViewDelegate, 
     private lazy var previewCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .horizontal
-        // ✅ Добавляем небольшой отступ между ячейками
-        layout.minimumLineSpacing = 10 // Подберите значение
+        // Возвращаем небольшой отступ между ячейками
+        layout.minimumLineSpacing = 10
+        // Добавляем боковые отступы секции для эффекта "подглядывания"
+        let sideInset: CGFloat = 40
+        layout.sectionInset = UIEdgeInsets(top: 0, left: sideInset, bottom: 0, right: sideInset)
+        
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
-        collectionView.isPagingEnabled = true // Оставим пейджинг, но с отступом
+        collectionView.isPagingEnabled = false // Отключаем пейджинг
         collectionView.showsHorizontalScrollIndicator = false
-        collectionView.backgroundColor = .black // Возвращаем черный фон
+        collectionView.backgroundColor = .black
+        // Позволяем видеть контент за границами
+        collectionView.clipsToBounds = false 
         collectionView.register(PreviewCell.self, forCellWithReuseIdentifier: PreviewCell.identifier)
         return collectionView
     }()
@@ -110,12 +116,14 @@ class PostMediaSelectionViewController: UIViewController, UIScrollViewDelegate, 
         // Констрейнты для UI элементов
         NSLayoutConstraint.activate([
             previewCollectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            // ✅ Добавляем боковые отступы
-            previewCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
-            previewCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
-            // ✅ Уменьшаем высоту CollectionView (подберите значение, начнем с 0.5)
-            previewCollectionView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.5),
-            // ✅ Восстанавливаем привязку верха SegmentedControl к низу CollectionView
+            // Возвращаем CollectionView на всю ширину
+            previewCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 0),
+            previewCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 0),
+            // Возвращаем фиксированное ограничение высоты для CollectionView
+            // Увеличиваем множитель, чтобы вместить 9:16
+            previewCollectionView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.65),
+            
+            // Восстанавливаем привязку верха SegmentedControl к низу CollectionView
             aspectRatioSegmentedControl.topAnchor.constraint(equalTo: previewCollectionView.bottomAnchor, constant: 20),
             aspectRatioSegmentedControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             aspectRatioSegmentedControl.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
@@ -147,10 +155,11 @@ class PostMediaSelectionViewController: UIViewController, UIScrollViewDelegate, 
         // Сохраняем выбранное значение
         selectedAspectRatio = newAspectRatio
         
-        // 🐞 DEBUG: Логируем изменение
-        print("🕹️ Aspect Ratio Selection Changed: Index=\(newIndex), New AR=\(newAspectRatio.stringValue) (\(newAspectRatio.ratio))")
+        // DEBUG: Логируем изменение
+        print(" Aspect Ratio Selection Changed: Index=\(newIndex), New AR=\(newAspectRatio.stringValue) (\(newAspectRatio.ratio))")
         
-        // ✅ Перезагружаем данные, чтобы ячейки обновились с новым aspectRatio
+        // Инвалидируем layout, чтобы заставить пересчитать размеры ячеек!
+        previewCollectionView.collectionViewLayout.invalidateLayout()
         previewCollectionView.reloadData()
     }
     
@@ -164,9 +173,9 @@ class PostMediaSelectionViewController: UIViewController, UIScrollViewDelegate, 
         let indexPath = IndexPath(item: index, section: 0)
         if previewCollectionView.indexPathsForVisibleItems.contains(indexPath) {
              previewCollectionView.reloadItems(at: [indexPath])
-             print("🔄 Reloaded cell at index \(index) after update.")
+             print(" Reloaded cell at index \(index) after update.")
         } else {
-             print("🔄 Updated item at index \(index) in data source (cell not visible).")
+             print(" Updated item at index \(index) in data source (cell not visible).")
         }
     }
 }
@@ -183,7 +192,7 @@ extension PostMediaSelectionViewController: UICollectionViewDataSource {
         }
         
         let mediaItem = editableMedia[indexPath.item]
-        // ✅ Приоритет отдаем finalImage (результат кропа), если он есть
+        // Приоритет отдаем finalImage (результат кропа), если он есть
         let imageToDisplay = mediaItem.finalImage ?? mediaItem.originalImage
         
         cell.configure(with: imageToDisplay, aspectRatio: selectedAspectRatio)
@@ -216,13 +225,19 @@ extension PostMediaSelectionViewController: UICollectionViewDelegate {
 extension PostMediaSelectionViewController: UICollectionViewDelegateFlowLayout {
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        // ✅ Размер ЯЧЕЙКИ остается НЕИЗМЕННЫМ (альбомным)
-        // Визуальное изменение формата происходит ВНУТРИ ячейки за счет containerView
-        let cellHeight = collectionView.bounds.height 
-        let cellWidth = collectionView.bounds.width * 0.9 
         
-        // 🐞 DEBUG: Логируем размер ячейки
-        print("🐞 sizeForItemAt: Returning size \(cellWidth)x\(cellHeight)")
+        // Получаем боковой отступ из layout'а
+        let sideInset = (collectionViewLayout as? UICollectionViewFlowLayout)?.sectionInset.left ?? 0
+        
+        // Рассчитываем ширину ячейки: ширина collectionView МИНУС двойной боковой отступ
+        let cellWidth = collectionView.bounds.width - (sideInset * 2)
+
+        // Рассчитываем высоту ячейки ДИНАМИЧЕСКИ на основе выбранного соотношения сторон
+        let ratio = selectedAspectRatio.ratio
+        let cellHeight = cellWidth / ratio // Высота = Ширина / Соотношение (Ширина/Высота)
+        
+        // DEBUG: Логируем размер ячейки
+        print(" sizeForItemAt: AspectRatio=\(selectedAspectRatio.stringValue), Ratio=\(ratio), CellWidth=\(cellWidth), sideInset=\(sideInset), Returning size \(cellWidth)x\(cellHeight)")
         
         return CGSize(width: cellWidth, height: cellHeight)
     }
@@ -233,7 +248,7 @@ extension PostMediaSelectionViewController {
     func cropViewControllerDidFinishCropping(item: EditableMediaItem) {
         // 1. Находим индекс обновленного элемента в нашем массиве
         guard let index = editableMedia.firstIndex(where: { $0.id == item.id }) else {
-            print("⚠️ CropDelegate Error: Could not find item with id \(item.id) to update.")
+            print(" CropDelegate Error: Could not find item with id \(item.id) to update.")
             return
         }
         
@@ -244,9 +259,9 @@ extension PostMediaSelectionViewController {
         let indexPath = IndexPath(item: index, section: 0)
         previewCollectionView.reloadItems(at: [indexPath])
         
-        print("✅ CropDelegate: Updated item at index \(index) and reloaded cell.")
+        print(" Updated item at index \(index) and reloaded cell.")
         
-        // ✅ Уведомляем делегата о завершении кропа
+        // Уведомляем делегата о завершении кропа
         delegate?.postMediaSelectionDidFinishCropping()
     }
 }

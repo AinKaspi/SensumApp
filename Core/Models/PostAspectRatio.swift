@@ -5,7 +5,6 @@ import CoreGraphics // For CGFloat
 enum PostAspectRatio: String, CaseIterable {
     case square = "1:1"     // Квадрат
     case portrait = "9:16"   // Вертикальный (старый был 4:5)
-    case landscape = "1.91:1" // Горизонтальный (Instagram Landscape)
     
     /// String representation for UI display
     var stringValue: String {
@@ -19,8 +18,6 @@ enum PostAspectRatio: String, CaseIterable {
             return 1.0
         case .portrait:
             return 9.0 / 16.0 // ~0.5625
-        case .landscape:
-            return 1.91 / 1.0 // 1.91
         }
     }
 } 
