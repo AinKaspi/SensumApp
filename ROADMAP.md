@@ -58,46 +58,16 @@
 *   `[X]` (P1.FEEDSCROLL.8) Реализовать предзагрузку изображений для `mediaCollectionView` (`Kingfisher.ImagePrefetcher`).
 *   `[X]` (P1.FEEDSCROLL.9) Улучшить UI/UX `FullPostCell` (расположение кнопок, лайков, комментов).
 
+### Theme: Feed (Refactor)
+*   `[ ]` (P1.FEEDREFACTOR.1) Заменить `UITableView` на `UICollectionView` в `FeedViewController`.
+*   `[ ]` (P1.FEEDREFACTOR.2) Использовать `FullPostCell` в `FeedViewController`.
+*   `[ ]` (P1.FEEDREFACTOR.3) Реализовать `collectionView(_:layout:sizeForItemAt:)` в `FeedViewController` для динамического расчета высоты ячейки (по аналогии с `UserPostScrollViewController`).
+*   `[ ]` (P1.FEEDREFACTOR.4) Реализовать `FullPostCellDelegate` в `FeedViewController` для обработки действий (лайк, комментарий, профиль).
+*   `[ ]` (P1.FEEDREFACTOR.5) Реализовать пагинацию в `FeedViewController` через `UICollectionViewDataSourcePrefetching` и `scrollViewDidScroll`.
+*   `[ ]` (P1.FEEDREFACTOR.6) Удалить неиспользуемые `PostCell.swift` и `CarouselPostCell.swift`.
+*   `[ ]` (P1.FEEDREFACTOR.7) Удалить неиспользуемые `PostCellDelegate` и `CarouselPostCellDelegate`.
+
 ### Theme: Comments (MVP)
 *   `[X]` (P1.COMMENT.1) Исправить установку делегата `UserPostScrollViewControllerDelegate` для открытия экрана комментариев.
 *   `[X]` (P1.COMMENT.2) Реализовать pull-to-refresh в `CommentsViewController`.
 *   `[X]` (P1.COMMENT.3) Оптимизировать добавление комментария (возвращать добавленный `Comment`, не перезагружать все).
-
-## Фаза 2: Улучшения и Новые Фичи
-
-### Theme: Feed (Main)
-*   `[ ]` (P2.FEEDMAIN.1) Реализовать основной экран ленты (`FeedViewController` + `FeedViewModel`).
-*   `[ ]` (P2.FEEDMAIN.2) Загрузка постов от подписок пользователя (агрегация на клиенте или Cloud Functions?).
-*   `[ ]` (P2.FEEDMAIN.3) Pull-to-refresh для основной ленты.
-*   `[ ]` (P2.FEEDMAIN.4) Пагинация для основной ленты.
-
-### Theme: Profile (Other User)
-*   `[ ]` (P2.PROFILEOTH.1) Возможность открыть профиль другого пользователя (из ленты, из комментариев).
-*   `[ ]` (P2.PROFILEOTH.2) Отображение кнопки "Follow"/"Unfollow" и логика подписки/отписки.
-
-### Theme: Search/Explore
-*   `[ ]` (P2.SEARCH.1) Экран поиска пользователей (`SearchViewController` + `SearchViewModel`).
-*   `[ ]` (P2.SEARCH.2) Логика поиска пользователей в Firebase.
-*   `[ ]` (P2.SEARCH.3) Отображение результатов поиска.
-*   `[ ]` (P2.SEARCH.4) (Опционально) Вкладка "Explore" с рекомендуемыми постами/пользователями.
-
-### Theme: Comments (Improvements)
-*   `[ ]` (P2.COMMENT.1) Внедрить real-time обновления для комментариев (Firestore `addSnapshotListener`).
-*   `[ ]` (P2.COMMENT.2) Реализовать лайки для комментариев (UI, Service, ViewModel).
-
-## Фаза 3: Fitness & RPG
-
-### Theme: Pose Estimation
-*   `[ ]` (P3.POSE.1) Интегрировать MediaPipe (`pose_landmarker_full.task`, Float16, 256x256).
-*   `[ ]` (P3.POSE.2) Экран записи упражнения с отображением камеры и оверлея скелета.
-*   `[ ]` (P3.POSE.3) Базовый анализатор для одного-двух упражнений (например, приседания, отжимания).
-*   `[ ]` (P3.POSE.4) Подсчет повторений и оценка качества выполнения.
-
-### Theme: Progress Tracking
-*   `[ ]` (P3.PROG.1) Сохранение результатов тренировок (упражнение, повторения, дата, оценка).
-*   `[ ]` (P3.PROG.2) Отображение истории тренировок пользователя.
-*   `[ ]` (P3.PROG.3) Расчет XP и обновление уровня/ранга пользователя на основе тренировок.
-*   `[ ]` (P3.PROG.4) Расчет и обновление аттрибутов (STR, CON и т.д.) на основе выполненных упражнений.
-
-### Theme: Comments (Advanced)
-*   `[ ]` (P3.COMMENT.1) Реализовать ответы на комментарии (вложенность) (UI, Data Model, Service, ViewModel).

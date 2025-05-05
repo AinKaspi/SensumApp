@@ -60,8 +60,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
 }
 
+// ----- Протокол для Главного Координатора -----
+protocol AppCoordinatorProtocol: AnyObject {
+    func showNotifications()
+    // Добавьте сюда другие методы, которые должны быть доступны дочерним координаторам
+}
+
 // ----- Главный Координатор Приложения -----
-class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
+class AppCoordinator: Coordinator, AuthCoordinatorDelegate, AppCoordinatorProtocol {
     
     var window: UIWindow
     var navigationController: UINavigationController
@@ -133,7 +139,7 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
             userProfileService: userProfileService,
             followService: followService,
             progressService: progressService,
-            appCoordinator: self 
+            appCoordinator: self as AppCoordinatorProtocol
         )
         addChild(feedCoordinator)
         feedCoordinator.start()
@@ -275,4 +281,3 @@ class AppCoordinator: Coordinator, AuthCoordinatorDelegate {
 // class RankCoordinator: Coordinator { ... }
 
 // LevelingCoordinator, StoreCoordinator теперь реальные координаторы в своих папках
-

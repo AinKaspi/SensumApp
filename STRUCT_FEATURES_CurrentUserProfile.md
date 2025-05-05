@@ -1,0 +1,12 @@
+### Features/CurrentUserProfile
+
+_Модуль отвечает за отображение и управление профилем текущего пользователя._
+
+*   `/Users/inga/Desktop/SensumApp/Features/CurrentUserProfile`
+    *   `Coordinators/`: Координатор для навигации в рамках фичи.
+        *   `CurrentUserProfileCoordinator.swift`: `final class`. Управляет навигацией для профиля *текущего* пользователя. Запускает `UserProfileFeedViewController`, обрабатывает переходы (редактирование, создание поста, просмотр постов/комментариев, выход), реализуя множество делегатов (`UserProfileFeedViewControllerDelegate`, `EditProfileViewControllerDelegate`, `PostMediaSelectionDelegate` и др.). Управляет полным циклом создания поста, инициированным из профиля. Может запускать дочерний `UserProfileCoordinator` для показа других профилей. Передает зависимости (сервисы) в ViewModel'ы.
+    *   `Scenes/`: Сцены (экраны) профиля.
+        *   `EditProfile/`: Содержит компоненты экрана редактирования профиля.
+            *   `EditProfileViewController.swift`: `UIViewController` для экрана редактирования профиля. Отображает текущие данные (аватар через Kingfisher, имя, статус). Позволяет выбрать новый аватар (`PHPickerViewControllerDelegate`) и изменить текстовые поля. Использует `EditProfileViewModel` (инъекция) и Combine (`setupBindings`) для загрузки начальных данных, отслеживания состояния загрузки/ошибок, активации кнопки "Save" (`checkForChanges`). Вызывает `viewModel.saveProfile()` при сохранении. Уведомляет координатора через `EditProfileViewControllerDelegate`.
+    *   `ViewModels/`: ViewModel'и для сцен фичи.
+        *   `EditProfileViewModel.swift`: `class`. Логика представления для `EditProfileViewController`. Загружает начальные данные профиля (`loadInitialData`) через `UserProfileService`. Предоставляет `@Published` свойства для UI (`initialUsername`, `initialStatus`, `initialAvatarURL`, `isLoading`, `errorMessage`). Метод `saveProfile` обрабатывает сохранение изменений: определяет измененные поля, использует `Future` (Combine) для загрузки нового аватара через `StorageService` (если нужно), затем обновляет данные в Firestore через `UserProfileService.updateUserProfile()`. Уведомляет координатора об успехе/ошибке через `EditProfileViewModelDelegate`.

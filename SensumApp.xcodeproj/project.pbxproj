@@ -82,6 +82,7 @@
 		B1AE8A522DB7B65B0089728F /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = B1AE8A512DB7B65B0089728F /* Kingfisher */; };
 		B1AE8A652DB8E4F90089728F /* UITextView+Combine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1AE8A622DB8E4F90089728F /* UITextView+Combine.swift */; };
 		B1C119262DC7A7CB00F04CAE /* IQKeyboardManagerSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B1C119252DC7A7CB00F04CAE /* IQKeyboardManagerSwift */; };
+		B1C1192E2DC7F16E00F04CAE /* STRUCT.md in Resources */ = {isa = PBXBuildFile; fileRef = B1C1192D2DC7F16E00F04CAE /* STRUCT.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -108,6 +109,7 @@
 		B1686C582DC213820074FA46 /* PostAspectRatio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostAspectRatio.swift; sourceTree = "<group>"; };
 		B1A6E6E92DA7F0F500E9E9EB /* ROADMAP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ROADMAP.md; sourceTree = "<group>"; };
 		B1AE8A622DB8E4F90089728F /* UITextView+Combine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UITextView+Combine.swift"; sourceTree = "<group>"; };
+		B1C1192D2DC7F16E00F04CAE /* STRUCT.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = STRUCT.md; sourceTree = "<group>"; };
 		C1B889D639EA09C28DFCEA72 /* Pods-SensumApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SensumApp.debug.xcconfig"; path = "Target Support Files/Pods-SensumApp/Pods-SensumApp.debug.xcconfig"; sourceTree = "<group>"; };
 		E9025409A618C3F734EB6431 /* Pods_SensumApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SensumApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		F09E02F1D36F1A3DF5B6EB3F /* Pods-SensumApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SensumApp.release.xcconfig"; path = "Target Support Files/Pods-SensumApp/Pods-SensumApp.release.xcconfig"; sourceTree = "<group>"; };
@@ -256,7 +258,7 @@
 				B1AE8A642DB8E4F90089728F /* Common */,
 				B190B3022DB6CF86007376B9 /* Core */,
 				B1A6E6E92DA7F0F500E9E9EB /* ROADMAP.md */,
-				B1BE36982DA6A74900BF1C55 /* Managers */,
+				B1C1192D2DC7F16E00F04CAE /* STRUCT.md */,
 				B148669E2DA43B8000C4A753 /* Features */,
 				B148666B2DA4351800C4A753 /* SensumApp */,
 				B148666A2DA4351800C4A753 /* Products */,
@@ -306,13 +308,6 @@
 				B1AE8A632DB8E4F90089728F /* Extensions */,
 			);
 			path = Common;
-			sourceTree = "<group>";
-		};
-		B1BE36982DA6A74900BF1C55 /* Managers */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Managers;
 			sourceTree = "<group>";
 		};
 		F63668B67930736A5C55B64D /* Frameworks */ = {
@@ -397,6 +392,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B1C1192E2DC7F16E00F04CAE /* STRUCT.md in Resources */,
 				B1A6E6EA2DA7F0F500E9E9EB /* ROADMAP.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

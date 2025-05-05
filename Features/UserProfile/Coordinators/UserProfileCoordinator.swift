@@ -3,6 +3,8 @@ import UIKit
 class UserProfileCoordinator: Coordinator {
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
+    // Добавляем ссылку на AppCoordinator
+    weak var appCoordinator: AppCoordinatorProtocol?
     
     // Зависимости
     private let userID: String // ID пользователя, чей профиль показываем
@@ -18,13 +20,15 @@ class UserProfileCoordinator: Coordinator {
          userProfileService: UserProfileServiceProtocol = UserProfileService(),
          postService: PostServiceProtocol = PostService(),
          followService: FollowServiceProtocol = FollowService(),
-         progressService: ProgressServiceProtocol) { // Убрали = ProgressService()
+         progressService: ProgressServiceProtocol, 
+         appCoordinator: AppCoordinatorProtocol?) { 
         self.navigationController = navigationController
         self.userID = userID
         self.userProfileService = userProfileService
         self.postService = postService
         self.followService = followService
-        self.progressService = progressService // Сохраняем
+        self.progressService = progressService 
+        self.appCoordinator = appCoordinator 
     }
 
     func start() {

@@ -19,7 +19,12 @@ class PostMediaSelectionViewController: UIViewController, UIScrollViewDelegate, 
     // Храним EditableMediaItem
     /* private */ var editableMedia: [EditableMediaItem]
     private var currentSelectedIndex: Int = 0
-    private var selectedAspectRatio: PostAspectRatio = .square
+    // ❗️ Формат по умолчанию - портретный
+    private var selectedAspectRatio: PostAspectRatio = .portrait
+    // ❗️ Переносим объявление сюда
+    private var previewCollectionViewHeightConstraint: NSLayoutConstraint?
+    // ❗️ Добавляем переменную для верхнего констрейнта
+    private var previewCollectionViewTopConstraint: NSLayoutConstraint?
     
     // MARK: - UI Elements
 
@@ -44,19 +49,36 @@ class PostMediaSelectionViewController: UIViewController, UIScrollViewDelegate, 
         return collectionView
     }()
 
-    // Переносим определение aspectRatioSegmentedControl внутрь класса
-    private lazy var aspectRatioSegmentedControl: UISegmentedControl = {
-        let items = PostAspectRatio.allCases.map { $0.stringValue }
-        let control = UISegmentedControl(items: items)
-        control.translatesAutoresizingMaskIntoConstraints = false
-        let defaultIndex = PostAspectRatio.allCases.firstIndex(of: .square) ?? 0
-        control.selectedSegmentIndex = defaultIndex
-        control.backgroundColor = .darkGray
-        control.selectedSegmentTintColor = .systemBlue
-        control.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
-        control.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
-        control.addTarget(self, action: #selector(aspectRatioChanged(_:)), for: .valueChanged)
-        return control
+    // +++ Добавляем новые элементы +++
+    private lazy var ratioButtonsContainer: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        // Можно добавить стили для контейнера, если нужно (например, скругление)
+        // view.layer.cornerRadius = 8
+        // view.clipsToBounds = true
+        return view
+    }()
+    
+    private lazy var portraitRatioButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setTitle(PostAspectRatio.portrait.stringValue, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        button.layer.cornerRadius = 8 // Скруглим углы
+        button.layer.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner] // Только левые
+        button.addTarget(self, action: #selector(portraitRatioTapped), for: .touchUpInside)
+        return button
+    }()
+    
+    private lazy var squareRatioButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setTitle(PostAspectRatio.square.stringValue, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        button.layer.cornerRadius = 8 // Скруглим углы
+        button.layer.maskedCorners = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner] // Только правые
+        button.addTarget(self, action: #selector(squareRatioTapped), for: .touchUpInside)
+        return button
     }()
 
     // MARK: - Initialization
@@ -88,6 +110,11 @@ class PostMediaSelectionViewController: UIViewController, UIScrollViewDelegate, 
         setupViews()
         setupConstraints()
         setupCollectionView()
+        updateRatioButtonStyles() 
+        // ❗️ Вызываем layoutIfNeeded после setupConstraints, чтобы ширина view была известна для расчета начальной высоты
+        view.layoutIfNeeded()
+        // ❗️ Устанавливаем начальную высоту коллекции
+        updateCollectionViewHeight(animated: false)
     }
 
     // MARK: - Setup
@@ -109,25 +136,53 @@ class PostMediaSelectionViewController: UIViewController, UIScrollViewDelegate, 
     private func setupViews() {
         // Добавляем UI элементы на view
         view.addSubview(previewCollectionView)
-        view.addSubview(aspectRatioSegmentedControl)
+        // ❗️ Добавляем контейнер и кнопки
+        view.addSubview(ratioButtonsContainer)
+        ratioButtonsContainer.addSubview(portraitRatioButton)
+        ratioButtonsContainer.addSubview(squareRatioButton)
     }
 
     private func setupConstraints() {
+        // Рассчитываем начальную высоту (до активации констрейнтов)
+        // Используем ширину view, но она может быть неточной до первого layout pass
+        let initialHeight = calculateCollectionViewHeight(for: view.bounds.width)
+        
+        // Создаем констрейнт высоты и сохраняем его
+        let heightConstraint = previewCollectionView.heightAnchor.constraint(equalToConstant: initialHeight)
+        // ❗️ Присваиваем значение свойству класса
+        self.previewCollectionViewHeightConstraint = heightConstraint
+         
+        // ❗️ Создаем верхний констрейнт и сохраняем его
+        let topConstraint = previewCollectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20) // Начальный отступ 20
+        self.previewCollectionViewTopConstraint = topConstraint
+        
         // Констрейнты для UI элементов
         NSLayoutConstraint.activate([
-            previewCollectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            // Возвращаем CollectionView на всю ширину
-            previewCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 0),
-            previewCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 0),
-            // Возвращаем фиксированное ограничение высоты для CollectionView
-            // Увеличиваем множитель, чтобы вместить 9:16
-            previewCollectionView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.65),
+            // ❗️ Активируем созданный верхний констрейнт
+            topConstraint,
+            previewCollectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            previewCollectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            // ❗️ Активируем созданный констрейнт высоты
+            heightConstraint,
+
+            // Констрейнты для контейнера кнопок
+            // Привязываем верх кнопок к низу коллекции
+            ratioButtonsContainer.topAnchor.constraint(equalTo: previewCollectionView.bottomAnchor, constant: 20),
+            // ❗️ Увеличиваем боковые отступы до 50
+            ratioButtonsContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 42),
+            ratioButtonsContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -42),
+            ratioButtonsContainer.heightAnchor.constraint(equalToConstant: 44), // Задаем высоту контейнера
             
-            // Восстанавливаем привязку верха SegmentedControl к низу CollectionView
-            aspectRatioSegmentedControl.topAnchor.constraint(equalTo: previewCollectionView.bottomAnchor, constant: 20),
-            aspectRatioSegmentedControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            aspectRatioSegmentedControl.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
-            aspectRatioSegmentedControl.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20)
+            // ❗️ Констрейнты для кнопок внутри контейнера
+            portraitRatioButton.topAnchor.constraint(equalTo: ratioButtonsContainer.topAnchor),
+            portraitRatioButton.bottomAnchor.constraint(equalTo: ratioButtonsContainer.bottomAnchor),
+            portraitRatioButton.leadingAnchor.constraint(equalTo: ratioButtonsContainer.leadingAnchor),
+            portraitRatioButton.trailingAnchor.constraint(equalTo: ratioButtonsContainer.centerXAnchor), // Левая кнопка до центра
+            
+            squareRatioButton.topAnchor.constraint(equalTo: ratioButtonsContainer.topAnchor),
+            squareRatioButton.bottomAnchor.constraint(equalTo: ratioButtonsContainer.bottomAnchor),
+            squareRatioButton.leadingAnchor.constraint(equalTo: ratioButtonsContainer.centerXAnchor), // Правая кнопка от центра
+            squareRatioButton.trailingAnchor.constraint(equalTo: ratioButtonsContainer.trailingAnchor)
         ])
     }
     
@@ -147,22 +202,102 @@ class PostMediaSelectionViewController: UIViewController, UIScrollViewDelegate, 
         delegate?.postMediaSelectionDidTapNext(items: editableMedia, aspectRatio: selectedAspectRatio)
     }
     
-    @objc private func aspectRatioChanged(_ sender: UISegmentedControl) {
-        let newIndex = sender.selectedSegmentIndex
-        guard newIndex >= 0 && newIndex < PostAspectRatio.allCases.count else { return }
-        let newAspectRatio = PostAspectRatio.allCases[newIndex]
-        
-        // Сохраняем выбранное значение
-        selectedAspectRatio = newAspectRatio
-        
-        // DEBUG: Логируем изменение
-        print(" Aspect Ratio Selection Changed: Index=\(newIndex), New AR=\(newAspectRatio.stringValue) (\(newAspectRatio.ratio))")
-        
-        // Инвалидируем layout, чтобы заставить пересчитать размеры ячеек!
-        previewCollectionView.collectionViewLayout.invalidateLayout()
-        previewCollectionView.reloadData()
+    // +++ Добавляем новые обработчики и стилизацию +++
+    @objc private func portraitRatioTapped() {
+        guard selectedAspectRatio != .portrait else { return } // Не меняем, если уже выбрано
+        selectedAspectRatio = .portrait
+        print("Selected aspect ratio: Portrait")
+        updateRatioButtonStyles()
+        reloadCollectionViewLayout()
     }
     
+    @objc private func squareRatioTapped() {
+        guard selectedAspectRatio != .square else { return } // Не меняем, если уже выбрано
+        selectedAspectRatio = .square
+        print("Selected aspect ratio: Square")
+        updateRatioButtonStyles()
+        reloadCollectionViewLayout()
+    }
+    
+    private func updateRatioButtonStyles() {
+        let portraitIsActive = selectedAspectRatio == .portrait
+        
+        portraitRatioButton.backgroundColor = portraitIsActive ? .white : .black
+        portraitRatioButton.setTitleColor(portraitIsActive ? .black : .white, for: .normal)
+        // Можно добавить обводку для неактивной кнопки для лучшего контраста
+        portraitRatioButton.layer.borderWidth = portraitIsActive ? 0 : 1
+        portraitRatioButton.layer.borderColor = UIColor.darkGray.cgColor
+        
+        squareRatioButton.backgroundColor = !portraitIsActive ? .white : .black
+        squareRatioButton.setTitleColor(!portraitIsActive ? .black : .white, for: .normal)
+        squareRatioButton.layer.borderWidth = !portraitIsActive ? 0 : 1
+        squareRatioButton.layer.borderColor = UIColor.darkGray.cgColor
+    }
+    
+    // Вспомогательный метод для перезагрузки layout'а
+    private func reloadCollectionViewLayout() {
+        // Обновляем высоту коллекции с анимацией
+        updateCollectionViewHeight(animated: true)
+         
+        // ❗️ Оборачиваем reloadData в анимацию перехода
+        UIView.transition(with: self.previewCollectionView, 
+                          duration: 0.2, // Короткая длительность для cross-fade
+                          options: .transitionCrossDissolve,
+                          animations: { self.previewCollectionView.reloadData() },
+                          completion: nil)
+         
+        // invalidateLayout не нужен при простой перезагрузке данных, если размер ячеек не меняется
+         
+        // Можно добавить плавный скролл к текущей ячейке после перезагрузки
+        // if currentSelectedIndex >= 0 && currentSelectedIndex < editableMedia.count {
+        //    let indexPath = IndexPath(item: currentSelectedIndex, section: 0)
+        //    previewCollectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: true)
+        // }
+    }
+    
+    // +++ Новый метод для расчета и обновления высоты +++
+    private func calculateCollectionViewHeight(for width: CGFloat) -> CGFloat {
+        // Используем ту же логику расчета, что и в sizeForItemAt, но для актуальной ширины КОЛЛЕКЦИИ
+        guard previewCollectionView.bounds.width > 0 else { 
+            print("⚠️ Warning: Trying to calculate height before collection view has width. Returning estimated height.")
+            // Возвращаем примерное значение, если ширина еще 0
+            return UIScreen.main.bounds.width / selectedAspectRatio.ratio 
+        }
+        let actualWidth = previewCollectionView.bounds.width
+        let sideInset = (previewCollectionView.collectionViewLayout as? UICollectionViewFlowLayout)?.sectionInset.left ?? 0
+        let cellWidth = actualWidth - (sideInset * 2)
+        let ratio = selectedAspectRatio.ratio
+        let cellHeight = cellWidth / ratio
+        print("Calculating CollectionView Height: actualWidth=\(actualWidth), ratio=\(ratio), height=\(cellHeight)")
+        return cellHeight
+    }
+    
+    private func updateCollectionViewHeight(animated: Bool) {
+        let newHeight = calculateCollectionViewHeight(for: previewCollectionView.bounds.width)
+        
+        // ❗️ Добавляем вычисление нового верхнего отступа
+        let newTopConstant: CGFloat = (selectedAspectRatio == .square) ? 120 : 20 // ❗️ Отступ 120 для 1:1, 20 для 9:16
+        
+        // Обновляем, если высота ИЛИ отступ изменились
+        guard previewCollectionViewHeightConstraint?.constant != newHeight || previewCollectionViewTopConstraint?.constant != newTopConstant else { 
+            print("CollectionView Height & Top already set to \(newHeight) & \(newTopConstant)")
+            return 
+        }
+        
+        print("Updating CollectionView Geometry: Height=\(newHeight), Top=\(newTopConstant)")
+        previewCollectionViewHeightConstraint?.constant = newHeight
+        // ❗️ Обновляем верхний отступ
+        previewCollectionViewTopConstraint?.constant = newTopConstant
+        
+        if animated {
+            UIView.animate(withDuration: 0.3) { // Длительность анимации можно настроить
+                self.view.layoutIfNeeded() // Применяем изменение констрейнта с анимацией
+            }
+        } else {
+            self.view.layoutIfNeeded() // Применяем немедленно
+        }
+    }
+
     // MARK: - Public Methods
     
     // Метод для обновления editableMedia извне (после кропа)

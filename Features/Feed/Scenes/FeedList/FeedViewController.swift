@@ -1,348 +1,447 @@
 import UIKit
 import Combine
+import FirebaseAuth
 
-class FeedViewController: UIViewController {
+// Определяем делегат здесь временно, или найдем его правильное место позже
+protocol FeedViewControllerDelegate: AnyObject {
+    func feedViewControllerDidTapNotifications(_ controller: FeedViewController)
+    func feedViewControllerDidTapMessages(_ controller: FeedViewController)
+    func feedViewController(_ controller: FeedViewController, didTapUsername userID: String)
+    func feedViewController(_ controller: FeedViewController, didTapCommentsForPostID postID: String)
+    // Добавьте другие методы по мере необходимости
+}
 
-    // Координатор для навигации
-    weak var coordinator: FeedCoordinator?
-    // Добавляем ViewModel
+// Меняем базовый класс и конформансы протоколов
+class FeedViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDataSourcePrefetching, FullPostCellDelegate {
+
+    // MARK: - Dependencies
     var viewModel: FeedViewModel!
+    weak var delegate: FeedViewControllerDelegate?
+
+    // Добавляем статическую ячейку для расчета высоты
+    private static let sizingCell = FullPostCell()
+    // Восстанавливаем cancellables
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - UI Elements
+    private lazy var collectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .vertical
+        layout.minimumLineSpacing = 15 // Промежуток между постами
+        layout.minimumInteritemSpacing = 0
 
-    // Верхняя плашка
-    private lazy var topBarView: UIView = {
-        let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Логотип DOJO
-        let logoImageView = UIImageView() // Используем ImageView
-        logoImageView.translatesAutoresizingMaskIntoConstraints = false
-        logoImageView.image = UIImage(named: "dojo_logo") // Предполагаем, что есть ассет "dojo_logo"
-        logoImageView.contentMode = .scaleAspectFit
-        // TODO: Задать фиксированный размер логотипа?
-        
-        // Кнопка Уведомлений (колокольчик)
-        let notificationsButton = UIButton(type: .system)
-        notificationsButton.translatesAutoresizingMaskIntoConstraints = false
-        notificationsButton.setImage(UIImage(systemName: "bell"), for: .normal)
-        notificationsButton.setPreferredSymbolConfiguration(.init(pointSize: 22, weight: .medium), forImageIn: .normal)
-        notificationsButton.tintColor = .white
-        notificationsButton.addTarget(self, action: #selector(notificationsButtonTapped), for: .touchUpInside)
-        // TODO: Добавить badge (кружок с цифрой) поверх кнопки
-        
-        // Кнопка Сообщений (самолетик)
-        let messagesButton = UIButton(type: .system)
-        messagesButton.translatesAutoresizingMaskIntoConstraints = false
-        messagesButton.setImage(UIImage(systemName: "paperplane"), for: .normal) 
-        messagesButton.setPreferredSymbolConfiguration(.init(pointSize: 24, weight: .medium), forImageIn: .normal)
-        messagesButton.tintColor = .white
-        messagesButton.addTarget(self, action: #selector(messagesButtonTapped), for: .touchUpInside)
-        
-        view.addSubview(logoImageView)
-        // Добавляем кнопки справа налево: сначала Сообщения, потом Уведомления
-        view.addSubview(messagesButton)
-        view.addSubview(notificationsButton)
-        
-        // Констрейнты внутри topBarView
-        NSLayoutConstraint.activate([
-            logoImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16), // <-- Отступ слева
-            logoImageView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            // Ограничим высоту логотипа
-            logoImageView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.5), // Например, 50% высоты topBar
-            // Добавим констрейнт ширины, чтобы сохранить пропорции (если известно соотношение) или задать фиксированную ширину
-            // Пример: logoImageView.widthAnchor.constraint(equalTo: logoImageView.heightAnchor, multiplier: 3.0) // Если соотношение 3:1
-            logoImageView.widthAnchor.constraint(equalToConstant: 100), // Или фиксированная ширина
-            
-            // Кнопка Сообщений прижата к правому краю
-            messagesButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16), // <-- Отступ справа
-            messagesButton.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            messagesButton.widthAnchor.constraint(equalToConstant: 30),
-            messagesButton.heightAnchor.constraint(equalToConstant: 30),
-            
-            // Кнопка Уведомлений левее кнопки Сообщений
-            notificationsButton.trailingAnchor.constraint(equalTo: messagesButton.leadingAnchor, constant: -15), // Отступ между кнопками
-            notificationsButton.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            notificationsButton.widthAnchor.constraint(equalToConstant: 30),
-            notificationsButton.heightAnchor.constraint(equalToConstant: 30)
-        ])
-        
-        return view
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        collectionView.backgroundColor = .black // Или другой цвет фона?
+        // Регистрируем FullPostCell
+        collectionView.register(FullPostCell.self, forCellWithReuseIdentifier: FullPostCell.identifier)
+        // Регистрируем футер для пагинации
+        collectionView.register(PaginationIndicatorFooterView.self,
+                              forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter,
+                              withReuseIdentifier: PaginationIndicatorFooterView.identifier)
+        collectionView.dataSource = self
+        collectionView.prefetchDataSource = self // Добавляем prefetchDataSource
+        collectionView.showsVerticalScrollIndicator = false
+        collectionView.alwaysBounceVertical = true // Для pull-to-refresh
+        return collectionView
     }()
 
-    // Создаем StoriesHeaderView
-    private lazy var storiesHeaderView: StoriesHeaderView = {
-        // Высота хедера = высота ячейки сторис + верхний/нижний отступ (если нужен)
-        let headerHeight: CGFloat = 120 + 10 // 120 высота ячейки + 10 отступ снизу?
-        let header = StoriesHeaderView(frame: CGRect(x: 0, y: 0, width: view.bounds.width * 0.86, height: headerHeight))
-        // Устанавливаем VC как делегата для CollectionView внутри хедера
-        header.setCollectionViewDataSourceDelegate(self, forRow: 0) 
-        return header
-    }()
-
-    // Основная лента
-    private lazy var feedTableView: UITableView = {
-        let tableView = UITableView()
-        tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.backgroundColor = .clear
-        tableView.separatorStyle = .none
-        // Регистрируем кастомную ячейку
-        tableView.register(PostCell.self, forCellReuseIdentifier: PostCell.identifier)
-        tableView.dataSource = self 
-        tableView.delegate = self 
-        // Добавляем Refresh Control
-        tableView.refreshControl = refreshControl
-        // Добавляем футер для индикатора пагинации
-        tableView.tableFooterView = paginationIndicatorFooterView
-        // Добавляем отступы для тени/эффектов, если нужно, т.к. таблица будет обрезаться
-        tableView.clipsToBounds = false 
-        // Устанавливаем хедер таблицы
-        tableView.tableHeaderView = storiesHeaderView
-        return tableView
-    }()
-
-    // Добавляем Refresh Control
-    private lazy var refreshControl: UIRefreshControl = {
-        let refreshControl = UIRefreshControl()
-        refreshControl.addTarget(self, action: #selector(handleRefreshControl), for: .valueChanged)
-        refreshControl.tintColor = .white // Цвет индикатора
-        return refreshControl
-    }()
-    
-    // Добавляем индикатор загрузки для пагинации (в футере)
-    private lazy var paginationIndicator: UIActivityIndicatorView = {
-        let indicator = UIActivityIndicatorView(style: .medium)
+    private lazy var activityIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .large)
+        indicator.translatesAutoresizingMaskIntoConstraints = false
         indicator.color = .white
         indicator.hidesWhenStopped = true
         return indicator
     }()
-    
-    // Контейнер для индикатора пагинации
-    private lazy var paginationIndicatorFooterView: UIView = {
-        let footerView = UIView(frame: CGRect(x: 0, y: 0, width: view.bounds.width * 0.86, height: 50)) // Ширина футера = 86%
-        paginationIndicator.center = footerView.center
-        footerView.addSubview(paginationIndicator)
-        return footerView
-    }()
+
+    // Добавляем refresh control для pull-to-refresh
+    private let refreshControl = UIRefreshControl()
+
+    // MARK: - Properties
+    private var expandedCaptions: Set<String> = [] // Для отслеживания развернутых описаний
 
     override func viewDidLoad() {
         super.viewDidLoad()
         assert(viewModel != nil, "ViewModel not injected")
         view.backgroundColor = .black
-        setupViews()
+        setupUI()
         setupConstraints()
+        setupRefreshControl() // Настраиваем pull-to-refresh
         setupBindings()
-    }
-    
-    // Скрываем системный Navigation Bar
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        navigationController?.setNavigationBarHidden(true, animated: animated)
+        // viewModel.loadInitialPosts() // Загружаем первые посты
     }
 
-    private func setupViews() {
-        view.addSubview(topBarView)
-        view.addSubview(feedTableView)
+    // MARK: - Setup
+    private func setupUI() {
+        // Добавляем collectionView вместо tableView
+        view.addSubview(collectionView)
+        view.addSubview(activityIndicator)
+        // refreshControl добавляется к collectionView
     }
 
     private func setupConstraints() {
-        let topBarHeight: CGFloat = 100
-        let topBarTopPadding: CGFloat = 64 
-        
-        // Убираем множитель ширины
-        // let containerWidthMultiplier: CGFloat = 0.86
-
         NSLayoutConstraint.activate([
-            // Верхняя плашка (100% ширины, привязана к safeArea)
-            topBarView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), // Используем safeAreaLayoutGuide
-            topBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            topBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            topBarView.heightAnchor.constraint(equalToConstant: topBarHeight),
-            
-            // Лента (UITableView) (оставляем 86% ширины, центрирована)
-            feedTableView.topAnchor.constraint(equalTo: topBarView.bottomAnchor, constant: 8),
-            feedTableView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.86), // <-- Оставляем 86%
-            feedTableView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            feedTableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+            // collectionView на весь экран
+            collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            collectionView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+
+            // Индикатор по центру
+            activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
         ])
     }
 
-    @objc private func messagesButtonTapped() {
-        coordinator?.showMessages()
+    private func setupRefreshControl() {
+        refreshControl.addTarget(self, action: #selector(refreshData(_:)), for: .valueChanged)
+        refreshControl.tintColor = .white // Цвет индикатора
+        collectionView.refreshControl = refreshControl // Привязываем к collectionView
     }
-    
-    // Обработчик Pull-to-Refresh
-    @objc private func handleRefreshControl() {
-        viewModel.refreshFeed()
-    }
-    
-    // Добавляем action для кнопки уведомлений
-    @objc private func notificationsButtonTapped() {
-        print("FeedVC: Notifications button tapped")
-        // Раскомментируем вызов координатора
-        coordinator?.showNotifications()
-    }
-    
-    // MARK: - Bindings
+
     private func setupBindings() {
-        // Подписка на посты ленты
+        // Загрузка начальных данных при первом появлении
+        // Используем fetchPosts(refresh: true)
+        viewModel.fetchPosts(refresh: true)
+
+        // Подписка на обновление постов
         viewModel.$feedPosts
             .receive(on: DispatchQueue.main)
-            // Используем .sink вместо прямого reloadData для возможности анимации
             .sink { [weak self] _ in
-                print("FeedVC: Received new feed posts. Reloading table view...")
-                self?.feedTableView.reloadData() // Пока простой reload
+                // Перезагружаем collectionView вместо tableView
+                self?.collectionView.reloadData()
             }
             .store(in: &cancellables)
-        
-        // Подписка на окончание обновления (Pull-to-Refresh)
+
+        // Подписка на состояние загрузки (начальной)
         viewModel.$isLoading
-             .receive(on: DispatchQueue.main)
-             .filter { !$0 } // Реагируем только на окончание загрузки (isLoading = false)
-             .sink { [weak self] _ in
-                 self?.refreshControl.endRefreshing()
-             }
-             .store(in: &cancellables)
-            
-        // Подписка на состояние загрузки пагинации
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isLoading in
+                if isLoading {
+                    self?.activityIndicator.startAnimating()
+                } else {
+                    self?.activityIndicator.stopAnimating()
+                    // Останавливаем pull-to-refresh, если он был активен
+                    self?.refreshControl.endRefreshing()
+                }
+            }
+            .store(in: &cancellables)
+
+        // Подписка на состояние пагинации (загрузки следующих)
         viewModel.$isFetchingMore
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isFetching in
-                if isFetching {
-                    self?.paginationIndicator.startAnimating()
-                    self?.feedTableView.tableFooterView?.isHidden = false
-                } else {
-                    self?.paginationIndicator.stopAnimating()
-                    // Скрываем футер, если больше нечего грузить или если загрузка просто завершилась
-                    if !(self?.viewModel.canLoadMore ?? true) {
-                         self?.feedTableView.tableFooterView?.isHidden = true
+                // Обновляем футер пагинации
+                // Найдем видимые футеры и обновим их состояние
+                self?.collectionView.indexPathsForVisibleSupplementaryElements(ofKind: UICollectionView.elementKindSectionFooter)
+                    .compactMap { self?.collectionView.supplementaryView(forElementKind: UICollectionView.elementKindSectionFooter, at: $0) as? PaginationIndicatorFooterView }
+                    .forEach { footer in
+                        if isFetching {
+                            footer.startAnimating()
+                        } else {
+                            footer.stopAnimating()
+                        }
                     }
-                }
+                // Также нужно вызвать reloadData или invalidation для футера, чтобы он появился/исчез
+                // Проще всего обновить секцию, но это может быть избыточно
+                 self?.collectionView.collectionViewLayout.invalidateLayout() // Пересчет layout для футера
             }
             .store(in: &cancellables)
-            
-        // Подписка на флаг canLoadMore
-        viewModel.$canLoadMore
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] canLoadMore in
-                // Если загрузка не идет и больше нечего грузить, скрываем футер
-                if !canLoadMore && !(self?.viewModel.isFetchingMore ?? false) {
-                    self?.feedTableView.tableFooterView?.isHidden = true
-                }
-            }
-            .store(in: &cancellables)
-            
-        // Добавляем биндинг для viewModel.$storyUsers
-        viewModel.$storyUsers
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                // Обновляем CollectionView внутри хедера
-                self?.storiesHeaderView.collectionView.reloadData()
-            }
-            .store(in: &cancellables)
-            
-        // TODO: Добавить биндинги для errorMessage, stories
-    }
-    
-    // TODO: Добавить методы для обработки нажатий на сторис/пользователей в ленте
-}
 
-// Обновляем DataSource и Delegate
-extension FeedViewController: UITableViewDataSource, UITableViewDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout, PostCellDelegate {
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        // Подписка на ошибки
+        viewModel.$errorMessage
+            .receive(on: DispatchQueue.main)
+            .compactMap { $0 } // Пропускаем nil
+            .sink { [weak self] errorMessage in
+                self?.showErrorAlert(message: errorMessage)
+                // Останавливаем все индикаторы
+                self?.activityIndicator.stopAnimating()
+                self?.refreshControl.endRefreshing()
+                // TODO: Возможно, остановить и индикатор пагинации, если ошибка при ней
+            }
+            .store(in: &cancellables)
+
+        // TODO: Добавить подписку на isLastPageReached, если нужно скрывать футер полностью
+    }
+
+    // MARK: - Actions
+    @objc private func refreshData(_ sender: UIRefreshControl) {
+        // Вызываем метод ViewModel для обновления
+        // Используем refreshFeed()
+        viewModel.refreshFeed()
+    }
+
+    // MARK: - Error Handling
+    private func showErrorAlert(message: String) {
+        let alert = UIAlertController(title: "Ошибка", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+
+    // MARK: - UICollectionViewDataSource
+    func numberOfSections(in collectionView: UICollectionView) -> Int {
+        return 1 // У нас одна секция для постов
+    }
+
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return viewModel.feedPosts.count
     }
-    
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let cell = tableView.dequeueReusableCell(withIdentifier: PostCell.identifier, for: indexPath) as? PostCell else {
-            fatalError("Unable to dequeue PostCell")
+
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: FullPostCell.identifier, for: indexPath) as? FullPostCell else {
+            fatalError("Unable to dequeue FullPostCell")
         }
-        let post = viewModel.feedPosts[indexPath.row]
-        cell.configure(with: post)
+
+        // 1. Пытаемся получить пост
+        guard let post = viewModel.feedPosts[safe: indexPath.item] else {
+            print("FeedVC [cellForItemAt] Warning: No post data for indexPath \(indexPath)")
+            // Вернуть пустую ячейку, если нет поста
+            return cell
+        }
+
+        // 2. Получаем currentUserID из Firebase Auth
+        guard let currentUserID = Auth.auth().currentUser?.uid else {
+             print("FeedVC Error: Could not get current user ID from Firebase Auth.")
+             // Вернуть пустую ячейку, если нет ID текущего пользователя
+             return cell
+        }
+
+        // 3. Используем метод configure с неопциональным post и currentUserID
+        cell.configure(with: post, currentUserID: currentUserID, indexPath: indexPath)
         cell.delegate = self
-        cell.setPostImageCornerRadius(25)
+        cell.indexPath = indexPath
         return cell
     }
-    
-    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        let padding: CGFloat = 8
-        let smallPadding: CGFloat = 4
-        let avatarHeight: CGFloat = 30
-        let actionButtonHeight: CGFloat = 30
-        let likesLabelHeight: CGFloat = 18
-        let imageWidth = view.bounds.width * 0.86 
-        let imageHeight = (imageWidth / 9 * 16)
-        let captionHeightEstimate: CGFloat = 40
-        
-        return padding + avatarHeight + padding + imageHeight + padding + actionButtonHeight + smallPadding + likesLabelHeight + smallPadding + captionHeightEstimate + padding
+
+    // Метод для футера пагинации
+    func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
+        switch kind {
+        case UICollectionView.elementKindSectionFooter:
+            guard let footer = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: PaginationIndicatorFooterView.identifier, for: indexPath) as? PaginationIndicatorFooterView else {
+                fatalError("Unable to dequeue PaginationIndicatorFooterView")
+            }
+            // Показываем анимацию, если идет загрузка и это последняя секция
+            if viewModel.isFetchingMore && indexPath.section == collectionView.numberOfSections - 1 && !viewModel.canLoadMore {
+                footer.startAnimating()
+            } else {
+                footer.stopAnimating()
+            }
+            return footer
+        default:
+            assert(false, "Unexpected element kind")
+            return UICollectionReusableView()
+        }
     }
-    
-    func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
-        let lastRowIndex = tableView.numberOfRows(inSection: indexPath.section) - 1
-        if indexPath.row == lastRowIndex {
+}
+
+// MARK: - UICollectionViewDelegateFlowLayout
+
+extension FeedViewController: UICollectionViewDelegateFlowLayout {
+
+    // Переписанный метод для расчета размера ячейки
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        let targetWidth = collectionView.bounds.width
+
+        guard let post = viewModel.feedPosts[safe: indexPath.item] else {
+            if indexPath.item == 0 {
+                print("FeedVC [sizeForItemAt 0] ⚠️ Warning: No post data")
+            }
+            return CGSize(width: targetWidth, height: 300) // Fallback
+        }
+
+        // Явный расчет высоты медиа
+        let aspectRatio = aspectRatioMultiplier(from: post.feedAspectRatio)
+        let mediaHeight = targetWidth * aspectRatio
+
+        // Расчет высоты остальных компонентов
+        // TODO: Уточнить эти константы или измерять их более точно, если нужно
+        let headerHeight: CGFloat = 50 // Аватар, имя, кнопка опций
+        let actionsHeight: CGFloat = 40 // Лайк, коммент, иконки
+        let footerSpacing: CGFloat = 10 // Отступ под caption
+
+        // Расчет высоты caption
+        let captionHeight = calculateCaptionHeight(for: post, targetWidth: targetWidth)
+
+        // Суммарная высота
+        let totalHeight = headerHeight + mediaHeight + actionsHeight + captionHeight + footerSpacing
+
+        // Логирование для первой ячейки
+        if indexPath.item == 0 {
+            print("FeedVC [sizeForItemAt 0]: AspectRatio String: \(post.feedAspectRatio), Multiplier: \(aspectRatio)")
+            print("FeedVC [sizeForItemAt 0]: H = Header(\(headerHeight)) + Media(\(mediaHeight)) + Actions(\(actionsHeight)) + Caption(\(captionHeight)) + Footer(\(footerSpacing)) = \(totalHeight)")
+        }
+
+        return CGSize(width: targetWidth, height: max(1, totalHeight))
+    }
+}
+
+// MARK: - UICollectionViewDelegate
+
+extension FeedViewController: UICollectionViewDelegate {
+
+    func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        if indexPath.item == 0, let fullPostCell = cell as? FullPostCell {
+            let cellFrame = fullPostCell.frame
+            // Доступ к 'mediaCollectionView' и 'imageAspectRatioConstraint' требует non-private в FullPostCell
+            let mediaFrame = fullPostCell.mediaCollectionView.frame 
+            let constraintMultiplier = fullPostCell.imageAspectRatioConstraint?.multiplier ?? -1
+            let isActive = fullPostCell.imageAspectRatioConstraint?.isActive ?? false
+            print("➡️ FeedVC [willDisplay 0]: Cell Frame: \(cellFrame), Media Frame: \(mediaFrame), Aspect Multiplier: \(String(format: "%.3f", constraintMultiplier)), IsActive: \(isActive)")
+        }
+        
+        // Логика для пагинации (ВРЕМЕННО ЗАКОММЕНТИРОВАНА ИЗ-ЗА ОШИБОК КОМПИЛЯЦИИ)
+        /*
+        if indexPath.item == viewModel.feedPosts.count - 5 && viewModel.canLoadMore && !viewModel.isLoadingPosts {
+            print("FeedVC [willDisplay]: Approaching end, loading more posts...")
+            viewModel.loadMorePosts()
+        }
+        */
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        if indexPath.item == 0 {
+            print("FeedVC [didEndDisplaying 0]: Cell disappeared.")
+        }
+        // Опционально: Отмена задач для ячейки, если необходимо (Kingfisher обычно справляется сам)
+        // if let cell = cell as? FullPostCell {
+        //     cell.cancelDownloadsIfNeeded()
+        // }
+    }
+}
+
+// MARK: - UICollectionViewDataSourcePrefetching
+extension FeedViewController {
+    func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+        // Проверяем, достигли ли мы конца списка при предзагрузке
+        if indexPaths.contains(where: { $0.item >= viewModel.feedPosts.count - 5 }) { // Загружаем за 5 элементов до конца
+            print("FeedVC: Prefetching near end, loading more...")
             viewModel.loadMorePostsIfNeeded()
         }
     }
-    
-    // MARK: - UICollectionViewDataSource & Delegate (для Stories)
-    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        // Возвращаем реальное количество пользователей
-        return viewModel.storyUsers.count
+}
+
+// MARK: - FullPostCellDelegate
+extension FeedViewController {
+
+    // Исправляем сигнатуру и реализацию
+    func didTapLikeButton(in cell: FullPostCell) {
+        guard let indexPath = collectionView.indexPath(for: cell),
+              let post = viewModel.feedPosts[safe: indexPath.item] else { return }
+        print("FeedVC: Like button tapped for post ID: \(post.id ?? "N/A")")
+        viewModel.toggleLike(for: post.id!)
     }
-    
-    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: StoryCell.identifier, for: indexPath) as? StoryCell else {
-            fatalError("Unable to dequeue StoryCell")
+
+    // Исправляем сигнатуру (Comment а не Comments) и реализацию
+    func didTapCommentButton(in cell: FullPostCell) {
+        guard let indexPath = collectionView.indexPath(for: cell),
+              let post = viewModel.feedPosts[safe: indexPath.item] else { return }
+        print("FeedVC: Comments button tapped for post ID: \(post.id ?? "N/A")")
+        delegate?.feedViewController(self, didTapCommentsForPostID: post.id!)
+    }
+
+    // Исправляем реализацию, чтобы получить userID
+    func didTapUsername(in cell: FullPostCell) {
+         guard let indexPath = collectionView.indexPath(for: cell),
+               let post = viewModel.feedPosts[safe: indexPath.item] else { return }
+        print("FeedVC: Username tapped for user ID: \(post.userID)")
+        delegate?.feedViewController(self, didTapUsername: post.userID)
+    }
+
+    // Реализуем недостающий метод
+    func didTapFollowButton(in cell: FullPostCell) {
+        guard let indexPath = collectionView.indexPath(for: cell),
+              let post = viewModel.feedPosts[safe: indexPath.item] else { return }
+        print("FeedVC: Follow button tapped for user ID: \(post.userID). Post ID: \(post.id ?? "N/A")")
+        // TODO: Implement follow/unfollow logic using viewModel or a dedicated service
+        // viewModel.toggleFollow(userId: post.userID)
+    }
+
+    // Реализуем недостающий метод
+    func fullPostCellDidRequestLayoutUpdate(at indexPath: IndexPath) {
+        // Этот метод вызывается из ячейки, когда ее контент изменился
+        // (например, развернули/свернули текст) и требуется пересчет высоты.
+        print("FeedVC: Layout update requested for cell at \(indexPath)")
+        // Используем performBatchUpdates для плавной анимации изменения размера
+        collectionView.performBatchUpdates({
+            // Простого invalidateLayout для UICollectionViewFlowLayout обычно достаточно,
+            // так как он заставит collection view переспросить размеры через sizeForItemAt.
+            // Если используется Compositional Layout с estimated размерами, может потребоваться
+            // collectionView.collectionViewLayout.invalidateLayout(with: context)
+            // или даже переконфигурация снапшота.
+            // Для Flow Layout этого должно хватить:
+            collectionView.collectionViewLayout.invalidateLayout()
+        }, completion: nil)
+
+        // Старый код с обновлением кэша (больше не нужен)
+        /*
+        guard let postId = viewModel.feedPosts[safe: indexPath.item]?.id else { return }
+        // Сбрасываем кэш высоты для этой ячейки
+        // cellHeightCache.removeValue(forKey: postId)
+
+        collectionView.performBatchUpdates({
+            // Инвалидируем layout только для измененного элемента, если возможно
+            // let context = UICollectionViewFlowLayoutInvalidationContext()
+            // context.invalidateItems(at: [indexPath])
+            // collectionView.collectionViewLayout.invalidateLayout(with: context)
+            // ИЛИ инвалидируем весь layout
+            collectionView.collectionViewLayout.invalidateLayout()
+        }, completion: nil)
+        */
+    }
+
+    func didTapOptionsButton(in cell: FullPostCell, forPostId postId: String) {
+        print("FeedVC: Options button tapped for post ID: \(postId)")
+        // TODO: Implement options action sheet (e.g., report, unfollow, delete)
+        showOptionsActionSheet(for: postId)
+    }
+
+    // MARK: - Private Helpers
+    private func showOptionsActionSheet(for postId: String) {
+        // TODO: Implement options action sheet
+    }
+}
+
+// MARK: - Helper Methods (Re-added)
+
+// Копируем или делаем доступным из FullPostCell
+extension FeedViewController {
+    private func aspectRatioMultiplier(from string: String) -> CGFloat {
+        switch string {
+            case "9:16": return 16.0 / 9.0
+            case "1:1": return 1.0 / 1.0
+            case "1.91:1": return 1.0 / 1.91
+            default:
+                print("FeedVC Warning: Unknown aspectRatio string '\(string)', defaulting to 1:1")
+                return 1.0 // Дефолт 1:1
         }
-        // Получаем данные пользователя из viewModel
-        let user = viewModel.storyUsers[indexPath.item]
-        // TODO: Определить hasNewContent
-        cell.configure(username: user.username, avatarURL: user.avatarURL, hasNewContent: false) // Placeholder для hasNewContent
-        return cell
     }
-    
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        print("Story cell tapped at index: \(indexPath.item)")
-        // Получаем userID из viewModel и вызываем навигацию
-        let userID = viewModel.storyUsers[indexPath.item].id
-        guard let validUserID = userID else {
-             print("FeedVC Error: User ID is nil for story at index \(indexPath.item)")
-             return
+
+    private func calculateCaptionHeight(for post: Post, targetWidth: CGFloat) -> CGFloat {
+        guard let caption = post.caption, !caption.isEmpty else {
+            return 0 // Нет подписи - нет высоты
         }
-        coordinator?.showUserProfile(userID: validUserID)
-    }
-    
-    // MARK: - PostCellDelegate
-    
-    func postCellDidTapAuthor(_ cell: PostCell) {
-        guard let indexPath = feedTableView.indexPath(for: cell) else { return }
-        let authorID = viewModel.feedPosts[indexPath.row].userID
-        print("FeedVC: Author tapped for post at index \(indexPath.row), userID: \(authorID)")
-        coordinator?.showUserProfile(userID: authorID)
-    }
-    
-    func postCellDidTapLikeButton(_ cell: PostCell, currentLikeState: Bool) {
-        guard let postID = cell.getPostID() else { return }
-        print("FeedVC: Like button tapped for postID: \(postID), current state: \(currentLikeState)")
-        viewModel.toggleLike(for: postID)
-    }
-    
-    // Реализуем метод для кнопки комментариев
-    func postCellDidTapCommentButton(_ cell: PostCell) {
-        guard let postID = cell.getPostID() else { return }
-        print("FeedVC: Comment button tapped for postID: \(postID)")
-        // Вызываем метод координатора для показа комментариев
-        coordinator?.showComments(for: postID)
-    }
-    
-    // Реализуем метод делегата для обновления ячейки
-    func postCellDidToggleCaption(_ cell: PostCell) {
-        // Обновляем layout таблицы, чтобы она пересчитала высоту ячейки
-        // Используем performBatchUpdates для плавной анимации
-        feedTableView.performBatchUpdates(nil, completion: nil)
-        // Альтернатива (без анимации):
-        // feedTableView.beginUpdates()
-        // feedTableView.endUpdates()
+
+        // Используем статическую ячейку для доступа к конфигурации шрифта/отступов captionLabel
+        // Либо создаем label с такими же параметрами
+        let sizingLabel = UILabel()
+        // TODO: Убедиться, что шрифт и другие параметры соответствуют captionLabel в FullPostCell
+        sizingLabel.font = .systemFont(ofSize: 14) // Пример, взять из FullPostCell
+        sizingLabel.numberOfLines = FullPostCell.captionMaxLinesCollapsed // Используем лимит строк из ячейки
+        sizingLabel.text = caption
+
+        // Определяем максимальную ширину для текста подписи (ширина ячейки минус горизонтальные отступы)
+        // TODO: Уточнить отступы (padding) из FullPostCell
+        let captionPadding: CGFloat = 16 * 2 // Пример: 16pt слева и справа
+        let captionMaxWidth = targetWidth - captionPadding
+
+        guard captionMaxWidth > 0 else { return 0 }
+
+        let calculatedSize = sizingLabel.systemLayoutSizeFitting(
+            CGSize(width: captionMaxWidth, height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required, // Ширина фиксирована
+            verticalFittingPriority: .fittingSizeLevel // Высота подстраивается
+        )
+
+        return calculatedSize.height
     }
 }

@@ -25,10 +25,10 @@ class FullPostCell: UICollectionViewCell {
     private var currentPostId: String?
     
     // УДАЛЯЕМ замыкание для запроса обновления layout
-    // var needsLayoutUpdateAction: ((IndexPath, CGFloat) -> Void)?
     
-    // Добавляем свойство для хранения активного констрейнта соотношения сторон
-    private var imageAspectRatioConstraint: NSLayoutConstraint?
+    
+    // Убираем private, чтобы FeedVC мог логировать его multiplier
+    var imageAspectRatioConstraint: NSLayoutConstraint?
 
     // ОБНОВЛЕНИЕ: Добавляем новые свойства
     private var isCaptionExpanded: Bool = false
@@ -52,7 +52,8 @@ class FullPostCell: UICollectionViewCell {
     }()
 
     // === НОВЫЕ ЭЛЕМЕНТЫ для МЕДИА ===
-    private lazy var mediaCollectionView: UICollectionView = {
+    // Убираем private, чтобы FeedVC мог логировать его frame
+    lazy var mediaCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .horizontal
         layout.minimumLineSpacing = 0
@@ -63,9 +64,6 @@ class FullPostCell: UICollectionViewCell {
         collectionView.showsHorizontalScrollIndicator = false
         collectionView.backgroundColor = .black // Фон контейнера
         collectionView.register(MediaItemCell.self, forCellWithReuseIdentifier: MediaItemCell.identifier)
-        collectionView.dataSource = self // Установим DataSource
-        collectionView.delegate = self   // Установим Delegate
-        collectionView.prefetchDataSource = self // Установим PrefetchDataSource
         return collectionView
     }()
 
@@ -122,7 +120,7 @@ class FullPostCell: UICollectionViewCell {
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.axis = .horizontal
         stackView.spacing = 8 // Отступ между элементами
-        stackView.alignment = .center // Выравнивание по центру вертикали
+        stackView.alignment = .center
         return stackView
     }()
 
@@ -192,9 +190,7 @@ class FullPostCell: UICollectionViewCell {
     // -- Action Buttons --
     private lazy var likeButton: UIButton = createActionButton(systemName: "heart", selector: #selector(likeButtonTapped))
     private lazy var commentButton: UIButton = createActionButton(systemName: "message", selector: #selector(commentButtonTapped))
-    // УДАЛЯЕМ shareButton
-    // private lazy var shareButton: UIButton = createActionButton(systemName: "paperplane", selector: #selector(shareButtonTapped))
-
+    
     // -- Sub-Stacks for Actions/Stats --
     private lazy var likeStackView: UIStackView = {
         let stackView = UIStackView(arrangedSubviews: [likeButton, likeCountLabel])
@@ -264,14 +260,33 @@ class FullPostCell: UICollectionViewCell {
         return label
     }()
 
+    // MARK: - Setup
+
+    // НОВЫЙ МЕТОД для настройки делегатов
+    func setupDelegates() {
+        // Делегаты и dataSource для mediaCollectionView
+        mediaCollectionView.delegate = self
+        mediaCollectionView.dataSource = self
+        mediaCollectionView.prefetchDataSource = self // Добавляем prefetching
+        
+        // TapGesture для captionLabel настраивается в lazy var
+        // captionLabel.delegate = self // TTTAttributedLabelDelegate, если используется
+        print("FullPostCell: setupDelegates выполнен")
+    }
+
     // MARK: - Init
 
     override init(frame: CGRect) {
         super.init(frame: frame)
+        
+        // Оставляем imageAspectRatioConstraint пока nil
+
         // Убираем фон
         contentView.backgroundColor = .black
         setupViews()
         setupConstraints()
+        setupDelegates() // Вызываем ПОСЛЕ setupConstraints
+        
     }
 
     required init?(coder: NSCoder) {
@@ -303,20 +318,19 @@ class FullPostCell: UICollectionViewCell {
     }
 
     private func setupConstraints() {
+        // СОЗДАЕМ КОНСТРЕЙНТ ЗДЕСЬ, В НАЧАЛЕ setupConstraints
+        imageAspectRatioConstraint = mediaCollectionView.heightAnchor.constraint(equalTo: mediaCollectionView.widthAnchor, multiplier: 1.0) // Default 1:1
+        imageAspectRatioConstraint?.priority = .required // Сразу ставим required
+        imageAspectRatioConstraint?.identifier = "MediaAspectRatioConstraint" // Идентификатор для дебаггинга
+        imageAspectRatioConstraint?.isActive = false // Неактивен при создании
+
         let padding: CGFloat = 10
         let footerPadding: CGFloat = 8
         let buttonSize: CGFloat = 28 // Размер кнопок действий
         let buttonSpacing: CGFloat = 12 // Расстояние между кнопками
         
-        // УДАЛЯЕМ создание и активацию дефолтного констрейнта соотношения сторон
-        // let defaultAspectRatioConstraint = postImageView.heightAnchor.constraint(equalTo: postImageView.widthAnchor, multiplier: 1.0)
-        // defaultAspectRatioConstraint.priority = .defaultHigh // 750 (ниже чем required 1000)
-
         NSLayoutConstraint.activate([
-            // УДАЛЯЕМ КОНСТРЕЙНТ ШИРИНЫ contentView
-            // contentView.widthAnchor.constraint(equalToConstant: UIScreen.main.bounds.width),
-            
-            // Констрейнты для postContainerView (с отступами 10pt слева/справа)
+            // postContainerView Constraints (отступы от contentView)
             postContainerView.topAnchor.constraint(equalTo: contentView.topAnchor),
             postContainerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
             postContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding), // Используем padding = 10
@@ -357,15 +371,13 @@ class FullPostCell: UICollectionViewCell {
             footerStackView.trailingAnchor.constraint(equalTo: postContainerView.trailingAnchor, constant: -padding),
             footerStackView.bottomAnchor.constraint(equalTo: postContainerView.bottomAnchor, constant: -footerPadding) // Привязываем низ стека к низу postContainerView
         ])
-        
-        // Создаем, но НЕ активируем констрейнты для низа ячейки
-        // captionBottomConstraint = captionLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -footerPadding)
-        // commentsButtonBottomConstraint = viewAllCommentsButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -footerPadding)
-        
-        print("FullPostCell: setupConstraints выполнен")
     }
 
     override func prepareForReuse() {
+        let oldMultiplier = imageAspectRatioConstraint?.multiplier ?? -1
+        let oldIsActive = imageAspectRatioConstraint?.isActive ?? false
+        print("➡️ FullPostCell [prepareForReuse \(indexPath?.item ?? -1)]: Called. Old Aspect Multiplier: \(String(format: "%.3f", oldMultiplier)), IsActive: \(oldIsActive)")
+        
         super.prepareForReuse()
         
         print("Preparing cell for reuse")
@@ -376,10 +388,6 @@ class FullPostCell: UICollectionViewCell {
             updateCaptionDisplay()
         }
         
-        // Сбрасываем содержимое
-        // postImageView.kf.cancelDownloadTask()
-        // postImageView.image = nil
-        // Сбрасываем делегатов и indexPath
         delegate = nil
         indexPath = nil
         authorAvatarImageView.kf.cancelDownloadTask()
@@ -389,50 +397,57 @@ class FullPostCell: UICollectionViewCell {
         captionLabel.attributedText = nil
         truncatedCaption = nil
         fullCaption = nil
-        // Обнуляем замыкание --> УДАЛЕНО
-        // needsLayoutUpdateAction = nil 
-        
-        // Деактивируем и удаляем старый констрейнт соотношения сторон
-        if let constraint = imageAspectRatioConstraint {
-            constraint.isActive = false
-        }
-        imageAspectRatioConstraint = nil
 
-        // Сбрасываем mediaCollectionView?
-        // mediaCollectionView.reloadData() // Не нужно, т.к. данные установятся в configure
-        pageControl.currentPage = 0
-        pageControl.numberOfPages = 0
-        mediaItems = []
+        // ВАЖНО: Деактивировать и удалить констрейнт соотношения сторон
+        if let constraint = imageAspectRatioConstraint {
+            print("➡️ FullPostCell [prepareForReuse]: Deactivating and removing existing constraint (Multiplier: \(String(format: "%.3f", constraint.multiplier))).")
+            constraint.isActive = false
+            // Удаляем из супервью, к которому добавляли (postContainerView)
+            if postContainerView.constraints.contains(constraint) {
+                postContainerView.removeConstraint(constraint)
+                print("➡️ FullPostCell [prepareForReuse]: Removed constraint from postContainerView.")
+            } else {
+                print("⚠️ Warning: Constraint to remove was not found in postContainerView.")
+            }
+        } else {
+            print("➡️ FullPostCell [prepareForReuse]: No existing constraint reference to remove.")
+        }
+        // Очищаем ссылку, чтобы updateAspectRatioConstraint гарантированно создал новый
+        imageAspectRatioConstraint = nil
+        print("➡️ FullPostCell [prepareForReuse]: Finished.")
     }
 
     // MARK: - Configuration
-    
-    // УДАЛЯЕМ параметр needsLayoutUpdateAction
-    // ✅ Добавляем currentUserID как параметр
     func configure(with post: Post, currentUserID: String?, indexPath: IndexPath) {
+        print("➡️ FullPostCell [configure \(indexPath.item)]: PostID: \(post.id ?? "nil"), AspectString: '\(post.feedAspectRatio)'")
+        
         self.indexPath = indexPath
-        // self.needsLayoutUpdateAction = needsLayoutUpdateAction --> УДАЛЕНО
-        print("FullPostCell: Начало конфигурации с постом ID=\(post.id ?? "nil"), indexPath: \(indexPath)")
 
         // --- Сброс состояния --- 
-        // postImageView.image = nil
         isCaptionExpanded = false
         fullCaption = post.caption ?? ""
-        if let constraint = imageAspectRatioConstraint {
-            constraint.isActive = false
-        }
-        imageAspectRatioConstraint = nil
-        
-        // Устанавливаем полный текст и начальное кол-во строк
+        // Используем восстановленный метод и напрямую присваиваем результат,
+        // так как новая функция возвращает String, а не String?
+        truncatedCaption = truncateCaptionIfNeeded(text: fullCaption ?? "", font: captionLabel.font, maxWidth: postContainerView.bounds.width - 32, maxLines: FullPostCell.captionMaxLinesCollapsed)
+ 
+        // Сохраняем ID поста для использования в делегатах
+        self.currentPostId = post.id
+
+        // Устанавливаем текст подписи и количество строк
         captionLabel.text = fullCaption
         captionLabel.numberOfLines = FullPostCell.captionMaxLinesCollapsed // ИСПОЛЬЗУЕМ STATIC
 
         // --- Настройка UI --- 
         authorUsernameButton.setTitle(post.authorUsername ?? "Unknown User", for: .normal)
+        // TODO: Заменить на реальную логику проверки подписки
         let isFollowed = false // Пока заглушка
         followButton.isSelected = isFollowed
         followButton.configurationUpdateHandler?(followButton) // Обновляем вид кнопки
-
+        // Скрываем кнопку Follow для своего поста
+        followButton.isHidden = (post.userID == currentUserID)
+        // Скрываем кнопку Options для чужого поста
+        optionsButton.isHidden = (post.userID != currentUserID)
+        
         if let avatarUrlString = post.authorAvatarURL, let url = URL(string: avatarUrlString) {
             authorAvatarImageView.kf.indicatorType = .activity
             authorAvatarImageView.kf.setImage(with: url, placeholder: UIImage(systemName: "person.circle.fill")?.withTintColor(.lightGray))
@@ -446,14 +461,13 @@ class FullPostCell: UICollectionViewCell {
         
         // ---> НОВАЯ ЛОГИКА: Используем post.feedAspectRatio <--- 
         aspectRatio = aspectRatioMultiplier(from: post.feedAspectRatio) // Используем хелпер
-        print("FullPostCell [\(indexPath.item)]: Используем aspectRatio \(aspectRatio) из post.feedAspectRatio ('\(post.feedAspectRatio)')")
-        
-        // --- ОТЛАДКА --- 
-        print("FullPostCell [\(indexPath.item)]: Итоговый aspectRatio для констрейнта: \(aspectRatio)")
+        print("➡️ FullPostCell [configure \(indexPath.item)]: Calculated Aspect Multiplier: \(String(format: "%.3f", aspectRatio))")
         
         // Устанавливаем констрейнт соотношения сторон ПЕРЕД загрузкой
         // Применяем его к mediaCollectionView!
-        setupAspectRatioConstraint(ratio: aspectRatio)
+        print("➡️ FullPostCell [configure \(indexPath.item)]: Calling updateAspectRatioConstraint...")
+        // Добавляем self. для вызова метода экземпляра
+        self.updateAspectRatioConstraint(ratio: aspectRatio)
         
         // Настраиваем pageControl
         pageControl.numberOfPages = mediaItems.count
@@ -462,85 +476,69 @@ class FullPostCell: UICollectionViewCell {
         pageControl.isHidden = mediaItems.count <= 1
 
         // Перезагружаем данные mediaCollectionView
+        print("➡️ FullPostCell [configure \(indexPath.item)]: Calling mediaCollectionView.reloadData(). Media Frame BEFORE: \(mediaCollectionView.frame)")
         mediaCollectionView.reloadData()
         // Сбрасываем скролл в начало, если ячейка переиспользуется
         mediaCollectionView.setContentOffset(.zero, animated: false)
-        
+        print("➡️ FullPostCell [configure \(indexPath.item)]: Finished configure. Media Frame AFTER reload/reset: \(mediaCollectionView.frame)")
+
         // ---> ПРОАКТИВНАЯ ПРЕДЗАГРУЗКА <--- 
         // Запускаем предзагрузку для первых нескольких изображений карусели СРАЗУ
         let initialPrefetchUrls = mediaItems.prefix(3).compactMap { URL(string: $0.url) } // Берем первые 3
         if !initialPrefetchUrls.isEmpty {
-            print("FullPostCell [configure]: Proactively prefetching initial \(initialPrefetchUrls.count) images.")
             ImagePrefetcher(urls: initialPrefetchUrls).start()
         }
-        // -----------------------------------
-        
-        // --- Настройка Footer --- 
-        likeButton.isSelected = post.isLiked
-        likeCountLabel.text = "\(post.likeCount)"
-        commentCountLabel.text = "\(post.commentCount)"
- 
-        // Больше ничего не скрываем, всегда показываем 0
- 
-        // Вызываем updateCaptionDisplay ПОСЛЕ установки констрейнта aspect ratio
+
+        // --- Настройка лайков и комментов --- 
+        likeButton.isSelected = post.isLiked // Используем опциональное значение ?? false
+        likeCountLabel.text = "\(post.likeCount ?? 0)"
+        commentCountLabel.text = "\(post.commentCount ?? 0)"
+
+        // Обновляем состояние UI в зависимости от данных (например, видимость кнопки 'more')
         updateCaptionDisplay()
         
-        // ✅ Добавляем postId и currentUserID
-        self.currentPostId = post.id
-        
-        // ✅ Показываем кнопку опций только если текущий пользователь - автор поста
-        // Используем переданный currentUserID
-        optionsButton.isHidden = (post.userID != currentUserID)
-
-        print("FullPostCell: Конфигурация завершена для indexPath \(indexPath)")
     }
     
-    // Новый метод для установки констрейнта соотношения сторон
-    private func setupAspectRatioConstraint(ratio: CGFloat) {
-        if let existingConstraint = imageAspectRatioConstraint {
-            existingConstraint.isActive = false
-        }
-        // Создаем новый констрейнт для mediaCollectionView
-        let constraint = mediaCollectionView.heightAnchor.constraint(equalTo: mediaCollectionView.widthAnchor, multiplier: max(0.1, ratio))
-        constraint.priority = .required // ВАЖНО: Делаем приоритет обязательным (1000)
-        constraint.isActive = true
-        self.imageAspectRatioConstraint = constraint
-    }
-    
-    // Метод теперь НЕ принимает indexPath
+    // Упрощенный метод
     private func updateCaptionDisplay() {
-        guard let currentPath = indexPath else { return } // Защита
+        let currentPath = indexPath ?? IndexPath(item: -2, section: -2) // For logging
+        print("FullPostCell [updateCaptionDisplay \(currentPath.item)]: Called. Expanded: \(isCaptionExpanded)")
+
+        // 1. Устанавливаем текст и количество строк
+        let textToShow = isCaptionExpanded ? fullCaption : truncatedCaption
+        let linesToShow = isCaptionExpanded ? 0 : FullPostCell.captionMaxLinesCollapsed
+
+        captionLabel.text = textToShow
+        captionLabel.numberOfLines = linesToShow
+
+        // 2. Определяем видимость кнопки "more"
+        // Для этого нужно временно установить полный текст и посчитать, нужно ли усечение
+        let originalText = captionLabel.text // Сохраняем текущее состояние
+        let originalLines = captionLabel.numberOfLines
+        captionLabel.text = fullCaption // Ставим полный текст для расчета
+        captionLabel.numberOfLines = 0
+        layoutIfNeeded() // Даем лейблу обновиться
+        let captionNeedsTruncation = needsTruncation(text: fullCaption ?? "", font: captionLabel.font, maxWidth: postContainerView.bounds.width - 32, maxLines: FullPostCell.captionMaxLinesCollapsed)
+        // Восстанавливаем отображаемое состояние
+        captionLabel.text = originalText 
+        captionLabel.numberOfLines = originalLines
+
+        print("FullPostCell [updateCaptionDisplay \(currentPath.item)]: Caption needs truncation: \(captionNeedsTruncation)")
+    }
+    
+    // MARK: - Layout Debugging
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
         
-        // Сначала проверяем, нужно ли вообще усечение
-        if needsTruncation(label: captionLabel, maxLines: FullPostCell.captionMaxLinesCollapsed) { // ИСПОЛЬЗУЕМ STATIC
-             print("FullPostCell [\(currentPath.item)]: Caption needs truncation.")
-             truncatedCaption = truncateText(label: captionLabel, maxLines: FullPostCell.captionMaxLinesCollapsed) + " ... more" // ИСПОЛЬЗУЕМ STATIC
-             captionLabel.text = isCaptionExpanded ? fullCaption : truncatedCaption
-             captionLabel.numberOfLines = isCaptionExpanded ? 0 : FullPostCell.captionMaxLinesCollapsed // ИСПОЛЬЗУЕМ STATIC
-        } else {
-             print("FullPostCell [\(currentPath.item)]: Caption fits.")
-             truncatedCaption = nil
-             captionLabel.text = fullCaption
-             captionLabel.numberOfLines = 0
-             isCaptionExpanded = true // Считаем развернутым
+        // Логируем размеры ключевых элементов ПОСЛЕ расчета Auto Layout
+        if let indexPath = indexPath, indexPath.item == 0 { // Log only for the first cell to reduce noise
+            
         }
     }
-
-    // Вспомогательный метод для загрузки изображения поста (упрощен)
-    // private func loadPostImage(from url: URL) {
-    //     postImageView.kf.indicatorType = .activity
-    //     let placeholderImage = UIImage(systemName: "photo")?.withTintColor(.darkGray)
-    //     
-    //     postImageView.kf.setImage(
-    //         with: url,
-    //         placeholder: placeholderImage,
-    //         options: [.transition(.fade(0.2))]
-    //         // УДАЛЯЕМ completionHandler, так как ratio устанавливается до загрузки
-    //     )
-    // }
-
+    
     // MARK: - Actions
-
+    
     @objc private func usernameTapped() {
         delegate?.didTapUsername(in: self)
     }
@@ -549,30 +547,12 @@ class FullPostCell: UICollectionViewCell {
         delegate?.didTapFollowButton(in: self)
     }
 
-    // ✅ Обработчик нажатия кнопки опций
     @objc private func optionsButtonTapped() {
         guard let postId = currentPostId else { return }
         delegate?.didTapOptionsButton(in: self, forPostId: postId)
     }
 
-    // Вспомогательный метод для создания кнопок (добавляем таргеты)
-    private func createActionButton(systemName: String, selector: Selector) -> UIButton {
-        let button = UIButton(type: .system)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .regular)
-        button.setImage(UIImage(systemName: systemName, withConfiguration: config), for: .normal)
-        button.setImage(UIImage(systemName: systemName + ".fill", withConfiguration: config), for: .selected) // Для Like/Bookmark
-        button.tintColor = .white
-        
-        button.addTarget(self, action: selector, for: .touchUpInside)
-        return button
-    }
-
-    // НОВЫЕ ОБРАБОТЧИКИ ДЛЯ КНОПОК
     @objc private func likeButtonTapped() {
-        // Меняем состояние локально для быстрого отклика
-        // likeButton.isSelected.toggle() // ViewModel теперь управляет состоянием
-        // Уведомляем делегата
         delegate?.didTapLikeButton(in: self)
     }
     
@@ -592,71 +572,118 @@ class FullPostCell: UICollectionViewCell {
         // Обновляем отображение подписи (текст, numberOfLines)
         updateCaptionDisplay()
         
-        // ВАЖНО: Уведомляем UICollectionView об изменениях, чтобы он пересчитал высоту
-        // Вместо прямого вызова делегата, используем стандартный механизм
-        // (предполагаем, что controller сделает invalidateLayout)
-        // УДАЛЕНО: delegate?.fullPostCellDidToggleCaption(self, at: indexPath)
-        
-        // Запрашиваем обновление layout для этой ячейки
-        // УДАЛЕНО: self.contentView.setNeedsLayout()
-        // УДАЛЕНО: self.contentView.layoutIfNeeded()
-        
-        // Сообщаем CollectionView, что layout нужно обновить (лучше делать в контроллере)
-        // УДАЛЯЕМ прямую инвалидацию layout из ячейки
-        // Но можно попробовать так для простоты, хотя не идеально
-        // if let collectionView = self.superview as? UICollectionView {
-        //     collectionView.collectionViewLayout.invalidateLayout()
-        // }
-        
-        // ВЫЗЫВАЕМ НОВЫЙ ДЕЛЕГАТ
+        // Сообщаем CollectionView, что layout нужно обновить
         delegate?.fullPostCellDidRequestLayoutUpdate(at: indexPath)
+    }
+    
+    @objc private func pageControlDidChange(_ sender: UIPageControl) {
+        let currentPage = sender.currentPage
+        let xOffset = CGFloat(currentPage) * mediaCollectionView.frame.width
+        mediaCollectionView.setContentOffset(CGPoint(x: xOffset, y: 0), animated: true)
     }
     
     // MARK: - Helpers
     
+    // Вспомогательный метод для создания кнопок (добавляем таргеты)
+    private func createActionButton(systemName: String, selector: Selector) -> UIButton {
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .regular)
+        button.setImage(UIImage(systemName: systemName, withConfiguration: config), for: .normal)
+        button.setImage(UIImage(systemName: systemName + ".fill", withConfiguration: config), for: .selected) // Для Like/Bookmark
+        button.tintColor = .white
+        
+        button.addTarget(self, action: selector, for: .touchUpInside)
+        return button
+    }
+    
     // Проверяет, действительно ли текст обрезается
-    private func needsTruncation(label: UILabel, maxLines: Int) -> Bool {
-        guard let text = label.text, !text.isEmpty else { return false }
+    private func needsTruncation(text: String, font: UIFont, maxWidth: CGFloat, maxLines: Int) -> Bool {
+        guard !text.isEmpty, maxWidth > 0, maxLines > 0 else { return false }
         
-        // Создаем временный лейбл с 0 строк, чтобы измерить полную высоту
-        let tempLabel = UILabel()
-        tempLabel.font = label.font
-        tempLabel.text = text
-        tempLabel.numberOfLines = 0
-        tempLabel.frame.size.width = label.bounds.width // Важно: используем текущую ширину
-        let fullSize = tempLabel.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
-        
-        // Создаем временный лейбл с N строками
-        tempLabel.numberOfLines = maxLines
-        let truncatedSize = tempLabel.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
+        let textAttributes = [NSAttributedString.Key.font: font]
+        let attributedText = NSAttributedString(string: text, attributes: textAttributes)
 
-        // Если полная высота больше усеченной (с небольшой погрешностью)
-        return fullSize.height > truncatedSize.height + 1 
-    }
-    
-    // Генерирует усеченный текст (упрощенно)
-    private func truncateText(label: UILabel, maxLines: Int) -> String {
-        // Эта реализация очень упрощенная, не всегда точно обрезает
-        // В идеале нужно использовать CTFramesetter для точного расчета
-        guard let text = label.text else { return "" }
+        // Создаем TextKit стек для точного расчета
+        let textStorage = NSTextStorage(attributedString: attributedText)
+        let layoutManager = NSLayoutManager()
+        textStorage.addLayoutManager(layoutManager)
+        let textContainer = NSTextContainer(size: CGSize(width: maxWidth, height: .greatestFiniteMagnitude))
+        textContainer.lineFragmentPadding = 0
+        textContainer.maximumNumberOfLines = maxLines
+        layoutManager.addTextContainer(textContainer)
+
+        // Вычисляем количество глифов, которые помещаются
+        let range = layoutManager.glyphRange(for: textContainer)
+        let numberOfGlyphs = range.length
         
-        var lines = 0
-        var truncatedText = ""
-        text.enumerateLines { line, stop in
-            lines += 1
-            if lines <= maxLines {
-                truncatedText += line + (lines == maxLines ? "" : "\n") 
-            } else {
-                stop = true
-            }
-        }
-        // Удаляем последний символ, если это перенос строки, перед добавлением "..."
-        if truncatedText.last == "\n" {
-            truncatedText.removeLast()
-        }
-        return truncatedText
+        // Если количество отображаемых глифов меньше общего количества, нужно усечение
+        let totalGlyphs = layoutManager.numberOfGlyphs
+        let needs = numberOfGlyphs < totalGlyphs
+        print("FullPostCell [needsTruncation Helper] - Needs: \(needs). Glyphs shown: \(numberOfGlyphs) / Total: \(totalGlyphs). MaxWidth: \(maxWidth), MaxLines: \(maxLines)")
+        return needs
     }
-    
+
+    // Генерирует усеченный текст до нужного количества строк
+    // Возвращает базовый усеченный текст БЕЗ '... more'
+    private func truncateText(text: String, font: UIFont, maxWidth: CGFloat, maxLines: Int) -> String? {
+        guard !text.isEmpty, maxWidth > 0, maxLines > 0 else { return nil }
+
+        let textAttributes = [NSAttributedString.Key.font: font]
+        let attributedText = NSAttributedString(string: text, attributes: textAttributes)
+
+        // Создаем TextKit стек
+        let textStorage = NSTextStorage(attributedString: attributedText)
+        let layoutManager = NSLayoutManager()
+        textStorage.addLayoutManager(layoutManager)
+        let textContainer = NSTextContainer(size: CGSize(width: maxWidth, height: .greatestFiniteMagnitude))
+        textContainer.lineFragmentPadding = 0
+        textContainer.maximumNumberOfLines = maxLines
+        textContainer.lineBreakMode = .byTruncatingTail // Важно для корректного расчета последней видимой строки
+        layoutManager.addTextContainer(textContainer)
+
+        // Находим диапазон глифов, которые помещаются
+        let range = layoutManager.glyphRange(for: textContainer)
+        
+        // Если глифы не помещаются вообще (маловероятно, но возможно)
+        guard range.length > 0 else { return nil }
+        
+        // Находим диапазон символов, соответствующий видимым глифам
+        let characterRange = layoutManager.characterRange(forGlyphRange: range, actualGlyphRange: nil)
+        
+        // Получаем подстроку
+        let truncatedNSString = (text as NSString).substring(with: characterRange)
+        
+        print("FullPostCell [truncateText Helper] - Original: '\(text.prefix(50))...', Truncated base: '\(truncatedNSString.prefix(50))...'. MaxWidth: \(maxWidth), MaxLines: \(maxLines)")
+
+        // Убираем возможные пробелы/переносы строк в конце усеченной строки
+        return truncatedNSString.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // Главная функция, вызывающая вспомогательные
+    // Возвращает либо оригинальный текст, либо усеченный текст с '... more'
+    private func truncateCaptionIfNeeded(text: String, font: UIFont, maxWidth: CGFloat, maxLines: Int) -> String {
+        print("FullPostCell [truncateCaptionIfNeeded Helper] - Checking text: '\(text.prefix(50))...'. MaxWidth: \(maxWidth), MaxLines: \(maxLines)")
+        // Сначала проверяем, нужно ли вообще усечение
+        if needsTruncation(text: text, font: font, maxWidth: maxWidth, maxLines: maxLines) {
+            // Если нужно, получаем усеченный базовый текст
+            if let truncatedBase = truncateText(text: text, font: font, maxWidth: maxWidth, maxLines: maxLines) {
+                // Добавляем '... more'
+                let result = truncatedBase + "... more"
+                print("FullPostCell [truncateCaptionIfNeeded Helper] - Truncation needed. Result: '\(result.prefix(50))...'")
+                return result
+            } else {
+                // Если truncateText вернул nil (ошибка или текст не помещается), возвращаем оригинал
+                print("FullPostCell [truncateCaptionIfNeeded Helper] - Truncation needed but truncateText failed. Returning original.")
+                return text
+            }
+        } else {
+            // Если усечение не нужно, возвращаем оригинальный текст
+            print("FullPostCell [truncateCaptionIfNeeded Helper] - No truncation needed. Returning original.")
+            return text
+        }
+    }
+
     // MARK: - Aspect Ratio Helper
     
     private func aspectRatioMultiplier(from string: String) -> CGFloat {
@@ -669,29 +696,46 @@ class FullPostCell: UICollectionViewCell {
                 return 1.0 // Дефолт 1:1
         }
     }
-    
-    // MARK: - Layout Debugging
-    
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        
-        // Логируем размеры ключевых элементов ПОСЛЕ расчета Auto Layout
-        if let indexPath = indexPath {
-            print("--- LayoutSubviews for Cell [\(indexPath.item)] ---")
-            print("  contentView frame: \(contentView.frame)")
-            print("  postContainerView frame: \(postContainerView.frame)") // Логируем новый контейнер
-            print("  mediaCollectionView frame: \(mediaCollectionView.frame)")
-            print("    imageAspectRatioConstraint: \(imageAspectRatioConstraint?.multiplier ?? -1)")
-            // --- Debugging Comment Interaction ---
-            print("  actionsAndStatsStackView frame: \(actionsAndStatsStackView.frame), isUserInteractionEnabled: \(actionsAndStatsStackView.isUserInteractionEnabled)")
-            print("    commentButton frame: \(commentButton.frame), isHidden: \(commentButton.isHidden), isUserInteractionEnabled: \(commentButton.isUserInteractionEnabled)")
-            print("  footerStackView frame: \(footerStackView.frame), isUserInteractionEnabled: \(footerStackView.isUserInteractionEnabled)")
-            print("  likeCountLabel frame: \(likeCountLabel.frame)")
-            print("  captionLabel frame: \(captionLabel.frame)")
-            print("    captionLabel lines: \(captionLabel.numberOfLines)")
-            // ------------------------------------
-            print("------------------------------------------")
+
+    // НОВЫЙ МЕТОД для обновления констрейнта
+    private func updateAspectRatioConstraint(ratio: CGFloat) {
+        // 1. Деактивируем и удаляем СТАРЫЙ констрейнт из postContainerView, если он существует
+        if let existingConstraint = self.imageAspectRatioConstraint {
+            print("➡️ FullPostCell [updateAspectRatioConstraint]: Deactivating and removing existing constraint (Multiplier: \(String(format: "%.3f", existingConstraint.multiplier)))")
+            existingConstraint.isActive = false
+            // Удаляем из супервью, к которому добавляли (postContainerView)
+            if postContainerView.constraints.contains(existingConstraint) {
+                postContainerView.removeConstraint(existingConstraint)
+                print("➡️ FullPostCell [updateAspectRatioConstraint]: Removed constraint from postContainerView.")
+            } else {
+                print("⚠️ Warning: Existing constraint was not found in postContainerView during removal.")
+                // Возможно, он был добавлен к contentView или mediaCollectionView? Проверь setupConstraints.
+            }
+        } else {
+            print("➡️ FullPostCell [updateAspectRatioConstraint]: No existing constraint reference found (likely due to prepareForReuse).")
         }
+
+        // 2. Создаем НОВЫЙ констрейнт
+        print("➡️ FullPostCell [updateAspectRatioConstraint]: Creating new constraint with multiplier \(String(format: "%.3f", ratio))")
+        let newConstraint = mediaCollectionView.heightAnchor.constraint(equalTo: mediaCollectionView.widthAnchor, multiplier: ratio)
+        newConstraint.priority = .required // Всегда required
+        newConstraint.identifier = "MediaAspectRatioConstraint" // Тот же идентификатор
+
+        // 3. Сохраняем ссылку на новый
+        self.imageAspectRatioConstraint = newConstraint
+
+        // 4. Добавляем новый в postContainerView
+        postContainerView.addConstraint(newConstraint)
+        print("➡️ FullPostCell [updateAspectRatioConstraint]: Added new constraint to postContainerView.")
+
+
+        // 5. Активируем новый
+        newConstraint.isActive = true
+        print("➡️ FullPostCell [updateAspectRatioConstraint]: Activated new constraint.")
+
+        // Дополнительно: Форсируем немедленное обновление layout, если нужно
+        // self.contentView.layoutIfNeeded()
+        // print("➡️ FullPostCell [updateAspectRatioConstraint]: Called layoutIfNeeded on contentView.")
     }
 }
 

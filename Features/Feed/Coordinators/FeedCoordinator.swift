@@ -2,11 +2,12 @@ import UIKit
 // Импортируем CommentsViewModel
 import FirebaseFirestore
 
-class FeedCoordinator: Coordinator {
+// Добавляем FeedViewControllerDelegate в список протоколов
+class FeedCoordinator: Coordinator, FeedViewControllerDelegate {
     var navigationController: UINavigationController
     var childCoordinators: [Coordinator] = []
-    // Добавляем ссылку на AppCoordinator
-    weak var appCoordinator: AppCoordinator?
+    // Используем протокол для ссылки на AppCoordinator
+    weak var appCoordinator: AppCoordinatorProtocol?
 
     // Добавляем зависимости для VM
     private let postService: PostServiceProtocol
@@ -19,7 +20,7 @@ class FeedCoordinator: Coordinator {
          userProfileService: UserProfileServiceProtocol = UserProfileService(),
          followService: FollowServiceProtocol = FollowService(),
          progressService: ProgressServiceProtocol,
-         appCoordinator: AppCoordinator?) {
+         appCoordinator: AppCoordinatorProtocol?) {
         self.navigationController = navigationController
         self.postService = postService
         self.userProfileService = userProfileService
@@ -34,33 +35,66 @@ class FeedCoordinator: Coordinator {
         let viewModel = FeedViewModel(postService: postService)
         
         let vc = FeedViewController()
-        vc.coordinator = self // Передаем себя для навигации (например, на профиль юзера)
+        // vc.coordinator = self // Удаляем эту строку
+        vc.delegate = self // Устанавливаем себя делегатом
         vc.viewModel = viewModel // <-- Передаем ViewModel
         navigationController.setViewControllers([vc], animated: false)
     }
     
-    // Метод для показа профиля другого пользователя
-    func showUserProfile(userID: String) {
+    // MARK: - FeedViewControllerDelegate
+
+    // Адаптируем существующий метод под протокол
+    func feedViewController(_ controller: FeedViewController, didTapUsername userID: String) {
         print("FeedCoordinator: Show user profile for ID: \(userID)")
         let userProfileCoordinator = UserProfileCoordinator(
             navigationController: self.navigationController,
-            userID: userID,
-            userProfileService: userProfileService,
+            userID: userID, // Передаем userID
+            userProfileService: userProfileService, // Передаем сервисы
             postService: postService,
             followService: followService,
-            progressService: progressService
+            progressService: progressService,
+            appCoordinator: self.appCoordinator // Передаем AppCoordinator
         )
+        childCoordinators.append(userProfileCoordinator)
         userProfileCoordinator.start()
     }
     
+    // Добавляем заглушку для комментариев
+    func feedViewController(_ controller: FeedViewController, didTapCommentsForPostID postID: String) {
+        print("FeedCoordinator: Show comments for post ID: \(postID) - (Not Implemented)")
+        // TODO: Реализовать переход к экрану комментариев
+        // Например, создать CommentsCoordinator и запустить его:
+        // let commentsCoordinator = CommentsCoordinator(navigationController: navigationController, postID: postID)
+        // childCoordinators.append(commentsCoordinator)
+        // commentsCoordinator.start()
+    }
+
+    // Добавляем заглушку для уведомлений
+    func feedViewControllerDidTapNotifications(_ controller: FeedViewController) {
+        print("FeedCoordinator: Show notifications - (Not Implemented)")
+        // TODO: Реализовать переход к экрану уведомлений
+    }
+
+    // Добавляем заглушку для сообщений
+    func feedViewControllerDidTapMessages(_ controller: FeedViewController) {
+        print("FeedCoordinator: Show messages - (Not Implemented)")
+        // TODO: Реализовать переход к экрану сообщений
+    }
+
     // НОВЫЙ МЕТОД: Показ экрана комментариев
     @MainActor // Добавляем аннотацию для вызова MainActor-изолированного init
     func showComments(for postId: String) {
-        print("FeedCoordinator: Show comments for post ID: \(postId)")
-        let viewModel = CommentsViewModel(postId: postId, postService: postService)
-        let vc = CommentsViewController(postId: postId, viewModel: viewModel) 
-        vc.hidesBottomBarWhenPushed = true // Скрываем TabBar
-        navigationController.pushViewController(vc, animated: true)
+        print("FeedCoordinator: Showing comments for post ID: \(postId)")
+        /* // Временно комментируем до создания CommentsCoordinator
+        let commentsCoordinator = CommentsCoordinator(
+            navigationController: navigationController,
+            postId: postId,
+            postService: postService // Передаем postService
+        )
+        childCoordinators.append(commentsCoordinator)
+        commentsCoordinator.start()
+        */
+        print("FeedCoordinator: CommentsCoordinator not implemented yet.") // Добавляем лог
     }
     
     // Метод для показа сообщений

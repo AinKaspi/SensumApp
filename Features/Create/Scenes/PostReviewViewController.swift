@@ -69,9 +69,9 @@ class PostReviewViewController: UIViewController, UICollectionViewDelegateFlowLa
        let button = UIButton(type: .system)
        button.translatesAutoresizingMaskIntoConstraints = false
        button.setTitle("Share", for: .normal)
-       button.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
-       button.setTitleColor(.white, for: .normal)
-       button.backgroundColor = .systemBlue
+       button.titleLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
+       button.backgroundColor = .white
+       button.setTitleColor(.black, for: .normal)
        button.layer.cornerRadius = 10
        button.addTarget(self, action: #selector(shareTapped), for: .touchUpInside)
        return button
